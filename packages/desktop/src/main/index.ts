@@ -346,7 +346,7 @@ const main = Effect.gen(function* () {
     }
 
     const port = yield* Effect.gen(function* () {
-      const fromEnv = process.env.OPENCODE_PORT
+      const fromEnv = process.env.OPENCODE_SERVER_PORT
       if (fromEnv) {
         const parsed = Number.parseInt(fromEnv, 10)
         if (!Number.isNaN(parsed)) return parsed
