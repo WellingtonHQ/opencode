@@ -1,4 +1,5 @@
 import type { ScheduleRun, ScheduleTaskWithLatest } from "@opencode-ai/sdk/v2/client"
+import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@opencode-ai/ui/v2/dialog-v2"
 import { DividerV2 } from "@opencode-ai/ui/v2/divider-v2"
@@ -7,7 +8,6 @@ import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
 import { Switch } from "@opencode-ai/ui/v2/switch-v2"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 import { For, Show, createMemo, createResource, createSignal, onCleanup } from "solid-js"
-import { createStore } from "solid-js/store"
 import { DialogScheduleV2 } from "@/components/dialog-schedule-v2"
 import { useLanguage } from "@/context/language"
 import { useServer } from "@/context/server"
@@ -39,11 +39,7 @@ function ScheduleNoServer() {
 function SchedulesContent() {
   const language = useLanguage()
   const sdk = useServerSDK()
-  const [ui, setUi] = createStore({
-    open: false,
-    editing: undefined as ScheduleTaskWithLatest | undefined,
-    deleting: undefined as ScheduleTaskWithLatest | undefined,
-  })
+  const dialog = useDialog()
   const [tick, setTick] = createSignal(0)
   onCleanup(() => clearInterval(setInterval(() => setTick(tick() + 1), REFRESH_INTERVAL_MS)))
 
@@ -80,16 +76,46 @@ function SchedulesContent() {
     }
   }
 
-  async function confirmDelete() {
-    const task = ui.deleting
-    if (!task) return
+  async function confirmDelete(task: ScheduleTaskWithLatest) {
     try {
       await client().v2.schedule.remove({ id: task.id })
-      setUi("deleting", undefined)
       refresh()
+      dialog.close()
     } catch (error) {
       showToast(failureToast(error, language))
     }
+  }
+
+  function showCreate() {
+    void dialog.show(() => <DialogScheduleV2 onDone={refresh} />)
+  }
+
+  function showEdit(task: ScheduleTaskWithLatest) {
+    void dialog.show(() => <DialogScheduleV2 editing={task} onDone={refresh} />)
+  }
+
+  function showDelete(task: ScheduleTaskWithLatest) {
+    void dialog.show(
+      () => (
+        <Dialog fit>
+          <DialogHeader>
+            <DialogTitle>{language.t("dialog.schedule.delete.title")}</DialogTitle>
+          </DialogHeader>
+          <DividerV2 />
+          <DialogBody class="px-4 py-4 text-[13px] font-[440] leading-relaxed tracking-[-0.04px] text-v2-text-text-muted">
+            {language.t("dialog.schedule.delete.body")}
+          </DialogBody>
+          <DialogFooter>
+            <ButtonV2 type="button" variant="neutral" onClick={() => dialog.close()}>
+              {language.t("common.cancel")}
+            </ButtonV2>
+            <ButtonV2 type="button" variant="danger" onClick={() => void confirmDelete(task)}>
+              {language.t("common.delete")}
+            </ButtonV2>
+          </DialogFooter>
+        </Dialog>
+      ),
+    )
   }
 
   const formatters = createMemo(() => ({
@@ -103,7 +129,7 @@ function SchedulesContent() {
     <div class="mx-auto flex min-h-full w-full max-w-[760px] flex-col gap-8 px-4 py-10 lg:px-6">
       <header class="flex shrink-0 items-center justify-between gap-4 pl-1.5 pr-3">
         <h1 class="text-v2-text-text-base [font-size:16px] [font-weight:560] tracking-[-0.04px]">{language.t("schedule.title")}</h1>
-        <ButtonV2 variant="contrast" icon="plus" onClick={() => setUi({ open: true, editing: undefined })}>
+        <ButtonV2 variant="contrast" icon="plus" onClick={showCreate}>
           {language.t("schedule.new")}
         </ButtonV2>
       </header>
@@ -115,7 +141,7 @@ function SchedulesContent() {
       <Show
         when={!list.error && sortedTasks().length > 0}
         fallback={
-          <Show when={list.loading} keyed fallback={<ScheduleEmpty language={language} onNew={() => setUi({ open: true, editing: undefined })} />}>
+          <Show when={list.loading} keyed fallback={<ScheduleEmpty language={language} onNew={showCreate} />}>
             <div class="h-8" />
           </Show>
         }
@@ -127,40 +153,14 @@ function SchedulesContent() {
                 task={task}
                 formatters={formatters()}
                 language={language}
-                onEdit={() => setUi({ open: true, editing: task })}
+                onEdit={() => showEdit(task)}
                 onToggle={(enabled) => toggleEnabled(task, enabled)}
                 onRunNow={() => runNow(task)}
-                onDelete={() => setUi("deleting", task)}
+                onDelete={() => showDelete(task)}
               />
             )}
           </For>
         </ol>
-      </Show>
-
-      <Show when={ui.open}>
-        <DialogScheduleV2 editing={ui.editing} onClose={() => setUi("open", false)} onSaved={() => refresh()} />
-      </Show>
-
-      <Show when={ui.deleting}>
-        <form onSubmit={confirmDelete} class="contents">
-          <Dialog fit>
-            <DialogHeader>
-              <DialogTitle>{language.t("dialog.schedule.delete.title")}</DialogTitle>
-            </DialogHeader>
-            <DividerV2 />
-            <DialogBody class="px-4 py-4 text-[13px] font-[440] leading-relaxed tracking-[-0.04px] text-v2-text-text-muted">
-              {language.t("dialog.schedule.delete.body")}
-            </DialogBody>
-            <DialogFooter>
-              <ButtonV2 type="button" variant="neutral" onClick={() => setUi("deleting", undefined)}>
-                {language.t("common.cancel")}
-              </ButtonV2>
-              <ButtonV2 type="submit" variant="danger">
-                {language.t("common.delete")}
-              </ButtonV2>
-            </DialogFooter>
-          </Dialog>
-        </form>
       </Show>
     </div>
   )

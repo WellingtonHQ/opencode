@@ -1,4 +1,5 @@
 import type { ScheduleTaskWithLatest } from "@opencode-ai/sdk/v2/client"
+import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@opencode-ai/ui/v2/dialog-v2"
 import { DividerV2 } from "@opencode-ai/ui/v2/divider-v2"
@@ -27,11 +28,11 @@ type DialogScheduleStore = ScheduleFormValues & { saving: boolean; errorKey?: Sc
 
 export function DialogScheduleV2(props: {
   editing?: ScheduleTaskWithLatest
-  onClose: () => void
-  onSaved: (id: string) => void
+  onDone?: () => void
 }) {
   const language = useLanguage()
   const sdk = useServerSDK()
+  const dialog = useDialog()
   const [store, setStore] = createStore<DialogScheduleStore>(initialValues(props.editing))
 
   const dayLabels = createMemo(() => {
@@ -81,14 +82,13 @@ export function DialogScheduleV2(props: {
     try {
       if (props.editing) {
         await sdk().client.v2.schedule.update({ id: props.editing.id, scheduleUpdate: payload })
-        props.onSaved(props.editing.id)
       } else {
         const created = await sdk().client.v2.schedule.create({ scheduleCreate: payload })
         const task = created.data?.data
         if (!task) throw new Error("empty response from server")
-        props.onSaved(task.id)
       }
-      props.onClose()
+      props.onDone?.()
+      dialog.close()
     } catch (error) {
       setStore("saving", false)
       showToast(failure(error, language))
@@ -209,7 +209,7 @@ export function DialogScheduleV2(props: {
           </Show>
         </DialogBody>
         <DialogFooter>
-          <ButtonV2 type="button" variant="neutral" disabled={store.saving} onClick={props.onClose}>
+          <ButtonV2 type="button" variant="neutral" disabled={store.saving} onClick={() => dialog.close()}>
             {language.t("common.cancel")}
           </ButtonV2>
           <ButtonV2 type="submit" variant="contrast" disabled={store.saving}>
