@@ -36,7 +36,7 @@ import { errorMessage } from "@/util/error"
 import { isMedia } from "@/util/media"
 import type { SystemError } from "bun"
 import type { Provider } from "@/provider/provider"
-import { Effect, Schema } from "effect"
+import { DateTime, Effect, Schema } from "effect"
 
 /** Error shape thrown by Bun's fetch() when gzip/br decompression fails mid-stream */
 interface FetchDecompressionError extends Error {
@@ -508,10 +508,13 @@ function v2AssistantParts(sessionID: SessionID, msg: V2AssistantMessage): Part[]
         type: "reasoning",
         text: item.text,
         metadata: item.providerMetadata,
-        time: { start: item.time?.created ?? msg.time.created, end: item.time?.completed },
+        time: {
+          start: DateTime.toEpochMillis(item.time?.created ?? msg.time.created),
+          end: item.time?.completed === undefined ? undefined : DateTime.toEpochMillis(item.time.completed),
+        },
       }
-    const start = item.time.ran ?? item.time.created
-    const end = item.time.completed ?? msg.time.completed ?? msg.time.created
+    const start = DateTime.toEpochMillis(item.time.ran ?? item.time.created)
+    const end = DateTime.toEpochMillis(item.time.completed ?? msg.time.completed ?? msg.time.created)
     if (item.state.status === "pending")
       return {
         ...base,
@@ -572,7 +575,7 @@ function v2UserInfo(
     id: MessageID.make(msg.id),
     sessionID,
     role: "user",
-    time: { created: msg.time.created },
+    time: { created: DateTime.toEpochMillis(msg.time.created) },
     agent,
     model: { providerID: model.providerID, modelID: model.id },
   } as unknown as User
@@ -583,7 +586,10 @@ function v2AssistantInfo(sessionID: SessionID, msg: V2AssistantMessage, parentID
     id: MessageID.make(msg.id),
     sessionID,
     role: "assistant",
-    time: { created: msg.time.created, completed: msg.time.completed },
+    time: {
+      created: DateTime.toEpochMillis(msg.time.created),
+      completed: msg.time.completed === undefined ? undefined : DateTime.toEpochMillis(msg.time.completed),
+    },
     error: msg.error ? { name: "UnknownError", data: { message: msg.error.message } } : undefined,
     parentID: MessageID.make(parentID),
     modelID: msg.model.id,
