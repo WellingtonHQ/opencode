@@ -21,6 +21,34 @@ export type InvalidRequestError = {
 export const isInvalidRequestError = (value: unknown): value is InvalidRequestError =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "InvalidRequestError"
 
+export type ScheduleInvalidSpecError = { readonly _tag: "ScheduleInvalidSpecError"; readonly message: string }
+export const isScheduleInvalidSpecError = (value: unknown): value is ScheduleInvalidSpecError =>
+  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "ScheduleInvalidSpecError"
+
+export type SchedulePastOneShotError = {
+  readonly _tag: "SchedulePastOneShotError"
+  readonly atMs: number
+  readonly message: string
+}
+export const isSchedulePastOneShotError = (value: unknown): value is SchedulePastOneShotError =>
+  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "SchedulePastOneShotError"
+
+export type ScheduleNotFoundError = {
+  readonly _tag: "ScheduleNotFoundError"
+  readonly id: string
+  readonly message: string
+}
+export const isScheduleNotFoundError = (value: unknown): value is ScheduleNotFoundError =>
+  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "ScheduleNotFoundError"
+
+export type ScheduleRunFailedError = {
+  readonly _tag: "ScheduleRunFailedError"
+  readonly taskId: string
+  readonly message: string
+}
+export const isScheduleRunFailedError = (value: unknown): value is ScheduleRunFailedError =>
+  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "ScheduleRunFailedError"
+
 export type InvalidCursorError = { readonly _tag: "InvalidCursorError"; readonly message: string }
 export const isInvalidCursorError = (value: unknown): value is InvalidCursorError =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "InvalidCursorError"
@@ -102,6 +130,368 @@ export const isProjectCopyError = (value: unknown): value is ProjectCopyError =>
   typeof value === "object" && value !== null && "name" in value && value["name"] === "ProjectCopyError"
 
 export type HealthGetOutput = { readonly healthy: true }
+
+export type SchedulesListInput = { readonly directory?: { readonly directory?: string | undefined }["directory"] }
+
+export type SchedulesListOutput = {
+  readonly data: ReadonlyArray<{
+    readonly id: string
+    readonly name: string
+    readonly promptText: string
+    readonly spec:
+      | { readonly kind: "one_shot"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly timeHhMm: string }
+      | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly timeHhMm: string }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly agentId?: string | undefined
+    readonly model?: { readonly id: string; readonly providerID: string } | undefined
+    readonly permissionPolicy: "allow_all"
+    readonly directory: string
+    readonly enabled: boolean
+    readonly lastFiredSlot: number | null
+    readonly nextFireMs?: number | undefined
+    readonly timeCreated: number
+    readonly timeUpdated: number
+    readonly latestRun?:
+      | {
+          readonly id: string
+          readonly taskId: string
+          readonly sessionId?: string | undefined
+          readonly status: "fired" | "catch_up" | "missed" | "error"
+          readonly startedAt: number
+          readonly finishedAt?: number | undefined
+          readonly errorText?: string | undefined
+        }
+      | undefined
+  }>
+}["data"]
+
+export type SchedulesCreateInput = {
+  readonly name: {
+    readonly name: string
+    readonly promptText: string
+    readonly spec:
+      | { readonly kind: "one_shot"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly timeHhMm: string }
+      | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly timeHhMm: string }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly agentId?: string | undefined
+    readonly model?: { readonly id: string; readonly providerID: string } | undefined
+    readonly permissionPolicy?: "allow_all" | undefined
+    readonly directory?: string | undefined
+  }["name"]
+  readonly promptText: {
+    readonly name: string
+    readonly promptText: string
+    readonly spec:
+      | { readonly kind: "one_shot"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly timeHhMm: string }
+      | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly timeHhMm: string }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly agentId?: string | undefined
+    readonly model?: { readonly id: string; readonly providerID: string } | undefined
+    readonly permissionPolicy?: "allow_all" | undefined
+    readonly directory?: string | undefined
+  }["promptText"]
+  readonly spec: {
+    readonly name: string
+    readonly promptText: string
+    readonly spec:
+      | { readonly kind: "one_shot"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly timeHhMm: string }
+      | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly timeHhMm: string }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly agentId?: string | undefined
+    readonly model?: { readonly id: string; readonly providerID: string } | undefined
+    readonly permissionPolicy?: "allow_all" | undefined
+    readonly directory?: string | undefined
+  }["spec"]
+  readonly agentId?: {
+    readonly name: string
+    readonly promptText: string
+    readonly spec:
+      | { readonly kind: "one_shot"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly timeHhMm: string }
+      | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly timeHhMm: string }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly agentId?: string | undefined
+    readonly model?: { readonly id: string; readonly providerID: string } | undefined
+    readonly permissionPolicy?: "allow_all" | undefined
+    readonly directory?: string | undefined
+  }["agentId"]
+  readonly model?: {
+    readonly name: string
+    readonly promptText: string
+    readonly spec:
+      | { readonly kind: "one_shot"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly timeHhMm: string }
+      | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly timeHhMm: string }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly agentId?: string | undefined
+    readonly model?: { readonly id: string; readonly providerID: string } | undefined
+    readonly permissionPolicy?: "allow_all" | undefined
+    readonly directory?: string | undefined
+  }["model"]
+  readonly permissionPolicy?: {
+    readonly name: string
+    readonly promptText: string
+    readonly spec:
+      | { readonly kind: "one_shot"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly timeHhMm: string }
+      | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly timeHhMm: string }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly agentId?: string | undefined
+    readonly model?: { readonly id: string; readonly providerID: string } | undefined
+    readonly permissionPolicy?: "allow_all" | undefined
+    readonly directory?: string | undefined
+  }["permissionPolicy"]
+  readonly directory?: {
+    readonly name: string
+    readonly promptText: string
+    readonly spec:
+      | { readonly kind: "one_shot"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly timeHhMm: string }
+      | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly timeHhMm: string }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly agentId?: string | undefined
+    readonly model?: { readonly id: string; readonly providerID: string } | undefined
+    readonly permissionPolicy?: "allow_all" | undefined
+    readonly directory?: string | undefined
+  }["directory"]
+}
+
+export type SchedulesCreateOutput = {
+  readonly data: {
+    readonly id: string
+    readonly name: string
+    readonly promptText: string
+    readonly spec:
+      | { readonly kind: "one_shot"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly timeHhMm: string }
+      | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly timeHhMm: string }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly agentId?: string | undefined
+    readonly model?: { readonly id: string; readonly providerID: string } | undefined
+    readonly permissionPolicy: "allow_all"
+    readonly directory: string
+    readonly enabled: boolean
+    readonly lastFiredSlot: number | null
+    readonly nextFireMs?: number | undefined
+    readonly timeCreated: number
+    readonly timeUpdated: number
+  }
+}["data"]
+
+export type SchedulesGetInput = { readonly id: { readonly id: string }["id"] }
+
+export type SchedulesGetOutput = {
+  readonly data: {
+    readonly id: string
+    readonly name: string
+    readonly promptText: string
+    readonly spec:
+      | { readonly kind: "one_shot"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly timeHhMm: string }
+      | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly timeHhMm: string }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly agentId?: string | undefined
+    readonly model?: { readonly id: string; readonly providerID: string } | undefined
+    readonly permissionPolicy: "allow_all"
+    readonly directory: string
+    readonly enabled: boolean
+    readonly lastFiredSlot: number | null
+    readonly nextFireMs?: number | undefined
+    readonly timeCreated: number
+    readonly timeUpdated: number
+  }
+}["data"]
+
+export type SchedulesUpdateInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly name?: {
+    readonly name?: string | undefined
+    readonly promptText?: string | undefined
+    readonly spec?:
+      | (
+          | { readonly kind: "one_shot"; readonly atMs: number }
+          | { readonly kind: "daily"; readonly timeHhMm: string }
+          | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly timeHhMm: string }
+          | { readonly kind: "cron"; readonly expr: string }
+        )
+      | undefined
+    readonly agentId?: string | undefined
+    readonly model?: { readonly id: string; readonly providerID: string } | undefined
+    readonly permissionPolicy?: "allow_all" | undefined
+    readonly directory?: string | undefined
+    readonly enabled?: boolean | undefined
+  }["name"]
+  readonly promptText?: {
+    readonly name?: string | undefined
+    readonly promptText?: string | undefined
+    readonly spec?:
+      | (
+          | { readonly kind: "one_shot"; readonly atMs: number }
+          | { readonly kind: "daily"; readonly timeHhMm: string }
+          | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly timeHhMm: string }
+          | { readonly kind: "cron"; readonly expr: string }
+        )
+      | undefined
+    readonly agentId?: string | undefined
+    readonly model?: { readonly id: string; readonly providerID: string } | undefined
+    readonly permissionPolicy?: "allow_all" | undefined
+    readonly directory?: string | undefined
+    readonly enabled?: boolean | undefined
+  }["promptText"]
+  readonly spec?: {
+    readonly name?: string | undefined
+    readonly promptText?: string | undefined
+    readonly spec?:
+      | (
+          | { readonly kind: "one_shot"; readonly atMs: number }
+          | { readonly kind: "daily"; readonly timeHhMm: string }
+          | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly timeHhMm: string }
+          | { readonly kind: "cron"; readonly expr: string }
+        )
+      | undefined
+    readonly agentId?: string | undefined
+    readonly model?: { readonly id: string; readonly providerID: string } | undefined
+    readonly permissionPolicy?: "allow_all" | undefined
+    readonly directory?: string | undefined
+    readonly enabled?: boolean | undefined
+  }["spec"]
+  readonly agentId?: {
+    readonly name?: string | undefined
+    readonly promptText?: string | undefined
+    readonly spec?:
+      | (
+          | { readonly kind: "one_shot"; readonly atMs: number }
+          | { readonly kind: "daily"; readonly timeHhMm: string }
+          | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly timeHhMm: string }
+          | { readonly kind: "cron"; readonly expr: string }
+        )
+      | undefined
+    readonly agentId?: string | undefined
+    readonly model?: { readonly id: string; readonly providerID: string } | undefined
+    readonly permissionPolicy?: "allow_all" | undefined
+    readonly directory?: string | undefined
+    readonly enabled?: boolean | undefined
+  }["agentId"]
+  readonly model?: {
+    readonly name?: string | undefined
+    readonly promptText?: string | undefined
+    readonly spec?:
+      | (
+          | { readonly kind: "one_shot"; readonly atMs: number }
+          | { readonly kind: "daily"; readonly timeHhMm: string }
+          | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly timeHhMm: string }
+          | { readonly kind: "cron"; readonly expr: string }
+        )
+      | undefined
+    readonly agentId?: string | undefined
+    readonly model?: { readonly id: string; readonly providerID: string } | undefined
+    readonly permissionPolicy?: "allow_all" | undefined
+    readonly directory?: string | undefined
+    readonly enabled?: boolean | undefined
+  }["model"]
+  readonly permissionPolicy?: {
+    readonly name?: string | undefined
+    readonly promptText?: string | undefined
+    readonly spec?:
+      | (
+          | { readonly kind: "one_shot"; readonly atMs: number }
+          | { readonly kind: "daily"; readonly timeHhMm: string }
+          | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly timeHhMm: string }
+          | { readonly kind: "cron"; readonly expr: string }
+        )
+      | undefined
+    readonly agentId?: string | undefined
+    readonly model?: { readonly id: string; readonly providerID: string } | undefined
+    readonly permissionPolicy?: "allow_all" | undefined
+    readonly directory?: string | undefined
+    readonly enabled?: boolean | undefined
+  }["permissionPolicy"]
+  readonly directory?: {
+    readonly name?: string | undefined
+    readonly promptText?: string | undefined
+    readonly spec?:
+      | (
+          | { readonly kind: "one_shot"; readonly atMs: number }
+          | { readonly kind: "daily"; readonly timeHhMm: string }
+          | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly timeHhMm: string }
+          | { readonly kind: "cron"; readonly expr: string }
+        )
+      | undefined
+    readonly agentId?: string | undefined
+    readonly model?: { readonly id: string; readonly providerID: string } | undefined
+    readonly permissionPolicy?: "allow_all" | undefined
+    readonly directory?: string | undefined
+    readonly enabled?: boolean | undefined
+  }["directory"]
+  readonly enabled?: {
+    readonly name?: string | undefined
+    readonly promptText?: string | undefined
+    readonly spec?:
+      | (
+          | { readonly kind: "one_shot"; readonly atMs: number }
+          | { readonly kind: "daily"; readonly timeHhMm: string }
+          | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly timeHhMm: string }
+          | { readonly kind: "cron"; readonly expr: string }
+        )
+      | undefined
+    readonly agentId?: string | undefined
+    readonly model?: { readonly id: string; readonly providerID: string } | undefined
+    readonly permissionPolicy?: "allow_all" | undefined
+    readonly directory?: string | undefined
+    readonly enabled?: boolean | undefined
+  }["enabled"]
+}
+
+export type SchedulesUpdateOutput = {
+  readonly data: {
+    readonly id: string
+    readonly name: string
+    readonly promptText: string
+    readonly spec:
+      | { readonly kind: "one_shot"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly timeHhMm: string }
+      | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly timeHhMm: string }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly agentId?: string | undefined
+    readonly model?: { readonly id: string; readonly providerID: string } | undefined
+    readonly permissionPolicy: "allow_all"
+    readonly directory: string
+    readonly enabled: boolean
+    readonly lastFiredSlot: number | null
+    readonly nextFireMs?: number | undefined
+    readonly timeCreated: number
+    readonly timeUpdated: number
+  }
+}["data"]
+
+export type SchedulesRemoveInput = { readonly id: { readonly id: string }["id"] }
+
+export type SchedulesRemoveOutput = void
+
+export type SchedulesRunInput = { readonly id: { readonly id: string }["id"] }
+
+export type SchedulesRunOutput = { readonly data: { readonly sessionID: string } }["data"]
+
+export type SchedulesRunsInput = {
+  readonly id: { readonly id: string }["id"]
+  readonly limit?: { readonly limit?: number | undefined }["limit"]
+}
+
+export type SchedulesRunsOutput = {
+  readonly data: ReadonlyArray<{
+    readonly id: string
+    readonly taskId: string
+    readonly sessionId?: string | undefined
+    readonly status: "fired" | "catch_up" | "missed" | "error"
+    readonly startedAt: number
+    readonly finishedAt?: number | undefined
+    readonly errorText?: string | undefined
+  }>
+}["data"]
 
 export type LocationGetInput = {
   readonly location?: {

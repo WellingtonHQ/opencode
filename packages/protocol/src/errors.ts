@@ -109,3 +109,38 @@ export class PtyNotFoundError extends Schema.TaggedErrorClass<PtyNotFoundError>(
   },
   { httpApiStatus: 404 },
 ) {}
+
+export class ScheduleNotFoundError extends Schema.TaggedErrorClass<ScheduleNotFoundError>()(
+  "ScheduleNotFoundError",
+  {
+    id: Schema.String,
+    message: Schema.String,
+  },
+  { httpApiStatus: 404 },
+) {}
+
+export class ScheduleInvalidSpecError extends Schema.TaggedErrorClass<ScheduleInvalidSpecError>()(
+  "ScheduleInvalidSpecError",
+  {
+    message: Schema.String,
+  },
+  { httpApiStatus: 400 },
+) {}
+
+export class SchedulePastOneShotError extends Schema.TaggedErrorClass<SchedulePastOneShotError>()(
+  "SchedulePastOneShotError",
+  {
+    atMs: Schema.Number,
+    message: Schema.String,
+  },
+  { httpApiStatus: 409 },
+) {}
+
+export class ScheduleRunFailedError extends Schema.TaggedErrorClass<ScheduleRunFailedError>()(
+  "ScheduleRunFailedError",
+  {
+    taskId: Schema.String,
+    message: Schema.String,
+  },
+  { httpApiStatus: 502 },
+) {}

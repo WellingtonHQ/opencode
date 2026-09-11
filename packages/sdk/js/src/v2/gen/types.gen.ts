@@ -2685,6 +2685,129 @@ export type UnauthorizedError = {
   message: string
 }
 
+export type ScheduleSpec =
+  | {
+      kind: "one_shot"
+      atMs: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+    }
+  | {
+      kind: "daily"
+      timeHhMm: string
+    }
+  | {
+      kind: "weekly"
+      days: Array<number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN">
+      timeHhMm: string
+    }
+  | {
+      kind: "cron"
+      expr: string
+    }
+
+export type ScheduleModel = {
+  id: string
+  providerID: string
+}
+
+export type ScheduleRun = {
+  id: string
+  taskId: string
+  sessionId?: string
+  status: "fired" | "catch_up" | "missed" | "error"
+  startedAt: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  finishedAt?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  errorText?: string
+}
+
+export type ScheduleTaskWithLatest = {
+  id: string
+  name: string
+  promptText: string
+  spec: ScheduleSpec
+  agentId?: string
+  model?: ScheduleModel
+  permissionPolicy: "allow_all"
+  directory: string
+  enabled: boolean
+  lastFiredSlot: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  nextFireMs?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  timeCreated: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  timeUpdated: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  latestRun?: ScheduleRun
+}
+
+export type ScheduleTasks = {
+  data: Array<ScheduleTaskWithLatest>
+}
+
+export type ScheduleCreate = {
+  name: string
+  promptText: string
+  spec: ScheduleSpec
+  agentId?: string
+  model?: ScheduleModel
+  permissionPolicy?: "allow_all"
+  directory?: string
+}
+
+export type ScheduleTask = {
+  id: string
+  name: string
+  promptText: string
+  spec: ScheduleSpec
+  agentId?: string
+  model?: ScheduleModel
+  permissionPolicy: "allow_all"
+  directory: string
+  enabled: boolean
+  lastFiredSlot: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  nextFireMs?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  timeCreated: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  timeUpdated: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+}
+
+export type ScheduleInvalidSpecError = {
+  _tag: "ScheduleInvalidSpecError"
+  message: string
+}
+
+export type SchedulePastOneShotError = {
+  _tag: "SchedulePastOneShotError"
+  atMs: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  message: string
+}
+
+export type ScheduleNotFoundError = {
+  _tag: "ScheduleNotFoundError"
+  id: string
+  message: string
+}
+
+export type ScheduleUpdate = {
+  name?: string
+  promptText?: string
+  spec?: ScheduleSpec
+  agentId?: string
+  model?: ScheduleModel
+  permissionPolicy?: "allow_all"
+  directory?: string
+  enabled?: boolean
+}
+
+export type ScheduleRunFailedError = {
+  _tag: "ScheduleRunFailedError"
+  taskId: string
+  message: string
+}
+
+export type ScheduleRunNow = {
+  sessionID: string
+}
+
+export type ScheduleRuns = {
+  data: Array<ScheduleRun>
+}
+
 export type SessionsResponse = {
   data: Array<SessionV2Info>
   cursor: {
@@ -11260,6 +11383,267 @@ export type V2HealthGetResponses = {
 }
 
 export type V2HealthGetResponse = V2HealthGetResponses[keyof V2HealthGetResponses]
+
+export type V2ScheduleListData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/api/schedule"
+}
+
+export type V2ScheduleListErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+}
+
+export type V2ScheduleListError = V2ScheduleListErrors[keyof V2ScheduleListErrors]
+
+export type V2ScheduleListResponses = {
+  /**
+   * ScheduleTasks
+   */
+  200: ScheduleTasks
+}
+
+export type V2ScheduleListResponse = V2ScheduleListResponses[keyof V2ScheduleListResponses]
+
+export type V2ScheduleCreateData = {
+  body: ScheduleCreate
+  path?: never
+  query?: never
+  url: "/api/schedule"
+}
+
+export type V2ScheduleCreateErrors = {
+  /**
+   * ScheduleInvalidSpecError | InvalidRequestError
+   */
+  400: ScheduleInvalidSpecError | InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+  /**
+   * SchedulePastOneShotError
+   */
+  409: SchedulePastOneShotError
+}
+
+export type V2ScheduleCreateError = V2ScheduleCreateErrors[keyof V2ScheduleCreateErrors]
+
+export type V2ScheduleCreateResponses = {
+  /**
+   * Success
+   */
+  200: {
+    data: ScheduleTask
+  }
+}
+
+export type V2ScheduleCreateResponse = V2ScheduleCreateResponses[keyof V2ScheduleCreateResponses]
+
+export type V2ScheduleRemoveData = {
+  body?: never
+  path: {
+    id: string
+  }
+  query?: never
+  url: "/api/schedule/{id}"
+}
+
+export type V2ScheduleRemoveErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+  /**
+   * ScheduleNotFoundError
+   */
+  404: ScheduleNotFoundError
+}
+
+export type V2ScheduleRemoveError = V2ScheduleRemoveErrors[keyof V2ScheduleRemoveErrors]
+
+export type V2ScheduleRemoveResponses = {
+  /**
+   * <No Content>
+   */
+  204: void
+}
+
+export type V2ScheduleRemoveResponse = V2ScheduleRemoveResponses[keyof V2ScheduleRemoveResponses]
+
+export type V2ScheduleGetData = {
+  body?: never
+  path: {
+    id: string
+  }
+  query?: never
+  url: "/api/schedule/{id}"
+}
+
+export type V2ScheduleGetErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+  /**
+   * ScheduleNotFoundError
+   */
+  404: ScheduleNotFoundError
+}
+
+export type V2ScheduleGetError = V2ScheduleGetErrors[keyof V2ScheduleGetErrors]
+
+export type V2ScheduleGetResponses = {
+  /**
+   * Success
+   */
+  200: {
+    data: ScheduleTask
+  }
+}
+
+export type V2ScheduleGetResponse = V2ScheduleGetResponses[keyof V2ScheduleGetResponses]
+
+export type V2ScheduleUpdateData = {
+  body: ScheduleUpdate
+  path: {
+    id: string
+  }
+  query?: never
+  url: "/api/schedule/{id}"
+}
+
+export type V2ScheduleUpdateErrors = {
+  /**
+   * ScheduleInvalidSpecError | InvalidRequestError
+   */
+  400: ScheduleInvalidSpecError | InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+  /**
+   * ScheduleNotFoundError
+   */
+  404: ScheduleNotFoundError
+  /**
+   * SchedulePastOneShotError
+   */
+  409: SchedulePastOneShotError
+  /**
+   * ScheduleRunFailedError
+   */
+  502: ScheduleRunFailedError
+}
+
+export type V2ScheduleUpdateError = V2ScheduleUpdateErrors[keyof V2ScheduleUpdateErrors]
+
+export type V2ScheduleUpdateResponses = {
+  /**
+   * Success
+   */
+  200: {
+    data: ScheduleTask
+  }
+}
+
+export type V2ScheduleUpdateResponse = V2ScheduleUpdateResponses[keyof V2ScheduleUpdateResponses]
+
+export type V2ScheduleRunData = {
+  body?: never
+  path: {
+    id: string
+  }
+  query?: never
+  url: "/api/schedule/{id}/run"
+}
+
+export type V2ScheduleRunErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+  /**
+   * ScheduleNotFoundError
+   */
+  404: ScheduleNotFoundError
+  /**
+   * ScheduleRunFailedError
+   */
+  502: ScheduleRunFailedError
+}
+
+export type V2ScheduleRunError = V2ScheduleRunErrors[keyof V2ScheduleRunErrors]
+
+export type V2ScheduleRunResponses = {
+  /**
+   * Success
+   */
+  200: {
+    data: ScheduleRunNow
+  }
+}
+
+export type V2ScheduleRunResponse = V2ScheduleRunResponses[keyof V2ScheduleRunResponses]
+
+export type V2ScheduleRunsData = {
+  body?: never
+  path: {
+    id: string
+  }
+  query?: {
+    limit?: number
+  }
+  url: "/api/schedule/{id}/runs"
+}
+
+export type V2ScheduleRunsErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+  /**
+   * ScheduleNotFoundError
+   */
+  404: ScheduleNotFoundError
+}
+
+export type V2ScheduleRunsError = V2ScheduleRunsErrors[keyof V2ScheduleRunsErrors]
+
+export type V2ScheduleRunsResponses = {
+  /**
+   * ScheduleRuns
+   */
+  200: ScheduleRuns
+}
+
+export type V2ScheduleRunsResponse = V2ScheduleRunsResponses[keyof V2ScheduleRunsResponses]
 
 export type V2LocationGetData = {
   body?: never

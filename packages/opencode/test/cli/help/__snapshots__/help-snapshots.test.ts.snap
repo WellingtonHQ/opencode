@@ -403,6 +403,28 @@ Options:
       --format      Output format                 [string] [choices: "json", "tsv"] [default: "tsv"]"
 `;
 
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode schedule --help 1`] = `
+"opencode schedule
+
+manage scheduled prompts
+
+Commands:
+  opencode schedule add [text..]  create a scheduled prompt
+  opencode schedule list          list scheduled prompts
+  opencode schedule show <id>     show a scheduled prompt and its recent runs
+  opencode schedule remove <id>   delete a scheduled prompt and its run history        [aliases: rm]
+  opencode schedule enable <id>   enable a scheduled prompt
+  opencode schedule disable <id>  disable a scheduled prompt
+  opencode schedule run-now <id>  run a scheduled prompt now in a new session
+
+Options:
+  -h, --help        show help                                                              [boolean]
+  -v, --version     show version number                                                    [boolean]
+      --print-logs  print logs to stderr                                                   [boolean]
+      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure        run without external plugins                                           [boolean]"
+`;
+
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode mcp list --help 1`] = `
 "opencode mcp list
 
@@ -620,4 +642,43 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]"
+`;
+
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode schedule add --help 1`] = `
+"opencode schedule add [text..]
+
+create a scheduled prompt
+
+Positionals:
+  text  prompt to run on the schedule                                          [array] [default: []]
+
+Options:
+  -h, --help        show help                                                              [boolean]
+  -v, --version     show version number                                                    [boolean]
+      --print-logs  print logs to stderr                                                   [boolean]
+      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure        run without external plugins                                           [boolean]
+  -p, --prompt      prompt text (alternative to positional arguments)                       [string]
+      --name        name for the scheduled prompt (defaults to a truncated prompt)          [string]
+      --at          run once at an ISO 8601 datetime, e.g. 2026-09-11T23:00:00              [string]
+      --daily       run daily at HH:mm (24-hour), e.g. 23:00                                [string]
+      --weekly      run weekly on <days> at HH:mm, e.g., --weekly "mon,wed 09:30"           [string]
+      --cron        run on a 5-field cron expression, e.g. "0 9 * * 1-5"                    [string]
+      --agent       agent to run the prompt with                                            [string]
+      --model       model to run the prompt with, in provider/model form                    [string]
+      --dir         directory for scheduled sessions (defaults to the current directory)    [string]"
+`;
+
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode schedule list --help 1`] = `
+"opencode schedule list
+
+list scheduled prompts
+
+Options:
+  -h, --help        show help                                                              [boolean]
+  -v, --version     show version number                                                    [boolean]
+      --print-logs  print logs to stderr                                                   [boolean]
+      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure        run without external plugins                                           [boolean]
+      --format      output format             [string] [choices: "table", "json"] [default: "table"]"
 `;

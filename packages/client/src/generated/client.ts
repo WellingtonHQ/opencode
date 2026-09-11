@@ -1,5 +1,19 @@
 import type {
   HealthGetOutput,
+  SchedulesListInput,
+  SchedulesListOutput,
+  SchedulesCreateInput,
+  SchedulesCreateOutput,
+  SchedulesGetInput,
+  SchedulesGetOutput,
+  SchedulesUpdateInput,
+  SchedulesUpdateOutput,
+  SchedulesRemoveInput,
+  SchedulesRemoveOutput,
+  SchedulesRunInput,
+  SchedulesRunOutput,
+  SchedulesRunsInput,
+  SchedulesRunsOutput,
   LocationGetInput,
   LocationGetOutput,
   AgentsListInput,
@@ -253,6 +267,106 @@ export function make(options: ClientOptions) {
           { method: "GET", path: `/api/health`, successStatus: 200, declaredStatuses: [401, 400], empty: false },
           requestOptions,
         ),
+    },
+    schedules: {
+      list: (input?: SchedulesListInput, requestOptions?: RequestOptions) =>
+        request<{ readonly data: SchedulesListOutput }>(
+          {
+            method: "GET",
+            path: `/api/schedule`,
+            query: { directory: input?.["directory"] },
+            successStatus: 200,
+            declaredStatuses: [401, 400],
+            empty: false,
+          },
+          requestOptions,
+        ).then((value) => value.data),
+      create: (input: SchedulesCreateInput, requestOptions?: RequestOptions) =>
+        request<{ readonly data: SchedulesCreateOutput }>(
+          {
+            method: "POST",
+            path: `/api/schedule`,
+            body: {
+              name: input["name"],
+              promptText: input["promptText"],
+              spec: input["spec"],
+              agentId: input["agentId"],
+              model: input["model"],
+              permissionPolicy: input["permissionPolicy"],
+              directory: input["directory"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 409, 401],
+            empty: false,
+          },
+          requestOptions,
+        ).then((value) => value.data),
+      get: (input: SchedulesGetInput, requestOptions?: RequestOptions) =>
+        request<{ readonly data: SchedulesGetOutput }>(
+          {
+            method: "GET",
+            path: `/api/schedule/${encodeURIComponent(input.id)}`,
+            successStatus: 200,
+            declaredStatuses: [404, 401, 400],
+            empty: false,
+          },
+          requestOptions,
+        ).then((value) => value.data),
+      update: (input: SchedulesUpdateInput, requestOptions?: RequestOptions) =>
+        request<{ readonly data: SchedulesUpdateOutput }>(
+          {
+            method: "PATCH",
+            path: `/api/schedule/${encodeURIComponent(input.id)}`,
+            body: {
+              name: input["name"],
+              promptText: input["promptText"],
+              spec: input["spec"],
+              agentId: input["agentId"],
+              model: input["model"],
+              permissionPolicy: input["permissionPolicy"],
+              directory: input["directory"],
+              enabled: input["enabled"],
+            },
+            successStatus: 200,
+            declaredStatuses: [404, 400, 409, 502, 401],
+            empty: false,
+          },
+          requestOptions,
+        ).then((value) => value.data),
+      remove: (input: SchedulesRemoveInput, requestOptions?: RequestOptions) =>
+        request<SchedulesRemoveOutput>(
+          {
+            method: "DELETE",
+            path: `/api/schedule/${encodeURIComponent(input.id)}`,
+            successStatus: 204,
+            declaredStatuses: [404, 401, 400],
+            empty: true,
+          },
+          requestOptions,
+        ),
+      run: (input: SchedulesRunInput, requestOptions?: RequestOptions) =>
+        request<{ readonly data: SchedulesRunOutput }>(
+          {
+            method: "POST",
+            path: `/api/schedule/${encodeURIComponent(input.id)}/run`,
+            successStatus: 200,
+            declaredStatuses: [404, 502, 401, 400],
+            empty: false,
+          },
+          requestOptions,
+        ).then((value) => value.data),
+      runs: (input: SchedulesRunsInput, requestOptions?: RequestOptions) =>
+        request<{ readonly data: SchedulesRunsOutput }>(
+          {
+            method: "GET",
+            path: `/api/schedule/${encodeURIComponent(input.id)}/runs`,
+            query: { limit: input["limit"] },
+            successStatus: 200,
+            declaredStatuses: [404, 401, 400],
+            empty: false,
+          },
+          requestOptions,
+        ).then((value) => value.data),
     },
     location: {
       get: (input?: LocationGetInput, requestOptions?: RequestOptions) =>

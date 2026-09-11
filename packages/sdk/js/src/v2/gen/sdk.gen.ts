@@ -175,6 +175,8 @@ import type {
   QuestionReplyErrors,
   QuestionReplyResponses,
   QuestionV2Reply,
+  ScheduleCreate,
+  ScheduleUpdate,
   SessionAbortErrors,
   SessionAbortResponses,
   SessionChildrenErrors,
@@ -333,6 +335,20 @@ import type {
   V2QuestionRequestListResponses,
   V2ReferenceListErrors,
   V2ReferenceListResponses,
+  V2ScheduleCreateErrors,
+  V2ScheduleCreateResponses,
+  V2ScheduleGetErrors,
+  V2ScheduleGetResponses,
+  V2ScheduleListErrors,
+  V2ScheduleListResponses,
+  V2ScheduleRemoveErrors,
+  V2ScheduleRemoveResponses,
+  V2ScheduleRunErrors,
+  V2ScheduleRunResponses,
+  V2ScheduleRunsErrors,
+  V2ScheduleRunsResponses,
+  V2ScheduleUpdateErrors,
+  V2ScheduleUpdateResponses,
   V2SessionActiveErrors,
   V2SessionActiveResponses,
   V2SessionCompactErrors,
@@ -5035,6 +5051,173 @@ export class Health extends HeyApiClient {
   }
 }
 
+export class Schedule extends HeyApiClient {
+  /**
+   * List schedules
+   *
+   * Retrieve scheduled prompt tasks, optionally filtered by directory. Each task includes its most recent run when one exists.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "directory" }] }])
+    return (options?.client ?? this.client).get<V2ScheduleListResponses, V2ScheduleListErrors, ThrowOnError>({
+      url: "/api/schedule",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Create schedule
+   *
+   * Create a scheduled prompt task. The spec is one of one_shot, daily, weekly, or cron; recurring specs are evaluated in the directory's local timezone.
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters: {
+      scheduleCreate: ScheduleCreate
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ key: "scheduleCreate", map: "body" }] }])
+    return (options?.client ?? this.client).post<V2ScheduleCreateResponses, V2ScheduleCreateErrors, ThrowOnError>({
+      url: "/api/schedule",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Remove schedule
+   *
+   * Delete a scheduled prompt task and its run history.
+   */
+  public remove<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "path", key: "id" }] }])
+    return (options?.client ?? this.client).delete<V2ScheduleRemoveResponses, V2ScheduleRemoveErrors, ThrowOnError>({
+      url: "/api/schedule/{id}",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Get schedule
+   *
+   * Retrieve a scheduled prompt task by ID.
+   */
+  public get<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "path", key: "id" }] }])
+    return (options?.client ?? this.client).get<V2ScheduleGetResponses, V2ScheduleGetErrors, ThrowOnError>({
+      url: "/api/schedule/{id}",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Update schedule
+   *
+   * Partially update a scheduled prompt task; omitted fields keep their current values.
+   */
+  public update<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string
+      scheduleUpdate: ScheduleUpdate
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "id" },
+            { key: "scheduleUpdate", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).patch<V2ScheduleUpdateResponses, V2ScheduleUpdateErrors, ThrowOnError>({
+      url: "/api/schedule/{id}",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Run schedule now
+   *
+   * Trigger one manual run of a scheduled prompt task and return the created session ID.
+   */
+  public run<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "path", key: "id" }] }])
+    return (options?.client ?? this.client).post<V2ScheduleRunResponses, V2ScheduleRunErrors, ThrowOnError>({
+      url: "/api/schedule/{id}/run",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * List schedule runs
+   *
+   * Retrieve the most recent runs of a scheduled prompt task.
+   */
+  public runs<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string
+      limit?: number
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "id" },
+            { in: "query", key: "limit" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<V2ScheduleRunsResponses, V2ScheduleRunsErrors, ThrowOnError>({
+      url: "/api/schedule/{id}/runs",
+      ...options,
+      ...params,
+    })
+  }
+}
+
 export class Location extends HeyApiClient {
   /**
    * Get location
@@ -6991,6 +7174,11 @@ export class V2 extends HeyApiClient {
   private _health?: Health
   get health(): Health {
     return (this._health ??= new Health({ client: this.client }))
+  }
+
+  private _schedule?: Schedule
+  get schedule(): Schedule {
+    return (this._schedule ??= new Schedule({ client: this.client }))
   }
 
   private _location?: Location
