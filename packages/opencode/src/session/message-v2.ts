@@ -1,4 +1,4 @@
-import { SessionID, MessageID } from "./schema"
+import { SessionID, MessageID, PartID } from "./schema"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import {
@@ -22,12 +22,14 @@ import { Database } from "@opencode-ai/core/database/database"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { NotFoundError } from "@/storage/storage"
 import { and } from "drizzle-orm"
+import { asc } from "drizzle-orm"
 import { desc } from "drizzle-orm"
 import { eq } from "drizzle-orm"
 import { inArray } from "drizzle-orm"
 import { lt } from "drizzle-orm"
 import { or } from "drizzle-orm"
-import { MessageTable, PartTable, SessionTable } from "@opencode-ai/core/session/sql"
+import { SessionMessage } from "@opencode-ai/core/session/message"
+import { MessageTable, PartTable, SessionMessageTable, SessionTable } from "@opencode-ai/core/session/sql"
 import { ProviderError } from "@/provider/error"
 import { iife } from "@/util/iife"
 import { errorMessage } from "@/util/error"
@@ -422,6 +424,213 @@ export function toModelMessages(
   return Effect.runPromise(toModelMessagesEffect(input, model, options))
 }
 
+// Sessions started outside the legacy prompt pipeline (e.g. scheduled prompts) persist their
+// transcript only in the V2 message tables, so a v1-negotiated client sees zero rows for them.
+// This read-side projection re-shapes those rows into the legacy wire format until clients
+// negotiate the current protocol end-to-end.
+
+const decodeV2Message = Schema.decodeUnknownEffect(SessionMessage.Message)
+
+type V2Message = (typeof SessionMessage.Message)["Type"]
+type V2UserMessage = (typeof SessionMessage.User)["Type"]
+type V2AssistantMessage = (typeof SessionMessage.Assistant)["Type"]
+type V2ToolContentItem =
+  | { readonly type: "text"; readonly text: string }
+  | { readonly type: "file"; readonly uri: string; readonly mime: string; readonly name?: string }
+
+type V2ProjectionContext = {
+  readonly directory: string
+  readonly agent?: string
+  readonly model?: { readonly id: string; readonly providerID: string }
+}
+
+function v2SessionContext(db: Database.Interface["db"], sessionID: SessionID) {
+  return db
+    .select({ directory: SessionTable.directory, agent: SessionTable.agent, model: SessionTable.model })
+    .from(SessionTable)
+    .where(eq(SessionTable.id, sessionID))
+    .get()
+    .pipe(Effect.orDie)
+}
+
+function v2MessageRows(db: Database.Interface["db"], sessionID: SessionID) {
+  return db
+    .select()
+    .from(SessionMessageTable)
+    .where(eq(SessionMessageTable.session_id, sessionID))
+    .orderBy(asc(SessionMessageTable.seq))
+    .all()
+    .pipe(Effect.orDie)
+}
+
+// Corrupt rows are skipped rather than failing the whole transcript read.
+const decodeV2Row = (row: typeof SessionMessageTable.$inferSelect) =>
+  decodeV2Message({ ...row.data, id: row.id, type: row.type }).pipe(Effect.catch(() => Effect.succeed(undefined)))
+
+function v2ToolText(content: ReadonlyArray<V2ToolContentItem>) {
+  return content
+    .filter((item): item is Extract<V2ToolContentItem, { type: "text" }> => item.type === "text")
+    .map((item) => item.text)
+    .join("\n")
+}
+
+function v2UserParts(sessionID: SessionID, msg: V2UserMessage): Part[] {
+  const messageID = MessageID.make(msg.id)
+  return [
+    { id: PartID.make(`prt_v2_${msg.id}_0`), sessionID, messageID, type: "text", text: msg.text },
+    ...(msg.files ?? []).map((file, index) => ({
+      id: PartID.make(`prt_v2_${msg.id}_${index + 1}`),
+      sessionID,
+      messageID,
+      type: "file",
+      mime: file.mime,
+      url: file.uri,
+      filename: file.name,
+    })),
+    ...(msg.agents ?? []).map((agent, index) => ({
+      id: PartID.make(`prt_v2_${msg.id}_${(msg.files?.length ?? 0) + index + 1}`),
+      sessionID,
+      messageID,
+      type: "agent",
+      name: agent.name,
+    })),
+  ] as Part[]
+}
+
+function v2AssistantParts(sessionID: SessionID, msg: V2AssistantMessage): Part[] {
+  const messageID = MessageID.make(msg.id)
+  return msg.content.map((item, index) => {
+    const base = { id: PartID.make(`prt_v2_${msg.id}_${index}`), sessionID, messageID }
+    if (item.type === "text") return { ...base, type: "text", text: item.text }
+    if (item.type === "reasoning")
+      return {
+        ...base,
+        type: "reasoning",
+        text: item.text,
+        metadata: item.providerMetadata,
+        time: { start: item.time?.created ?? msg.time.created, end: item.time?.completed },
+      }
+    const start = item.time.ran ?? item.time.created
+    const end = item.time.completed ?? msg.time.completed ?? msg.time.created
+    if (item.state.status === "pending")
+      return {
+        ...base,
+        type: "tool",
+        callID: item.id,
+        tool: item.name,
+        state: { status: "pending", input: {}, raw: item.state.input },
+      }
+    if (item.state.status === "running")
+      return {
+        ...base,
+        type: "tool",
+        callID: item.id,
+        tool: item.name,
+        state: { status: "running", input: item.state.input, time: { start } },
+      }
+    if (item.state.status === "error")
+      return {
+        ...base,
+        type: "tool",
+        callID: item.id,
+        tool: item.name,
+        state: { status: "error", input: item.state.input, error: item.state.error.message, time: { start, end } },
+      }
+    return {
+      ...base,
+      type: "tool",
+      callID: item.id,
+      tool: item.name,
+      state: {
+        status: "completed",
+        input: item.state.input,
+        output: v2ToolText(item.state.content),
+        title: item.name,
+        metadata: {},
+        time: { start, end },
+        attachments: item.state.attachments?.map((file, fileIndex) => ({
+          id: PartID.make(`prt_v2_${msg.id}_${index}_a${fileIndex}`),
+          sessionID,
+          messageID,
+          type: "file",
+          mime: file.mime,
+          url: file.uri,
+          filename: file.name,
+        })),
+      },
+    }
+  }) as Part[]
+}
+
+function v2UserInfo(
+  sessionID: SessionID,
+  msg: V2UserMessage,
+  agent: string,
+  model: { id: string; providerID: string },
+): User {
+  return {
+    id: MessageID.make(msg.id),
+    sessionID,
+    role: "user",
+    time: { created: msg.time.created },
+    agent,
+    model: { providerID: model.providerID, modelID: model.id },
+  } as unknown as User
+}
+
+function v2AssistantInfo(sessionID: SessionID, msg: V2AssistantMessage, parentID: string, directory: string): Assistant {
+  return {
+    id: MessageID.make(msg.id),
+    sessionID,
+    role: "assistant",
+    time: { created: msg.time.created, completed: msg.time.completed },
+    error: msg.error ? { name: "UnknownError", data: { message: msg.error.message } } : undefined,
+    parentID: MessageID.make(parentID),
+    modelID: msg.model.id,
+    providerID: msg.model.providerID,
+    mode: msg.agent,
+    agent: msg.agent,
+    path: { cwd: directory, root: directory },
+    cost: msg.cost ?? 0,
+    tokens: msg.tokens ?? { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    finish: msg.finish,
+  } as unknown as Assistant
+}
+
+function projectV2Messages(sessionID: SessionID, messages: V2Message[], context: V2ProjectionContext): WithParts[] {
+  const firstAssistant = messages.find((msg): msg is V2AssistantMessage => msg.type === "assistant")
+  const agent = context.agent ?? firstAssistant?.agent ?? ""
+  const model =
+    context.model ??
+    (firstAssistant ? { id: firstAssistant.model.id, providerID: firstAssistant.model.providerID } : undefined) ?? {
+      id: "",
+      providerID: "",
+    }
+  const items: WithParts[] = []
+  let lastUser = ""
+  for (const msg of messages) {
+    if (msg.type === "user") {
+      lastUser = msg.id
+      items.push({ info: v2UserInfo(sessionID, msg, agent, model), parts: v2UserParts(sessionID, msg) })
+      continue
+    }
+    if (msg.type !== "assistant") continue
+    items.push({
+      info: v2AssistantInfo(sessionID, msg, lastUser || msg.id, context.directory),
+      parts: v2AssistantParts(sessionID, msg),
+    })
+  }
+  return items
+}
+
+function v2Transcript(db: Database.Interface["db"], sessionID: SessionID, context: V2ProjectionContext) {
+  return Effect.gen(function* () {
+    const rows = yield* v2MessageRows(db, sessionID)
+    const messages = (yield* Effect.forEach(rows, decodeV2Row)).filter((msg): msg is V2Message => msg !== undefined)
+    return projectV2Messages(sessionID, messages, context)
+  })
+}
+
 export const page = Effect.fn("MessageV2.page")(function* (input: {
   sessionID: SessionID
   limit: number
@@ -441,17 +650,15 @@ export const page = Effect.fn("MessageV2.page")(function* (input: {
     .all()
     .pipe(Effect.orDie)
   if (rows.length === 0) {
-    const row = yield* db
-      .select({ id: SessionTable.id })
-      .from(SessionTable)
-      .where(eq(SessionTable.id, input.sessionID))
-      .get()
-      .pipe(Effect.orDie)
-    if (!row) return yield* new NotFoundError({ message: `Session not found: ${input.sessionID}` })
-    return {
-      items: [] as WithParts[],
-      more: false,
-    }
+    const session = yield* v2SessionContext(db, input.sessionID)
+    if (!session) return yield* new NotFoundError({ message: `Session not found: ${input.sessionID}` })
+    // Projection returns the whole transcript at once; no cursor is issued so callers never page further.
+    const items = yield* v2Transcript(db, input.sessionID, {
+      directory: session.directory,
+      agent: session.agent ?? undefined,
+      model: session.model ?? undefined,
+    })
+    return { items, more: false }
   }
 
   const more = rows.length > input.limit
@@ -511,11 +718,22 @@ export const get = Effect.fn("MessageV2.get")(function* (input: { sessionID: Ses
     .where(and(eq(MessageTable.id, input.messageID), eq(MessageTable.session_id, input.sessionID)))
     .get()
     .pipe(Effect.orDie)
-  if (!row) return yield* new NotFoundError({ message: `Message not found: ${input.messageID}` })
-  return {
-    info: info(row),
-    parts: yield* parts(input.messageID),
+  if (row) {
+    return {
+      info: info(row),
+      parts: yield* parts(input.messageID),
+    }
   }
+  const session = yield* v2SessionContext(db, input.sessionID)
+  if (!session) return yield* new NotFoundError({ message: `Message not found: ${input.messageID}` })
+  const projected = yield* v2Transcript(db, input.sessionID, {
+    directory: session.directory,
+    agent: session.agent ?? undefined,
+    model: session.model ?? undefined,
+  })
+  const item = projected.find((message) => String(message.info.id) === String(input.messageID))
+  if (!item) return yield* new NotFoundError({ message: `Message not found: ${input.messageID}` })
+  return item
 })
 
 export function filterCompacted(msgs: Iterable<WithParts>) {
