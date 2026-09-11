@@ -2310,6 +2310,7 @@ export type ServerScheduleListOutput = ReadonlyArray<{
     | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly hour: number; readonly minute: number }
     | { readonly kind: "cron"; readonly expr: string }
   readonly agentId?: string
+  readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
   readonly directory: string
   readonly enabled: boolean
   readonly nextRunAtMs?: number
@@ -2331,6 +2332,7 @@ export type ServerScheduleGetOutput = {
     | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly hour: number; readonly minute: number }
     | { readonly kind: "cron"; readonly expr: string }
   readonly agentId?: string
+  readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
   readonly directory: string
   readonly enabled: boolean
   readonly nextRunAtMs?: number
@@ -2355,6 +2357,7 @@ export type ServerScheduleCreateInput = {
         }
       | { readonly kind: "cron"; readonly expr: string }
     readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
     readonly directory: string
   }["name"]
   readonly prompt: {
@@ -2371,6 +2374,7 @@ export type ServerScheduleCreateInput = {
         }
       | { readonly kind: "cron"; readonly expr: string }
     readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
     readonly directory: string
   }["prompt"]
   readonly spec: {
@@ -2387,6 +2391,7 @@ export type ServerScheduleCreateInput = {
         }
       | { readonly kind: "cron"; readonly expr: string }
     readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
     readonly directory: string
   }["spec"]
   readonly agentId?: {
@@ -2403,8 +2408,26 @@ export type ServerScheduleCreateInput = {
         }
       | { readonly kind: "cron"; readonly expr: string }
     readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
     readonly directory: string
   }["agentId"]
+  readonly model?: {
+    readonly name?: string
+    readonly prompt: string
+    readonly spec:
+      | { readonly kind: "once"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
+      | {
+          readonly kind: "weekly"
+          readonly days: ReadonlyArray<number>
+          readonly hour: number
+          readonly minute: number
+        }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
+    readonly directory: string
+  }["model"]
   readonly directory: {
     readonly name?: string
     readonly prompt: string
@@ -2419,6 +2442,7 @@ export type ServerScheduleCreateInput = {
         }
       | { readonly kind: "cron"; readonly expr: string }
     readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
     readonly directory: string
   }["directory"]
 }
@@ -2433,6 +2457,7 @@ export type ServerScheduleCreateOutput = {
     | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly hour: number; readonly minute: number }
     | { readonly kind: "cron"; readonly expr: string }
   readonly agentId?: string
+  readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
   readonly directory: string
   readonly enabled: boolean
   readonly nextRunAtMs?: number
@@ -2458,6 +2483,7 @@ export type ServerScheduleUpdateInput = {
         }
       | { readonly kind: "cron"; readonly expr: string }
     readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
     readonly directory?: string
     readonly enabled?: boolean
   }["name"]
@@ -2475,6 +2501,7 @@ export type ServerScheduleUpdateInput = {
         }
       | { readonly kind: "cron"; readonly expr: string }
     readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
     readonly directory?: string
     readonly enabled?: boolean
   }["prompt"]
@@ -2492,6 +2519,7 @@ export type ServerScheduleUpdateInput = {
         }
       | { readonly kind: "cron"; readonly expr: string }
     readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
     readonly directory?: string
     readonly enabled?: boolean
   }["spec"]
@@ -2509,9 +2537,28 @@ export type ServerScheduleUpdateInput = {
         }
       | { readonly kind: "cron"; readonly expr: string }
     readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
     readonly directory?: string
     readonly enabled?: boolean
   }["agentId"]
+  readonly model?: {
+    readonly name?: string
+    readonly prompt?: string
+    readonly spec?:
+      | { readonly kind: "once"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
+      | {
+          readonly kind: "weekly"
+          readonly days: ReadonlyArray<number>
+          readonly hour: number
+          readonly minute: number
+        }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
+    readonly directory?: string
+    readonly enabled?: boolean
+  }["model"]
   readonly directory?: {
     readonly name?: string
     readonly prompt?: string
@@ -2526,6 +2573,7 @@ export type ServerScheduleUpdateInput = {
         }
       | { readonly kind: "cron"; readonly expr: string }
     readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
     readonly directory?: string
     readonly enabled?: boolean
   }["directory"]
@@ -2543,6 +2591,7 @@ export type ServerScheduleUpdateInput = {
         }
       | { readonly kind: "cron"; readonly expr: string }
     readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
     readonly directory?: string
     readonly enabled?: boolean
   }["enabled"]
@@ -2558,6 +2607,7 @@ export type ServerScheduleUpdateOutput = {
     | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly hour: number; readonly minute: number }
     | { readonly kind: "cron"; readonly expr: string }
   readonly agentId?: string
+  readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
   readonly directory: string
   readonly enabled: boolean
   readonly nextRunAtMs?: number
@@ -2579,6 +2629,7 @@ export type ServerScheduleRemoveOutput = {
     | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly hour: number; readonly minute: number }
     | { readonly kind: "cron"; readonly expr: string }
   readonly agentId?: string
+  readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
   readonly directory: string
   readonly enabled: boolean
   readonly nextRunAtMs?: number
@@ -2600,6 +2651,7 @@ export type ServerScheduleRunNowOutput = {
     | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly hour: number; readonly minute: number }
     | { readonly kind: "cron"; readonly expr: string }
   readonly agentId?: string
+  readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
   readonly directory: string
   readonly enabled: boolean
   readonly nextRunAtMs?: number

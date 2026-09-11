@@ -2,6 +2,7 @@ export * as Schedule from "./schedule"
 
 import { Schema } from "effect"
 import { Agent } from "./agent"
+import { Model } from "./model"
 import { define, inventory } from "./event"
 import { Session } from "./session"
 import { ascending } from "./identifier"
@@ -59,6 +60,7 @@ export const Info = Schema.Struct({
   prompt: Schema.String,
   spec: Spec,
   agentId: Agent.ID.pipe(optional),
+  model: Model.Ref.pipe(optional),
   directory: AbsolutePath,
   enabled: Schema.Boolean,
   nextRunAtMs: NonNegativeInt.pipe(optional),
@@ -74,6 +76,7 @@ export const CreateInput = Schema.Struct({
   prompt: Schema.String,
   spec: Spec,
   agentId: Agent.ID.pipe(optional),
+  model: Model.Ref.pipe(optional),
   directory: AbsolutePath,
 }).annotate({ identifier: "Schedule.CreateInput" })
 
@@ -83,6 +86,8 @@ export const UpdateInput = Schema.Struct({
   prompt: optional(Schema.String),
   spec: Spec.pipe(optional),
   agentId: Agent.ID.pipe(optional),
+  // Absent leaves the stored model untouched; null clears it back to the default.
+  model: optional(Schema.NullOr(Model.Ref)),
   directory: AbsolutePath.pipe(optional),
   enabled: Schema.Boolean.pipe(optional),
 }).annotate({ identifier: "Schedule.UpdateInput" })

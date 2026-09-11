@@ -56,6 +56,7 @@ const layer = Layer.effect(
       prompt: row.prompt,
       spec: specFrom(row),
       ...(row.agent_id ? { agentId: row.agent_id } : {}),
+      ...(row.model ? { model: row.model } : {}),
       directory: row.directory,
       enabled: row.enabled,
       nextRunAtMs: row.next_run_at_ms ?? undefined,
@@ -131,6 +132,7 @@ const layer = Layer.effect(
         const session = yield* sessions.create({
           location: { directory: claimedRow.directory },
           ...(claimedRow.agent_id ? { agent: claimedRow.agent_id } : {}),
+          ...(claimedRow.model ? { model: claimedRow.model } : {}),
         })
         yield* sessions.prompt({ sessionID: session.id, prompt: { text: claimedRow.prompt } })
         return session.id
@@ -199,6 +201,7 @@ const layer = Layer.effect(
             prompt: input.prompt,
             ...specColumns(input.spec),
             agent_id: input.agentId ?? null,
+            model: input.model ?? null,
             directory: input.directory,
             enabled: true,
             next_run_at_ms: next,
@@ -211,6 +214,7 @@ const layer = Layer.effect(
           prompt: input.prompt,
           spec: input.spec,
           ...(input.agentId !== undefined ? { agentId: input.agentId } : {}),
+          ...(input.model !== undefined ? { model: input.model } : {}),
           directory: input.directory,
           enabled: true,
           nextRunAtMs: next ?? undefined,
@@ -231,6 +235,7 @@ const layer = Layer.effect(
             ...(updates.spec !== undefined ? specColumns(updates.spec) : {}),
             ...(specNext !== undefined ? { next_run_at_ms: specNext } : {}),
             ...(updates.agentId !== undefined ? { agent_id: updates.agentId } : {}),
+            ...(updates.model !== undefined ? { model: updates.model } : {}),
             ...(updates.directory !== undefined ? { directory: updates.directory } : {}),
             ...(updates.enabled !== undefined ? { enabled: updates.enabled } : {}),
           })

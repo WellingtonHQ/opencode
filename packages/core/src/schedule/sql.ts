@@ -1,5 +1,6 @@
 import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core"
 import type { Agent } from "@opencode-ai/schema/agent"
+import type { Model } from "@opencode-ai/schema/model"
 import type { Schedule } from "@opencode-ai/schema/schedule"
 import type { Session } from "@opencode-ai/schema/session"
 import * as DatabasePath from "../database/path"
@@ -18,6 +19,7 @@ export const ScheduleTaskTable = sqliteTable(
     days: text(),
     expr: text(),
     agent_id: text().$type<Agent.ID>(),
+    model: text({ mode: "json" }).$type<Model.Ref>(),
     directory: DatabasePath.absoluteColumn().notNull(),
     enabled: integer({ mode: "boolean" }).notNull().default(true),
     next_run_at_ms: integer(),

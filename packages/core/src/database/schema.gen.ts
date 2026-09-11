@@ -136,6 +136,7 @@ export default {
           \`days\` text,
           \`expr\` text,
           \`agent_id\` text,
+          \`model\` text,
           \`directory\` text NOT NULL,
           \`enabled\` integer DEFAULT true NOT NULL,
           \`next_run_at_ms\` integer,

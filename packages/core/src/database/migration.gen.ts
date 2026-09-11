@@ -41,5 +41,6 @@ export const migrations = (
     import("./migration/20260622170816_reset_v2_session_state"),
     import("./migration/20260622202450_simplify_session_input"),
     import("./migration/20260910074445_medical_the_santerians"),
+    import("./migration/20260911071846_add_schedule_task_model"),
   ])
 ).map((module) => module.default) satisfies DatabaseMigration.Migration[]

@@ -396,6 +396,7 @@ type Endpoint9_2Input = {
   readonly prompt: Endpoint9_2Request["payload"]["prompt"]
   readonly spec: Endpoint9_2Request["payload"]["spec"]
   readonly agentId?: Endpoint9_2Request["payload"]["agentId"]
+  readonly model?: Endpoint9_2Request["payload"]["model"]
   readonly directory: Endpoint9_2Request["payload"]["directory"]
 }
 const Endpoint9_2 = (raw: RawClient["server.schedule"]) => (input: Endpoint9_2Input) =>
@@ -405,6 +406,7 @@ const Endpoint9_2 = (raw: RawClient["server.schedule"]) => (input: Endpoint9_2In
       prompt: input["prompt"],
       spec: input["spec"],
       agentId: input["agentId"],
+      model: input["model"],
       directory: input["directory"],
     },
   }).pipe(Effect.mapError(mapClientError))
@@ -416,6 +418,7 @@ type Endpoint9_3Input = {
   readonly prompt?: Endpoint9_3Request["payload"]["prompt"]
   readonly spec?: Endpoint9_3Request["payload"]["spec"]
   readonly agentId?: Endpoint9_3Request["payload"]["agentId"]
+  readonly model?: Endpoint9_3Request["payload"]["model"]
   readonly directory?: Endpoint9_3Request["payload"]["directory"]
   readonly enabled?: Endpoint9_3Request["payload"]["enabled"]
 }
@@ -427,6 +430,7 @@ const Endpoint9_3 = (raw: RawClient["server.schedule"]) => (input: Endpoint9_3In
       prompt: input["prompt"],
       spec: input["spec"],
       agentId: input["agentId"],
+      model: input["model"],
       directory: input["directory"],
       enabled: input["enabled"],
     },

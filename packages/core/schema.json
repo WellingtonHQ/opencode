@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "200d1f44-3c0c-4faf-bc55-f15a3f7933d4",
+  "id": "23cc3a8d-6cab-4ab5-8e49-fab2b17e47dd",
   "prevIds": [
-    "f14a9b18-8207-487e-a3d3-227e629ba9ad"
+    "200d1f44-3c0c-4faf-bc55-f15a3f7933d4"
   ],
   "ddl": [
     {
@@ -873,6 +873,16 @@
       "default": null,
       "generated": null,
       "name": "agent_id",
+      "entityType": "columns",
+      "table": "scheduled_task"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "model",
       "entityType": "columns",
       "table": "scheduled_task"
     },

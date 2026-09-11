@@ -4,11 +4,13 @@ import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@opencode-ai/ui/v2/dialog-v2"
 import { DividerV2 } from "@opencode-ai/ui/v2/divider-v2"
 import { Field } from "@opencode-ai/ui/v2/field-v2"
+import { SelectV2 } from "@opencode-ai/ui/v2/select-v2"
 import { SegmentedControlV2, SegmentedControlItemV2 } from "@opencode-ai/ui/v2/segmented-control-v2"
 import { TextInputV2 } from "@opencode-ai/ui/v2/text-input-v2"
 import { TextareaV2 } from "@opencode-ai/ui/v2/textarea-v2"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { Agent } from "@opencode-ai/schema/agent"
+import { Model } from "@opencode-ai/schema/model"
 import { AbsolutePath } from "@opencode-ai/schema/schema"
 import { Schedule } from "@opencode-ai/schema/schedule"
 import { getFilename } from "@opencode-ai/core/util/path"
@@ -22,6 +24,11 @@ import { useDirectoryPicker } from "@/components/directory-picker"
 import { useServerSDK } from "@/context/server-sdk"
 
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0]
+
+type ModelOption = { key: string; name: string; group: string }
+
+// Non-empty sentinel for the "no override" option: SelectV2/Kobalte cannot select an option whose value is "".
+const DEFAULT_MODEL_KEY = "__default_model__"
 
 function toDatetimeLocalValue(value: number): string {
   const date = new Date(value)
@@ -55,6 +62,7 @@ export const DialogScheduleV2: Component<{ task?: Schedule.Info; defaultDirector
     prompt: props.task?.prompt ?? "",
     directory: props.defaultDirectory || (props.task ? props.task.directory : "") || "",
     agentId: props.task?.agentId as string | undefined,
+    modelKey: props.task?.model ? `${String(props.task.model.providerID)}:${props.task.model.id}` : DEFAULT_MODEL_KEY,
     kind: spec ? spec.kind : "daily",
     onceValue: spec && spec.kind === "once" ? toDatetimeLocalValue(spec.atMs) : defaultOnceValue(),
     timeValue: spec && (spec.kind === "daily" || spec.kind === "weekly") ? formatClock(spec.hour, spec.minute) : "09:00",
@@ -73,6 +81,41 @@ export const DialogScheduleV2: Component<{ task?: Schedule.Info; defaultDirector
   const agents = createMemo(
     () => (agentQuery.data ?? []).filter((agent) => agent.mode !== "subagent" && !agent.hidden).map((agent) => agent.name),
   )
+
+  const providerQuery = createQuery(
+    () => {
+      const options = sync().queryOptions.providers(pathKey(form.directory || "/"))
+      return form.directory ? options : { ...options, enabled: false }
+    },
+  )
+  const modelOptions = createMemo<ModelOption[]>(() => {
+    const data = providerQuery.data
+    if (!data) return []
+    const options = data.connected.flatMap((providerID) => {
+      const provider = data.all.get(providerID)
+      if (!provider) return []
+      return Object.values(provider.models).map((model) => ({ key: `${provider.id}:${model.id}`, name: model.name, group: provider.name }))
+    })
+    options.sort((a, b) => a.group.localeCompare(b.group) || a.name.localeCompare(b.name))
+    return options
+  })
+  const allModelOptions = createMemo<ModelOption[]>(() => [
+    { key: DEFAULT_MODEL_KEY, name: "Use default model", group: "" },
+    ...modelOptions(),
+  ])
+  const currentModelOption = createMemo(() => {
+    const options = allModelOptions()
+    return options.find((option) => option.key === form.modelKey) ?? options[0]
+  })
+
+  // null clears the stored override; a saved model that vanished from the catalog also resolves to null.
+  function resolveModel(): Model.Ref | null {
+    const key = form.modelKey
+    if (!key || key === DEFAULT_MODEL_KEY) return null
+    if (providerQuery.data && !modelOptions().some((option) => option.key === key)) return null
+    const separator = key.indexOf(":")
+    return { providerID: key.slice(0, separator), id: key.slice(separator + 1) } as Model.Ref
+  }
 
   function buildSpec(): { spec?: Schedule.Spec; error?: string } {
     const now = Date.now()
@@ -134,16 +177,18 @@ export const DialogScheduleV2: Component<{ task?: Schedule.Info; defaultDirector
     }
     setForm({ error: undefined, busy: true })
     // Agent IDs are branded on the wire but keyed by plain names everywhere else.
-    const input = {
+    const baseInput = {
       name: form.name.trim() || undefined,
       prompt,
       spec: built.spec,
       agentId: form.agentId ? (form.agentId as Agent.ID) : undefined,
       directory: form.directory as AbsolutePath,
     }
+    // An unset model is omitted on create but sent as null on update so a stored override clears.
+    const model = resolveModel()
     const action = props.task
-      ? scheduleApi(serverSDK().server.http).update(props.task.id, input)
-      : scheduleApi(serverSDK().server.http).create(input)
+      ? scheduleApi(serverSDK().server.http).update(props.task.id, { ...baseInput, model })
+      : scheduleApi(serverSDK().server.http).create(model ? { ...baseInput, model } : baseInput)
     void action
       .then(() => dialog.close())
       .catch((err: unknown) => setForm("error", formatServerError(err, language.t)))
@@ -209,6 +254,20 @@ export const DialogScheduleV2: Component<{ task?: Schedule.Info; defaultDirector
               </SegmentedControlV2>
             </Field>
           </Show>
+
+          <Field>
+            <Field.Label>Model</Field.Label>
+            <SelectV2<ModelOption>
+              appearance="large"
+              disabled={form.busy}
+              options={allModelOptions()}
+              current={currentModelOption()}
+              groupBy={(option) => option.group}
+              value={(option) => option.key}
+              label={(option) => option.name}
+              onSelect={(option) => setForm("modelKey", option ? option.key : DEFAULT_MODEL_KEY)}
+            />
+          </Field>
 
           <SegmentedControlV2 value={form.kind} disabled={form.busy} onChange={(value) => {
             if (!value) return
