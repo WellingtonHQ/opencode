@@ -58,6 +58,8 @@ export type HomeProjectsViewProps = {
   onCloseProject: (server: ServerConnection.Any, directory: string) => void
   onOpenSettings: () => void
   onOpenHelp: () => void
+  onToggleSchedules: () => void
+  schedulesActive: Accessor<boolean>
 }
 
 export function HomeProjectsView(props: HomeProjectsViewProps) {
@@ -148,6 +150,8 @@ export function HomeProjectsView(props: HomeProjectsViewProps) {
         class="mb-8 mt-4 hidden shrink-0 lg:flex"
         onOpenSettings={props.onOpenSettings}
         onOpenHelp={props.onOpenHelp}
+        onToggleSchedules={props.onToggleSchedules}
+        schedulesActive={props.schedulesActive}
         language={props.language}
       />
     </aside>
@@ -158,10 +162,22 @@ export function HomeUtilityNav(props: {
   class?: string
   onOpenSettings: () => void
   onOpenHelp: () => void
+  onToggleSchedules: () => void
+  schedulesActive: Accessor<boolean>
   language: ReturnType<typeof useLanguage>
 }) {
   return (
     <div class={`${props.class ?? ""} min-w-0 flex-col gap-1 pr-3`}>
+      <HomeProjectNavButton
+        type="button"
+        data-selected={props.schedulesActive() ? "" : undefined}
+        aria-pressed={props.schedulesActive()}
+        classList={{ "text-v2-text-text-faint [&>[data-slot=icon-svg]]:text-v2-icon-icon-muted": !props.schedulesActive() }}
+        onClick={props.onToggleSchedules}
+      >
+        <IconV2 name="status" size="small" />
+        <span class={HOME_PROJECT_NAV_LABEL}>{props.language.t("sidebar.schedules")}</span>
+      </HomeProjectNavButton>
       <HomeProjectNavButton
         type="button"
         class="text-v2-text-text-faint [&>[data-slot=icon-svg]]:text-v2-icon-icon-muted"

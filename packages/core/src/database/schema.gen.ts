@@ -125,6 +125,29 @@ export default {
         );
       `)
       yield* tx.run(`
+        CREATE TABLE \`scheduled_task\` (
+          \`id\` text PRIMARY KEY,
+          \`name\` text,
+          \`prompt\` text NOT NULL,
+          \`kind\` text NOT NULL,
+          \`at_ms\` integer,
+          \`hour\` integer,
+          \`minute\` integer,
+          \`days\` text,
+          \`expr\` text,
+          \`agent_id\` text,
+          \`directory\` text NOT NULL,
+          \`enabled\` integer DEFAULT true NOT NULL,
+          \`next_run_at_ms\` integer,
+          \`last_run_at_ms\` integer,
+          \`last_session_id\` text,
+          \`last_error\` text,
+          \`run_count\` integer DEFAULT 0 NOT NULL,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL
+        );
+      `)
+      yield* tx.run(`
         CREATE TABLE \`message\` (
           \`id\` text PRIMARY KEY,
           \`session_id\` text NOT NULL,
@@ -241,6 +264,7 @@ export default {
       yield* tx.run(
         `CREATE UNIQUE INDEX \`permission_project_action_resource_idx\` ON \`permission\` (\`project_id\`,\`action\`,\`resource\`);`,
       )
+      yield* tx.run(`CREATE INDEX \`scheduled_task_next_run_at_ms_idx\` ON \`scheduled_task\` (\`next_run_at_ms\`);`)
       yield* tx.run(
         `CREATE INDEX \`message_session_time_created_id_idx\` ON \`message\` (\`session_id\`,\`time_created\`,\`id\`);`,
       )

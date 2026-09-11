@@ -63,6 +63,17 @@ import type {
   CredentialsUpdateOutput,
   CredentialsRemoveInput,
   CredentialsRemoveOutput,
+  ServerScheduleListOutput,
+  ServerScheduleGetInput,
+  ServerScheduleGetOutput,
+  ServerScheduleCreateInput,
+  ServerScheduleCreateOutput,
+  ServerScheduleUpdateInput,
+  ServerScheduleUpdateOutput,
+  ServerScheduleRemoveInput,
+  ServerScheduleRemoveOutput,
+  ServerScheduleRunNowInput,
+  ServerScheduleRunNowOutput,
   PermissionsListRequestsInput,
   PermissionsListRequestsOutput,
   PermissionsListSavedInput,
@@ -659,6 +670,83 @@ export function make(options: ClientOptions) {
             successStatus: 204,
             declaredStatuses: [401, 400],
             empty: true,
+          },
+          requestOptions,
+        ),
+    },
+    "server.schedule": {
+      list: (requestOptions?: RequestOptions) =>
+        request<ServerScheduleListOutput>(
+          { method: "GET", path: `/api/schedule`, successStatus: 200, declaredStatuses: [401, 400], empty: false },
+          requestOptions,
+        ),
+      get: (input: ServerScheduleGetInput, requestOptions?: RequestOptions) =>
+        request<ServerScheduleGetOutput>(
+          {
+            method: "GET",
+            path: `/api/schedule/${encodeURIComponent(input.scheduleID)}`,
+            successStatus: 200,
+            declaredStatuses: [404, 401, 400],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      create: (input: ServerScheduleCreateInput, requestOptions?: RequestOptions) =>
+        request<ServerScheduleCreateOutput>(
+          {
+            method: "POST",
+            path: `/api/schedule`,
+            body: {
+              name: input["name"],
+              prompt: input["prompt"],
+              spec: input["spec"],
+              agentId: input["agentId"],
+              directory: input["directory"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 409, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      update: (input: ServerScheduleUpdateInput, requestOptions?: RequestOptions) =>
+        request<ServerScheduleUpdateOutput>(
+          {
+            method: "PATCH",
+            path: `/api/schedule/${encodeURIComponent(input.scheduleID)}`,
+            body: {
+              name: input["name"],
+              prompt: input["prompt"],
+              spec: input["spec"],
+              agentId: input["agentId"],
+              directory: input["directory"],
+              enabled: input["enabled"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 404, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      remove: (input: ServerScheduleRemoveInput, requestOptions?: RequestOptions) =>
+        request<ServerScheduleRemoveOutput>(
+          {
+            method: "DELETE",
+            path: `/api/schedule/${encodeURIComponent(input.scheduleID)}`,
+            successStatus: 200,
+            declaredStatuses: [404, 401, 400],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      runNow: (input: ServerScheduleRunNowInput, requestOptions?: RequestOptions) =>
+        request<ServerScheduleRunNowOutput>(
+          {
+            method: "POST",
+            path: `/api/schedule/${encodeURIComponent(input.scheduleID)}/run-now`,
+            successStatus: 200,
+            declaredStatuses: [404, 401, 400],
+            empty: false,
           },
           requestOptions,
         ),

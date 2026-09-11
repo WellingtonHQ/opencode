@@ -1,3 +1,4 @@
+import { Show } from "solid-js"
 import { ScrollView } from "@opencode-ai/ui/scroll-view"
 import { createHomeController } from "./home/home-controller"
 import { createHomeProjectsController } from "./home/home-projects-controller"
@@ -7,6 +8,7 @@ import { createHomeScrollController } from "./home/home-scroll-controller"
 import { createHomeSessionSearchController } from "./home/home-session-search-controller"
 import { createHomeSessionsController } from "./home/home-sessions-controller"
 import { HomeSessions } from "./home/home-sessions"
+import { SidebarSchedules } from "./layout/sidebar-schedules"
 
 export function NewHome() {
   const home = createHomeController()
@@ -36,11 +38,15 @@ export function NewHome() {
           `}
         >
           <HomeProjects projects={projects} scroll={scroll} />
-          <HomeSessions sessions={sessions} search={search} scroll={scroll} />
+          <Show when={projects.utility.schedules.open()} fallback={<HomeSessions sessions={sessions} search={search} scroll={scroll} />}>
+            <SidebarSchedules defaultDirectory={home.project.selected()?.worktree} />
+          </Show>
           <HomeUtilityNav
             class="flex lg:hidden"
             onOpenSettings={projects.utility.settings}
             onOpenHelp={projects.utility.help}
+            onToggleSchedules={projects.utility.schedules.toggle}
+            schedulesActive={projects.utility.schedules.open}
             language={projects.copy.language}
           />
         </div>

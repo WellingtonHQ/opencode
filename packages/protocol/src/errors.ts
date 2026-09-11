@@ -109,3 +109,20 @@ export class PtyNotFoundError extends Schema.TaggedErrorClass<PtyNotFoundError>(
   },
   { httpApiStatus: 404 },
 ) {}
+
+export class ScheduleNotFoundError extends Schema.TaggedErrorClass<ScheduleNotFoundError>()(
+  "ScheduleNotFoundError",
+  {
+    scheduleID: Schema.String,
+    message: Schema.String,
+  },
+  { httpApiStatus: 404 },
+) {}
+
+export class ScheduleLimitExceededError extends Schema.TaggedErrorClass<ScheduleLimitExceededError>()(
+  "ScheduleLimitExceededError",
+  {
+    message: Schema.String,
+  },
+  { httpApiStatus: 409 },
+) {}

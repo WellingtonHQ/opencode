@@ -1,0 +1,78 @@
+---
+title: Schedules
+description: Run a prompt on a schedule with scheduled tasks.
+---
+
+Scheduled tasks let you run a prompt automatically at fixed times without starting a session yourself. Tasks are stored in the global opencode database so they survive restarts, and every time one fires it starts a new background session in the task's directory — your normal sessions are never touched.
+
+You can create and manage schedules from OpenCode Desktop or the web app, or with the `schedule` CLI command against a running server.
+
+---
+
+## Create from the UI
+
+Open the **Schedules** button on the sidebar rail to see all of your tasks. The panel lists each task's name and prompt, its schedule summary, next run time, an enable toggle, Run now, and delete.
+
+To create or edit a task you pick one of four schedule types: One-time, Daily, Weekly, or Cron. Weekly shows Monday–Sunday day chips plus a time picker; cron is the raw 5-field expression for when none of the other three fits. All times are in your local timezone.
+
+---
+
+## Create from the CLI
+
+The `schedule` command talks to a running `opencode serve` instance or the server built into OpenCode Desktop:
+
+```bash
+opencode schedule add "Summarize the latest news" --name daily-news --daily "09:30"
+opencode schedule add "Draft quarterly report outline" --at "2026-09-12 02:11"
+opencode schedule add "Prepare standup notes" --weekly "mon,wed 14:00"
+opencode schedule add "Nightly cleanup check" --cron "30 2 * * *"
+```
+
+Manage existing tasks by their ID, which you can get from `list`:
+
+```bash
+opencode schedule list            # or -f json
+opencode schedule enable <id>
+opencode schedule disable <id>
+opencode schedule remove <id>
+opencode schedule run-now <id>
+```
+
+Every command accepts these flags:
+
+| Flag         | Short     | Description                                                                                     |
+| ------------ | --------- | ----------------------------------------------------------------------------------------------- |
+| `--server`   |           | Server URL (default `http://localhost:4096`)                                                    |
+| `--username` | `-u`      | Basic auth username, falls back to `OPENCODE_SERVER_USERNAME`                                   |
+| `--password` | `-p`      | Basic auth password, falls back to `OPENCODE_SERVER_PASSWORD`                                   |
+
+The `--weekly` days accept `sun` through `sat` names or `0`–`6`. The `--at` value is a local date and time in `yyyy-MM-dd HH:mm` format and must be in the future; one-time tasks auto-disable after they fire.
+
+---
+
+## Schedule types
+
+| Type     | Example            | Fires                                                                  |
+| -------- | ------------------ | ---------------------------------------------------------------------- |
+| One-time | `2026-09-12 02:11` | Once at that local date and time, then it disables itself              |
+| Daily    | `09:30`            | Every day at that local time                                           |
+| Weekly   | `mon,wed 14:00`    | On the chosen weekdays (`sun`–`sat` or `0`–`6`) at that local time     |
+| Cron     | `30 2 * * *`       | Standard 5-field cron expression, evaluated in your local timezone     |
+
+Cron expressions use the fields minute, hour, day-of-month, month, and day-of-week. They support `*`, ranges, steps, and comma-separated lists; weekday is `0`–`7` with both `0` and `7` meaning Sunday. When both the day-of-month and day-of-week fields are constrained, vixie semantics apply — the task fires when either one matches. `L`, `W`, `?`, and month or weekday names are not supported.
+
+---
+
+## How scheduled tasks run
+
+- The server checks for due tasks every ~15 seconds while it is running.
+- If a task was missed because the app or server was closed at fire time, it fires once on the next startup — one catch-up, never repeated.
+- Recurring schedules are recomputed from wall-clock local time and are DST-aware: a daily 09:30 stays 09:30 through daylight-saving transitions.
+- Each run creates a new background session in the task's working directory, optionally with a chosen agent. The run shows up as an ordinary session you can open; if a run fails to start it is reported on the task itself.
+
+---
+
+## Limitations
+
+- Tasks only fire while an opencode server is running — OpenCode Desktop keeps one alive for you, otherwise use `opencode serve`.
+- Up to 50 scheduled tasks are stored in the global database.

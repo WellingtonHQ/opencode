@@ -11,7 +11,7 @@ import { closeHomeProject, errorMessage, homeProjectDirectories } from "@/pages/
 import { Persist, persisted } from "@/utils/persist"
 import { showToast } from "@/utils/toast"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
-import { createResource } from "solid-js"
+import { createEffect, createResource } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { HomeController } from "./home-controller"
 
@@ -32,6 +32,15 @@ export function createHomeProjectsController(home: HomeController) {
     (promise) => promise.then(() => _state),
     { initialValue: _state },
   )
+  const [schedules, setSchedules] = createStore({ open: false })
+  let lastSelection = home.selection.value()
+  createEffect(() => {
+    // Any selection change (project pick, server focus, close, add) exits the schedules view.
+    const selection = home.selection.value()
+    if (selection === lastSelection) return
+    lastSelection = selection
+    setSchedules("open", false)
+  })
   function directories(project: LocalProject) {
     return [project.worktree, ...(project.sandboxes ?? [])]
   }
@@ -62,7 +71,12 @@ export function createHomeProjectsController(home: HomeController) {
         serverManagement.setDefault(conn ? ServerConnection.key(conn) : null),
       remove: (conn: ServerConnection.Any) => serverManagement.handleRemove(ServerConnection.key(conn)),
       edit: (conn: ServerConnection.Http) => dialog.show(() => <DialogServerV2 mode="edit" server={conn} />),
-      focus: home.selection.focusServer,
+      // A click can land on an already-focused server, which does not change
+      // selection; row clicks must still leave the schedules view.
+      focus: (conn: ServerConnection.Any) => {
+        setSchedules("open", false)
+        home.selection.focusServer(conn)
+      },
     },
     project: {
       list: home.project.list,
@@ -121,6 +135,10 @@ export function createHomeProjectsController(home: HomeController) {
     utility: {
       settings: openSettings,
       help: () => platform.openExternal("https://opencode.ai/desktop-feedback"),
+      schedules: {
+        open: () => schedules.open,
+        toggle: () => setSchedules("open", !schedules.open),
+      },
     },
   }
 }

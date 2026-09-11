@@ -35,6 +35,8 @@ export function HomeProjects(props: { projects: HomeProjectsController; scroll: 
       onCloseProject={props.projects.project.close}
       onOpenSettings={props.projects.utility.settings}
       onOpenHelp={props.projects.utility.help}
+      onToggleSchedules={props.projects.utility.schedules.toggle}
+      schedulesActive={props.projects.utility.schedules.open}
     />
   )
 }

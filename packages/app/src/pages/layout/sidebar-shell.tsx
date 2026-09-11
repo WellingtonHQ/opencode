@@ -30,11 +30,33 @@ export const SidebarContent = (props: {
   onOpenSettings: () => void
   helpLabel: Accessor<string>
   onOpenHelp: () => void
+  schedules?: {
+    label: Accessor<string>
+    active: Accessor<boolean>
+    toggle: () => void
+  }
   renderPanel: () => JSX.Element
 }): JSX.Element => {
   const expanded = createMemo(() => !!props.mobile || props.opened())
   const placement = () => (props.mobile ? "bottom" : "right")
   let panel: HTMLDivElement | undefined
+
+  const scheduleButton = (): JSX.Element | null => {
+    if (!props.schedules) return null
+    return (
+      <Tooltip placement={placement()} value={props.schedules.label()}>
+        <IconButton
+          icon="calendar"
+          variant="ghost"
+          size="large"
+          onClick={props.schedules.toggle}
+          aria-label={props.schedules.label()}
+          aria-pressed={props.schedules.active()}
+          classList={{ "bg-surface-raised-base text-text-strong": props.schedules.active() }}
+        />
+      </Tooltip>
+    )
+  }
 
   createEffect(() => {
     const el = panel
@@ -90,6 +112,7 @@ export const SidebarContent = (props: {
           </DragDropProvider>
         </div>
         <div class="shrink-0 w-full pt-3 pb-6 flex flex-col items-center gap-2">
+          {scheduleButton()}
           <TooltipKeybind placement={placement()} title={props.settingsLabel()} keybind={props.settingsKeybind() ?? ""}>
             <IconButton
               icon="settings-gear"

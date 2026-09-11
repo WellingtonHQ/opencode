@@ -82,6 +82,7 @@ import {
 } from "./layout/sidebar-workspace"
 import { ProjectDragOverlay, SortableProject, type ProjectSidebarContext } from "./layout/sidebar-project"
 import { SidebarContent } from "./layout/sidebar-shell"
+import { SidebarSchedules } from "./layout/sidebar-schedules"
 
 export default function LegacyLayout(props: ParentProps) {
   const serverSDK = useServerSDK()
@@ -156,6 +157,7 @@ export default function LegacyLayout(props: ParentProps) {
     peek: undefined as string | undefined,
     peeked: false,
     debugTools: true,
+    schedulesPanel: false,
   })
 
   const updateVersion = () => {
@@ -2239,9 +2241,19 @@ export default function LegacyLayout(props: ParentProps) {
       onOpenSettings={openSettings}
       helpLabel={() => language.t("sidebar.help")}
       onOpenHelp={() => platform.openExternal("https://opencode.ai/desktop-feedback")}
-      renderPanel={() =>
-        mobile ? <SidebarPanel project={currentProject} mobile /> : <SidebarPanel project={currentProject} merged />
-      }
+      schedules={{
+        label: () => language.t("sidebar.schedules"),
+        active: () => state.schedulesPanel,
+        toggle: () => {
+          const next = !state.schedulesPanel
+          setState("schedulesPanel", next)
+          if (next && !layout.sidebar.opened()) layout.sidebar.open()
+        },
+      }}
+      renderPanel={() => {
+        if (state.schedulesPanel) return <SidebarSchedules defaultDirectory={currentProject()?.worktree} />
+        return mobile ? <SidebarPanel project={currentProject} mobile /> : <SidebarPanel project={currentProject} merged />
+      }}
     />
   )
 

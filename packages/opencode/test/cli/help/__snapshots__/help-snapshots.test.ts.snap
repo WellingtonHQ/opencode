@@ -403,6 +403,31 @@ Options:
       --format      Output format                 [string] [choices: "json", "tsv"] [default: "tsv"]"
 `;
 
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode schedule --help 1`] = `
+"opencode schedule
+
+manage scheduled prompt tasks
+
+Commands:
+  opencode schedule list          list scheduled tasks on a running opencode server
+  opencode schedule add <prompt>  create a scheduled prompt task
+  opencode schedule remove <id>   remove a scheduled task
+  opencode schedule enable <id>   re-enable a paused scheduled task
+  opencode schedule disable <id>  pause a scheduled task without removing it
+  opencode schedule run-now <id>  run a scheduled task immediately, ignoring its schedule and
+                                  enabled state
+
+Options:
+  -h, --help        show help                                                              [boolean]
+  -v, --version     show version number                                                    [boolean]
+      --print-logs  print logs to stderr                                                   [boolean]
+      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure        run without external plugins                                           [boolean]
+      --server      opencode server to manage            [string] [default: "http://localhost:4096"]
+  -p, --password    basic auth password (defaults to OPENCODE_SERVER_PASSWORD)              [string]
+  -u, --username    basic auth username (defaults to OPENCODE_SERVER_USERNAME or opencode)  [string]"
+`;
+
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode mcp list --help 1`] = `
 "opencode mcp list
 
@@ -620,4 +645,123 @@ Options:
       --print-logs  print logs to stderr                                                   [boolean]
       --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
       --pure        run without external plugins                                           [boolean]"
+`;
+
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode schedule list --help 1`] = `
+"opencode schedule list
+
+list scheduled tasks on a running opencode server
+
+Options:
+  -h, --help        show help                                                              [boolean]
+  -v, --version     show version number                                                    [boolean]
+      --print-logs  print logs to stderr                                                   [boolean]
+      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure        run without external plugins                                           [boolean]
+      --server      opencode server to manage            [string] [default: "http://localhost:4096"]
+  -p, --password    basic auth password (defaults to OPENCODE_SERVER_PASSWORD)              [string]
+  -u, --username    basic auth username (defaults to OPENCODE_SERVER_USERNAME or opencode)  [string]
+  -f, --format                                [string] [choices: "table", "json"] [default: "table"]"
+`;
+
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode schedule add --help 1`] = `
+"opencode schedule add <prompt>
+
+create a scheduled prompt task
+
+Positionals:
+  prompt  prompt to run on schedule                                              [string] [required]
+
+Options:
+  -h, --help        show help                                                              [boolean]
+  -v, --version     show version number                                                    [boolean]
+      --print-logs  print logs to stderr                                                   [boolean]
+      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure        run without external plugins                                           [boolean]
+      --server      opencode server to manage            [string] [default: "http://localhost:4096"]
+  -p, --password    basic auth password (defaults to OPENCODE_SERVER_PASSWORD)              [string]
+  -u, --username    basic auth username (defaults to OPENCODE_SERVER_USERNAME or opencode)  [string]
+      --name        human-readable task name                                                [string]
+      --agent       agent to run the prompt with (defaults to the server's default agent)   [string]
+      --at          one-shot, local time — "yyyy-MM-dd HH:mm"                               [string]
+      --daily       every day at a local "HH:mm" time                                       [string]
+      --weekly      given days and a local "HH:mm" time (e.g. mon,wed 14:00); days are sun..sat or
+                    0-6                                                                      [array]
+      --cron        5-field cron expression in the local timezone (e.g. "30 9 * * 1")       [string]"
+`;
+
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode schedule remove --help 1`] = `
+"opencode schedule remove <id>
+
+remove a scheduled task
+
+Positionals:
+  id  task ID to remove                                                          [string] [required]
+
+Options:
+  -h, --help        show help                                                              [boolean]
+  -v, --version     show version number                                                    [boolean]
+      --print-logs  print logs to stderr                                                   [boolean]
+      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure        run without external plugins                                           [boolean]
+      --server      opencode server to manage            [string] [default: "http://localhost:4096"]
+  -p, --password    basic auth password (defaults to OPENCODE_SERVER_PASSWORD)              [string]
+  -u, --username    basic auth username (defaults to OPENCODE_SERVER_USERNAME or opencode)  [string]"
+`;
+
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode schedule enable --help 1`] = `
+"opencode schedule enable <id>
+
+re-enable a paused scheduled task
+
+Positionals:
+  id  task ID to enable                                                          [string] [required]
+
+Options:
+  -h, --help        show help                                                              [boolean]
+  -v, --version     show version number                                                    [boolean]
+      --print-logs  print logs to stderr                                                   [boolean]
+      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure        run without external plugins                                           [boolean]
+      --server      opencode server to manage            [string] [default: "http://localhost:4096"]
+  -p, --password    basic auth password (defaults to OPENCODE_SERVER_PASSWORD)              [string]
+  -u, --username    basic auth username (defaults to OPENCODE_SERVER_USERNAME or opencode)  [string]"
+`;
+
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode schedule disable --help 1`] = `
+"opencode schedule disable <id>
+
+pause a scheduled task without removing it
+
+Positionals:
+  id  task ID to disable                                                         [string] [required]
+
+Options:
+  -h, --help        show help                                                              [boolean]
+  -v, --version     show version number                                                    [boolean]
+      --print-logs  print logs to stderr                                                   [boolean]
+      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure        run without external plugins                                           [boolean]
+      --server      opencode server to manage            [string] [default: "http://localhost:4096"]
+  -p, --password    basic auth password (defaults to OPENCODE_SERVER_PASSWORD)              [string]
+  -u, --username    basic auth username (defaults to OPENCODE_SERVER_USERNAME or opencode)  [string]"
+`;
+
+exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode schedule run-now --help 1`] = `
+"opencode schedule run-now <id>
+
+run a scheduled task immediately, ignoring its schedule and enabled state
+
+Positionals:
+  id  task ID to run now                                                         [string] [required]
+
+Options:
+  -h, --help        show help                                                              [boolean]
+  -v, --version     show version number                                                    [boolean]
+      --print-logs  print logs to stderr                                                   [boolean]
+      --log-level   log level                   [string] [choices: "DEBUG", "INFO", "WARN", "ERROR"]
+      --pure        run without external plugins                                           [boolean]
+      --server      opencode server to manage            [string] [default: "http://localhost:4096"]
+  -p, --password    basic auth password (defaults to OPENCODE_SERVER_PASSWORD)              [string]
+  -u, --username    basic auth username (defaults to OPENCODE_SERVER_USERNAME or opencode)  [string]"
 `;
