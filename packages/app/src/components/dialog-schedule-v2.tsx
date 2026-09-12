@@ -256,7 +256,7 @@ export const DialogScheduleV2: Component<{ task?: Schedule.Info; defaultDirector
           </Show>
 
           <Field>
-            <Field.Label>Model</Field.Label>
+            <Field.Label>{language.t("schedule.dialog.model.label")}</Field.Label>
             <SelectV2<ModelOption>
               appearance="large"
               disabled={form.busy}

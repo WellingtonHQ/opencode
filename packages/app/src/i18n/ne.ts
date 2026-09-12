@@ -1176,6 +1176,7 @@ export const dict: Record<string, string> = {
   "schedule.dialog.project.placeholder": "No folder selected",
   "schedule.dialog.project.change": "Change",
   "schedule.dialog.agent.label": "Agent",
+  "schedule.dialog.model.label": "Model",
   "schedule.dialog.frequency.once": "One-time",
   "schedule.dialog.frequency.daily": "Daily",
   "schedule.dialog.frequency.weekly": "Weekly",
