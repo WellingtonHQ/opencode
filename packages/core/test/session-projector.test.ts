@@ -19,7 +19,8 @@ import { SessionMessageUpdater } from "@opencode-ai/core/session/message-updater
 import { SessionProjector } from "@opencode-ai/core/session/projector"
 import { SessionExecution } from "@opencode-ai/core/session/execution"
 import { SessionInput } from "@opencode-ai/core/session/input"
-import { SessionInputTable, SessionMessageTable, SessionTable } from "@opencode-ai/core/session/sql"
+import { MessageTable, PartTable, SessionInputTable, SessionMessageTable, SessionTable } from "@opencode-ai/core/session/sql"
+import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { testEffect } from "./lib/effect"
 import { Snapshot } from "@opencode-ai/core/snapshot"
 import { Location } from "@opencode-ai/core/location"
@@ -562,6 +563,253 @@ describe("SessionProjector", () => {
           time: { created },
         }),
       ])
+    }),
+  )
+
+  it.effect("mirrors V2 prompt and assistant turns into the legacy message tables", () =>
+    Effect.gen(function* () {
+      const { db } = yield* Database.Service
+      yield* db
+        .insert(ProjectTable)
+        .values({ id: Project.ID.global, worktree: AbsolutePath.make("/project"), sandboxes: [] })
+        .run()
+        .pipe(Effect.orDie)
+      const userMsg = SessionMessage.ID.make("msg_mirror_user")
+      const asstMsg = SessionMessage.ID.make("msg_mirror_asst")
+      yield* db
+        .insert(SessionTable)
+        .values({
+          id: sessionID,
+          project_id: Project.ID.global,
+          slug: "test",
+          directory: "/project",
+          title: "New session - 1970-01-01T00:00:00.000Z",
+          version: "test",
+        })
+        .run()
+        .pipe(Effect.orDie)
+      const events = yield* EventV2.Service
+
+      yield* events.publish(SessionEvent.Prompted, {
+        sessionID,
+        messageID: userMsg,
+        timestamp: DateTime.makeUnsafe(1),
+        prompt: Prompt.make({ text: "mirror me please" }),
+        delivery: "steer",
+      })
+      // The prompt row is not mirrored yet: no assistant has resolved its agent/model. The title fallback still applies.
+      expect(yield* db.select().from(MessageTable).all()).toEqual([])
+      expect((yield* db.select({ title: SessionTable.title }).from(SessionTable).get())?.title).toBe("mirror me please")
+
+      yield* events.publish(SessionEvent.Step.Started, {
+        sessionID,
+        assistantMessageID: asstMsg,
+        timestamp: DateTime.makeUnsafe(2),
+        agent: "build",
+        model,
+      })
+      yield* events.publish(SessionEvent.Reasoning.Started, {
+        sessionID,
+        assistantMessageID: asstMsg,
+        timestamp: DateTime.makeUnsafe(3),
+        reasoningID: "rsn-1",
+      })
+      yield* events.publish(SessionEvent.Reasoning.Ended, {
+        sessionID,
+        assistantMessageID: asstMsg,
+        timestamp: DateTime.makeUnsafe(4),
+        reasoningID: "rsn-1",
+        text: "thinking about it",
+      })
+      yield* events.publish(SessionEvent.Text.Started, {
+        sessionID,
+        assistantMessageID: asstMsg,
+        timestamp: DateTime.makeUnsafe(5),
+        textID: "txt-1",
+      })
+      yield* events.publish(SessionEvent.Text.Ended, {
+        sessionID,
+        assistantMessageID: asstMsg,
+        timestamp: DateTime.makeUnsafe(6),
+        textID: "txt-1",
+        text: "hello world",
+      })
+      yield* events.publish(SessionEvent.Tool.Input.Started, {
+        sessionID,
+        assistantMessageID: asstMsg,
+        timestamp: DateTime.makeUnsafe(7),
+        callID: "call-1",
+        name: "read",
+      })
+      yield* events.publish(SessionEvent.Tool.Called, {
+        sessionID,
+        assistantMessageID: asstMsg,
+        timestamp: DateTime.makeUnsafe(8),
+        callID: "call-1",
+        tool: "read",
+        input: { filePath: "/project/README.md" },
+        provider: { executed: true },
+      })
+      yield* events.publish(SessionEvent.Tool.Success, {
+        sessionID,
+        assistantMessageID: asstMsg,
+        timestamp: DateTime.makeUnsafe(9),
+        callID: "call-1",
+        structured: {},
+        content: [{ type: "text", text: "# ReadMe" }],
+        provider: { executed: true },
+      })
+      yield* events.publish(SessionEvent.Step.Ended, {
+        sessionID,
+        assistantMessageID: asstMsg,
+        timestamp: DateTime.makeUnsafe(10),
+        finish: "stop",
+        cost: 0.5,
+        tokens: { input: 2, output: 3, reasoning: 4, cache: { read: 5, write: 6 } },
+      })
+
+      const messages = yield* db
+        .select()
+        .from(MessageTable)
+        .where(eq(MessageTable.session_id, sessionID))
+        .orderBy(asc(MessageTable.time_created), asc(MessageTable.id))
+        .all()
+        .pipe(Effect.orDie)
+      expect(messages.map((row) => String(row.id))).toEqual([String(userMsg), String(asstMsg)])
+      expect(messages[0]?.data).toMatchObject({ role: "user", agent: "build", model: { providerID: "provider", modelID: "model" } })
+      expect(messages[1]?.data).toMatchObject({
+        role: "assistant",
+        agent: "build",
+        mode: "build",
+        parentID: String(userMsg),
+        path: { cwd: "/project", root: "/project" },
+        finish: "stop",
+        cost: 0.5,
+      })
+
+      const userParts = yield* db
+        .select()
+        .from(PartTable)
+        .where(eq(PartTable.message_id, SessionV1.MessageID.ascending(String(userMsg))))
+        .all()
+        .pipe(Effect.orDie)
+      expect(userParts).toHaveLength(1)
+      expect(userParts[0]?.data).toMatchObject({ type: "text", text: "mirror me please" })
+
+      const parts = yield* db
+        .select()
+        .from(PartTable)
+        .where(eq(PartTable.message_id, SessionV1.MessageID.ascending(String(asstMsg))))
+        .orderBy(asc(PartTable.id))
+        .all()
+        .pipe(Effect.orDie)
+      expect(parts.map((row) => row.data.type)).toEqual(["step-start", "reasoning", "text", "tool", "step-finish"])
+      expect(parts[1]?.data).toMatchObject({ type: "reasoning", text: "thinking about it" })
+      expect(parts[2]?.data).toMatchObject({ type: "text", text: "hello world" })
+      expect(parts[3]?.data).toMatchObject({
+        type: "tool",
+        tool: "read",
+        state: { status: "completed", output: "# ReadMe", title: "/project/README.md", input: { filePath: "/project/README.md" } },
+      })
+      expect(parts[4]?.data).toMatchObject({
+        type: "step-finish",
+        reason: "stop",
+        cost: 0.5,
+        tokens: { input: 2, output: 3, reasoning: 4, cache: { read: 5, write: 6 } },
+      })
+
+      expect(yield* db.select().from(SessionTable).where(eq(SessionTable.id, sessionID)).get()).toMatchObject({
+        cost: 0.5,
+        tokens_input: 2,
+        tokens_output: 3,
+        tokens_reasoning: 4,
+        tokens_cache_read: 5,
+        tokens_cache_write: 6,
+      })
+
+      // Appending more content re-derives the mirror; usage must reconcile, not accumulate.
+      yield* events.publish(SessionEvent.Text.Started, {
+        sessionID,
+        assistantMessageID: asstMsg,
+        timestamp: DateTime.makeUnsafe(11),
+        textID: "txt-2",
+      })
+      yield* events.publish(SessionEvent.Text.Ended, {
+        sessionID,
+        assistantMessageID: asstMsg,
+        timestamp: DateTime.makeUnsafe(12),
+        textID: "txt-2",
+        text: "second block",
+      })
+
+      const partsAgain = yield* db
+        .select()
+        .from(PartTable)
+        .where(eq(PartTable.message_id, SessionV1.MessageID.ascending(String(asstMsg))))
+        .orderBy(asc(PartTable.id))
+        .all()
+        .pipe(Effect.orDie)
+      expect(partsAgain.map((row) => row.data.type)).toEqual(["step-start", "reasoning", "text", "tool", "text", "step-finish"])
+      expect(yield* db.select().from(SessionTable).where(eq(SessionTable.id, sessionID)).get()).toMatchObject({
+        cost: 0.5,
+        tokens_input: 2,
+        tokens_output: 3,
+        tokens_reasoning: 4,
+        tokens_cache_read: 5,
+        tokens_cache_write: 6,
+      })
+    }),
+  )
+
+  it.effect("drops mirrored legacy rows when a revert commit truncates the aggregate", () =>
+    Effect.gen(function* () {
+      const { db } = yield* Database.Service
+      yield* db
+        .insert(ProjectTable)
+        .values({ id: Project.ID.global, worktree: AbsolutePath.make("/project"), sandboxes: [] })
+        .run()
+        .pipe(Effect.orDie)
+      yield* db
+        .insert(SessionTable)
+        .values({
+          id: sessionID,
+          project_id: Project.ID.global,
+          slug: "test",
+          directory: "/project",
+          title: "test",
+          version: "test",
+        })
+        .run()
+        .pipe(Effect.orDie)
+      const boundary = SessionMessage.ID.make("msg_mirror_boundary")
+      const later = SessionMessage.ID.make("msg_mirror_later")
+      yield* db
+        .insert(SessionMessageTable)
+        .values([assistantRow(boundary, 1), assistantRow(later, 2)])
+        .run()
+        .pipe(Effect.orDie)
+
+      // Backfill the mirror from existing V2 rows, as a one-off repair would.
+      yield* SessionProjector.syncLegacyMirror(db, sessionID)
+      expect((yield* db.select().from(MessageTable).all()).map((row) => String(row.id))).toEqual([
+        String(boundary),
+        String(later),
+      ])
+
+      const events = yield* EventV2.Service
+      yield* events.publish(SessionEvent.RevertEvent.Committed, {
+        sessionID,
+        messageID: boundary,
+        timestamp: DateTime.makeUnsafe(4),
+      })
+
+      expect((yield* db.select({ id: SessionMessageTable.id }).from(SessionMessageTable).all()).map((row) => String(row.id))).toEqual([
+        String(boundary),
+      ])
+      expect((yield* db.select().from(MessageTable).all()).map((row) => String(row.id))).toEqual([String(boundary)])
+      expect(
+        (yield* db.select().from(PartTable).where(eq(PartTable.session_id, sessionID)).all()).map((row) => String(row.message_id)),
+      ).toEqual([String(boundary)])
     }),
   )
 })
