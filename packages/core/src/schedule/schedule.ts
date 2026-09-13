@@ -502,7 +502,6 @@ const layer = Layer.effect(
           return yield* new PastOneShotError({ atMs: input.spec.atMs })
       }
       const set: Partial<typeof ScheduledTaskTable.$inferInsert> = {}
-      // Never touch last_fired_slot here: a stale cursor is always in the past and stays a valid lower bound for the next schedule.
       if (input.name !== undefined) {
         if (!input.name.trim()) return yield* new InvalidSpecError({ message: "name must not be empty" })
         set.name = input.name.trim()
@@ -511,7 +510,11 @@ const layer = Layer.effect(
         if (!input.promptText.trim()) return yield* new InvalidSpecError({ message: "promptText must not be empty" })
         set.prompt_text = input.promptText
       }
-      if (input.spec !== undefined) Object.assign(set, encodeSpecColumns(input.spec))
+      if (input.spec !== undefined) {
+        Object.assign(set, encodeSpecColumns(input.spec))
+        // Re-specifying a task resyncs its fire cursor like create(): an updated one-shot must become due again at its new time — the stale cursor would keep it marked fired forever — and a recurring spec starts counting from now so already-passed slots are not replayed.
+        set.last_fired_slot = input.spec.kind === "one_shot" ? null : minuteSlotOf(Date.now())
+      }
       if (input.directory !== undefined) {
         if (!ABSOLUTE_DIRECTORY_RE.test(input.directory))
           return yield* new InvalidSpecError({ message: "directory must be an absolute path" })

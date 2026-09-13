@@ -1,6 +1,18 @@
 import { describe, expect, test } from "bun:test"
+import { Effect, Layer } from "effect"
+import { eq } from "drizzle-orm"
+import { Database } from "@opencode-ai/core/database/database"
+import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { EventV2 } from "@opencode-ai/core/event"
 import * as Cron from "@opencode-ai/core/schedule/cron"
-import { latestDueSlot, nextFireMs, type ScheduleSpec } from "@opencode-ai/core/schedule/schedule"
+import { ScheduledTaskTable } from "@opencode-ai/core/schedule/sql"
+import { ScheduleV2, latestDueSlot, nextFireMs, type ScheduleSpec } from "@opencode-ai/core/schedule/schedule"
+import { SessionExecution } from "@opencode-ai/core/session/execution"
+import { SessionProjector } from "@opencode-ai/core/session/projector"
+import { SessionStore } from "@opencode-ai/core/session/store"
+import { SessionV2 } from "@opencode-ai/core/session"
+import { testEffect } from "./lib/effect"
 
 const at = (year: number, month: number, day: number, hours = 0, minutes = 0) => new Date(year, month, day, hours, minutes).getTime()
 // January avoids DST transitions in every timezone.
@@ -243,4 +255,82 @@ describe("validators", () => {
     expect(Cron.isValidDayList([1.5])).toBe(false)
     expect(Cron.isValidDayList([-1])).toBe(false)
   })
+})
+
+const execution = Layer.succeed(
+  SessionExecution.Service,
+  SessionExecution.Service.of({
+    active: Effect.succeed(new Set()),
+    resume: () => Effect.void,
+    interrupt: () => Effect.void,
+    wake: () => Effect.void,
+  }),
+)
+
+const itSchedule = testEffect(
+  AppNodeBuilder.build(
+    LayerNode.group([Database.node, EventV2.node, SessionProjector.node, SessionStore.node, SessionV2.node, ScheduleV2.node]),
+    [[SessionExecution.node, execution]],
+  ),
+)
+
+describe("ScheduleV2.update", () => {
+  itSchedule.effect("resets the fire cursor when a fired one-shot is re-specified", () =>
+    Effect.gen(function* () {
+      const schedule = yield* ScheduleV2.Service
+      const { db } = yield* Database.Service
+
+      const created = yield* schedule.create({
+        name: "Re-arm target",
+        promptText: "ping",
+        spec: { kind: "one_shot", atMs: at(J1.y, J1.m, 5, 9) },
+        directory: "/rearm-project",
+      })
+
+      // Simulate the task having fired once; tick() stores the fired slot in the cursor.
+      yield* db
+        .update(ScheduledTaskTable)
+        .set({ last_fired_slot: at(J1.y, J1.m, 5, 9) })
+        .where(eq(ScheduledTaskTable.id, created.id))
+        .run()
+        .pipe(Effect.orDie)
+
+      const updated = yield* schedule.update(created.id, { spec: { kind: "one_shot", atMs: at(J1.y, J1.m, 6, 9) } })
+
+      // A stale cursor keeps a one-shot marked fired forever; re-specifying must clear it.
+      expect(updated.lastFiredSlot).toBeNull()
+    }),
+  )
+
+  itSchedule.live("fires a re-armed one-shot at its new time", () =>
+    Effect.gen(function* () {
+      const schedule = yield* ScheduleV2.Service
+
+      const created = yield* schedule.create({
+        name: "Re-fire target",
+        promptText: "ping",
+        spec: { kind: "one_shot", atMs: Date.now() + 40 },
+        directory: "/refire-project",
+      })
+
+      // Wait past the original slot, then tick so it fires.
+      yield* Effect.sleep("250 millis")
+      yield* schedule.tick()
+      // Let the forked launch fiber record its run row before asserting on history.
+      yield* Effect.sleep("300 millis")
+      const before = yield* schedule.listRuns(created.id)
+      expect(before).toHaveLength(1)
+      expect(before[0].status).toBe("fired")
+
+      // Re-arm with a new time; the stale cursor would keep this from ever becoming due again.
+      yield* schedule.update(created.id, { spec: { kind: "one_shot", atMs: Date.now() + 40 } })
+      yield* Effect.sleep("250 millis")
+      yield* schedule.tick()
+      yield* Effect.sleep("300 millis")
+
+      const after = yield* schedule.listRuns(created.id)
+      expect(after).toHaveLength(2)
+      expect(after.every((run) => run.status === "fired")).toBe(true)
+    }),
+  )
 })
