@@ -4,14 +4,18 @@ import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@opencode-ai/ui/v2/dialog-v2"
 import { DividerV2 } from "@opencode-ai/ui/v2/divider-v2"
 import { Field } from "@opencode-ai/ui/v2/field-v2"
+import { Icon } from "@opencode-ai/ui/v2/icon"
 import { SegmentedControlV2, SegmentedControlItemV2 } from "@opencode-ai/ui/v2/segmented-control-v2"
 import { TextareaV2 } from "@opencode-ai/ui/v2/textarea-v2"
 import { TextInputV2 } from "@opencode-ai/ui/v2/text-input-v2"
 import { For, Show, createMemo } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLanguage } from "@/context/language"
+import type { ModelKey, ModelSelection } from "@/context/local"
+import { useModels } from "@/context/models"
 import { useServerSDK } from "@/context/server-sdk"
 import { showToast } from "@/utils/toast"
+import { ModelSelectorPopoverV2 } from "./dialog-select-model"
 import {
   scheduleSpecToFormValues,
   validateScheduleForm,
@@ -33,7 +37,39 @@ export function DialogScheduleV2(props: {
   const language = useLanguage()
   const sdk = useServerSDK()
   const dialog = useDialog()
+  const models = useModels()
   const [store, setStore] = createStore<DialogScheduleStore>(initialValues(props.editing))
+
+  // Feeds the shared model popover without touching the composer's own selection:
+  // `current` and `set` read/write this dialog's store, everything else delegates to the catalog.
+  const modelSelection: ModelSelection = {
+    ready: models.ready,
+    list: models.list,
+    recent: () => models.recent.list().map(models.find).filter(Boolean),
+    visible: models.visible,
+    setVisibility: models.setVisibility,
+    current: () => (store.model ? models.find(store.model) : undefined),
+    cycle: () => {},
+    set(item?: ModelKey) {
+      if (!item) return
+      setStore("model", { providerID: item.providerID, modelID: item.modelID })
+    },
+    variant: {
+      configured: () => undefined,
+      selected: () => undefined,
+      current: () => undefined,
+      list: () => [],
+      set: () => {},
+      cycle: () => {},
+    },
+  }
+
+  const modelLabel = createMemo(() => {
+    if (!store.model) return language.t("common.default")
+    const item = models.find(store.model)
+    // A saved selection can outlive a disconnected provider; show its key rather than "Default".
+    return item ? item.name : `${store.model.providerID}/${store.model.modelID}`
+  })
 
   const dayLabels = createMemo(() => {
     const format = new Intl.DateTimeFormat(language.intl(), { weekday: "short" })
@@ -78,6 +114,7 @@ export function DialogScheduleV2(props: {
       promptText: store.promptText.trim(),
       spec: result.spec,
       ...(store.directory.trim() ? { directory: store.directory.trim() } : {}),
+      ...(store.model ? { model: { id: store.model.modelID, providerID: store.model.providerID } } : {}),
     }
     try {
       if (props.editing) {
@@ -131,6 +168,21 @@ export function DialogScheduleV2(props: {
           <Field>
             <Field.Label>{language.t("dialog.schedule.directory.label")}</Field.Label>
             <TextInputV2 class="!w-full" value={store.directory} onInput={(event) => setStore("directory", event.currentTarget.value)} />
+          </Field>
+
+          <Field>
+            <Field.Label>{language.t("dialog.schedule.model.label")}</Field.Label>
+            <ModelSelectorPopoverV2
+              model={modelSelection}
+              trigger={(triggerProps) => (
+                <ButtonV2 {...triggerProps} type="button" variant="ghost-muted" size="normal" class="!w-full justify-start gap-1">
+                  <span class="min-w-0 flex-1 truncate text-left leading-5" aria-label={language.t("dialog.schedule.model.label")}>
+                    {modelLabel()}
+                  </span>
+                  <Icon name="chevron-down" size="small" class="shrink-0 opacity-60" />
+                </ButtonV2>
+              )}
+            />
           </Field>
 
           <div class="flex w-full flex-col gap-3">
@@ -231,6 +283,7 @@ function initialValues(editing: ScheduleTaskWithLatest | undefined): DialogSched
     name: editing?.name ?? "",
     promptText: editing?.promptText ?? "",
     directory: editing?.directory ?? "",
+    model: editing?.model ? { providerID: editing.model.providerID, modelID: editing.model.id } : undefined,
     ...base,
     timeHhMm: base.timeHhMm || "09:00",
     weekDays: base.weekDays.length ? base.weekDays : Array.from({ length: 7 }, () => false),

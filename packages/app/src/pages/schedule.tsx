@@ -10,6 +10,7 @@ import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 import { For, Show, createMemo, createResource, createSignal, onCleanup } from "solid-js"
 import { DialogScheduleV2 } from "@/components/dialog-schedule-v2"
 import { useLanguage } from "@/context/language"
+import { useModels } from "@/context/models"
 import { useServer } from "@/context/server"
 import { useServerSDK } from "@/context/server-sdk"
 import { describeScheduleSpec } from "@/utils/schedule-spec"
@@ -188,6 +189,14 @@ function ScheduleRow(props: {
   onDelete: () => void
 }) {
   const task = props.task
+  const models = useModels()
+  const modelLabel = createMemo(() => {
+    const selection = task.model
+    if (!selection) return ""
+    const item = models.list().find((m) => m.provider.id === selection.providerID && m.id === selection.id)
+    // A saved selection can outlive a disconnected provider; show its key rather than hiding it.
+    return item ? item.name : `${selection.providerID}/${selection.id}`
+  })
 
   return (
     <li class="flex w-full items-center gap-4 rounded-[10px] px-3 py-3 transition-colors hover:bg-v2-overlay-simple-overlay-hover">
@@ -200,6 +209,7 @@ function ScheduleRow(props: {
         </div>
         <p class="truncate text-[13px] font-[440] tracking-[-0.04px] text-v2-text-text-muted">
           {specText(task, props.formatters, props.language)}
+          <Show when={modelLabel()}>{" · "}{modelLabel()}</Show>
         </p>
         <p class="truncate text-[12px] font-[440] text-v2-text-text-faint" title={task.directory}>
           {shortDirectory(task.directory)}

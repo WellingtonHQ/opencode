@@ -1169,6 +1169,7 @@ export const dict: Record<string, string> = {
   "dialog.schedule.prompt.label": "Prompt",
   "dialog.schedule.prompt.placeholder": "What should OpenCode run?",
   "dialog.schedule.directory.label": "Directory",
+  "dialog.schedule.model.label": "Model",
   "dialog.schedule.kind.label": "Runs",
   "schedule.form.kind.oneShot": "One time",
   "schedule.form.kind.daily": "Daily",

@@ -3,10 +3,13 @@ import type { ScheduleSpec } from "@opencode-ai/sdk/v2/client"
 
 export type ScheduleFormKind = "one_shot" | "daily" | "weekly" | "cron"
 
+export type ScheduleModelSelection = { providerID: string; modelID: string }
+
 export interface ScheduleFormValues {
   name: string
   promptText: string
   directory: string
+  model?: ScheduleModelSelection
   kind: ScheduleFormKind
   dateStr: string
   timeHhMm: string
