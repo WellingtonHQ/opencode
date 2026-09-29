@@ -2,6 +2,15 @@
   width: 100%;
 }
 
+/* Size the track to its labels instead of the fixed default, so longer text is not truncated. */
+[data-slot="segmented-control-v2"].segmented-control-v2--auto {
+  width: max-content;
+}
+
+[data-slot="segmented-control-v2"].segmented-control-v2--auto [data-slot="segmented-control-v2-item"] {
+  flex: none;
+}
+
 [data-slot="segmented-control-v2"] {
   box-sizing: border-box;
   display: flex;

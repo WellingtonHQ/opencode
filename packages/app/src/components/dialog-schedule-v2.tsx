@@ -60,7 +60,8 @@ export const DialogScheduleV2: Component<{ task?: Schedule.Info; defaultDirector
   const [form, setForm] = createStore({
     name: props.task?.name ?? "",
     prompt: props.task?.prompt ?? "",
-    directory: props.defaultDirectory || (props.task ? props.task.directory : "") || "",
+    // Editing an existing schedule always shows its stored folder; the sidebar's current project only seeds new ones.
+    directory: props.task ? props.task.directory : props.defaultDirectory || "",
     agentId: props.task?.agentId as string | undefined,
     modelKey: props.task?.model ? `${String(props.task.model.providerID)}:${props.task.model.id}` : DEFAULT_MODEL_KEY,
     kind: spec ? spec.kind : "daily",
@@ -245,7 +246,12 @@ export const DialogScheduleV2: Component<{ task?: Schedule.Info; defaultDirector
           <Show when={agents().length > 0}>
             <Field>
               <Field.Label>{language.t("schedule.dialog.agent.label")}</Field.Label>
-              <SegmentedControlV2 value={form.agentId ?? null} disabled={form.busy} onChange={(value) => setForm("agentId", value ?? undefined)}>
+              <SegmentedControlV2
+                class="segmented-control-v2--auto"
+                value={form.agentId ?? null}
+                disabled={form.busy}
+                onChange={(value) => setForm("agentId", value ?? undefined)}
+              >
                 <For each={agents()}>
                   {(name) => (
                     <SegmentedControlItemV2 value={name}>{name}</SegmentedControlItemV2>
@@ -269,7 +275,7 @@ export const DialogScheduleV2: Component<{ task?: Schedule.Info; defaultDirector
             />
           </Field>
 
-          <SegmentedControlV2 value={form.kind} disabled={form.busy} onChange={(value) => {
+          <SegmentedControlV2 class="segmented-control-v2--auto" value={form.kind} disabled={form.busy} onChange={(value) => {
             if (!value) return
             setForm("kind", value as Schedule.Kind)
             if (value === "once" && !form.onceValue) setForm("onceValue", defaultOnceValue())
@@ -320,7 +326,8 @@ export const DialogScheduleV2: Component<{ task?: Schedule.Info; defaultDirector
                           disabled={form.busy}
                           onClick={() => toggleDay(day)}
                           class="h-7 w-7 rounded-md text-12-medium hover:bg-surface-raised-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-border-focus"
-                          classList={{ "bg-surface-raised-base text-text-strong": form.days.includes(day) }}
+                          // Same contrast pair as the primary button so selected days stay legible in both themes.
+                          classList={{ "bg-v2-background-bg-contrast text-v2-text-text-contrast": form.days.includes(day) }}
                         >
                           {label.charAt(0)}
                         </button>
