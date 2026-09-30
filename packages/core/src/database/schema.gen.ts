@@ -24,6 +24,20 @@ export default {
         );
       `)
       yield* tx.run(`
+        CREATE TABLE \`auth_config\` (
+          \`id\` integer PRIMARY KEY,
+          \`salt\` text NOT NULL,
+          \`verifier\` text NOT NULL
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`auth_session\` (
+          \`token_hash\` text PRIMARY KEY,
+          \`credential_hash\` text DEFAULT '' NOT NULL,
+          \`expires_at\` integer NOT NULL
+        );
+      `)
+      yield* tx.run(`
         CREATE TABLE \`account_state\` (
           \`id\` integer PRIMARY KEY,
           \`active_account_id\` text,
@@ -236,6 +250,7 @@ export default {
           CONSTRAINT \`fk_session_share_session_id_session_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session\`(\`id\`) ON DELETE CASCADE
         );
       `)
+      yield* tx.run(`CREATE INDEX \`auth_session_expires_at_idx\` ON \`auth_session\` (\`expires_at\`);`)
       yield* tx.run(`CREATE UNIQUE INDEX \`event_aggregate_seq_idx\` ON \`event\` (\`aggregate_id\`,\`seq\`);`)
       yield* tx.run(`CREATE INDEX \`event_aggregate_type_seq_idx\` ON \`event\` (\`aggregate_id\`,\`type\`,\`seq\`);`)
       yield* tx.run(

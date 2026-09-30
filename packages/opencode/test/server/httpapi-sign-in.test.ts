@@ -1,4 +1,11 @@
-import { describe, expect } from "bun:test"
+import { afterAll, describe, expect } from "bun:test"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { createHash } from "node:crypto"
+import { AuthSessionTable } from "@opencode-ai/core/database/auth-session.sql"
+import { Database } from "@opencode-ai/core/database/database"
+import { eq } from "drizzle-orm"
 import { ServerRateLimit } from "@opencode-ai/server/auth/rate-limit"
 import { ServerSession } from "@opencode-ai/server/auth/session"
 import * as TestClock from "effect/testing/TestClock"
@@ -23,6 +30,15 @@ const pageRoute = HttpRouter.use((router) =>
   }),
 ).pipe(Layer.provide(authorizationRouterMiddleware.layer))
 
+const directory = mkdtempSync(join(tmpdir(), "opencode-auth-test-"))
+const database = Database.layerFromPath(join(directory, "auth.db"))
+const credentials = { username: "opencode", password: Option.some("secret") }
+const disposers: Array<() => Promise<void>> = []
+afterAll(async () => {
+  await Promise.all(disposers.map((dispose) => dispose()))
+  rmSync(directory, { recursive: true, force: true })
+})
+
 // Stands in for the production app: a protected HTML page wired with the same
 // router middleware the UI fallback uses, plus the real sign-in routes.
 function app(
@@ -32,19 +48,21 @@ function app(
   // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion
   context: Context.Context<unknown> = Context.empty() as Context.Context<unknown>,
 ) {
-  const handler = HttpRouter.toWebHandler(
+  const web = HttpRouter.toWebHandler(
     Layer.mergeAll(pageRoute, signInRoute).pipe(
       Layer.provide(authConfigLayer(input)),
       Layer.provide(ServerRateLimit.layer),
+      Layer.provide(database),
       Layer.provide(HttpServer.layerServices),
     ),
     { disableLogger: true },
-  ).handler
+  )
+  disposers.push(web.dispose)
   return {
     request(input: string | URL | Request, init?: RequestInit) {
       return Effect.promise(() =>
         Promise.resolve(
-          handler(
+          web.handler(
             input instanceof Request ? input : new Request(new URL(input, "http://localhost"), init),
             context,
           ),
@@ -63,7 +81,7 @@ const formPost = (body: string, headers?: Record<string, string>, context?: Cont
     headers: { "content-type": "application/x-www-form-urlencoded", ...headers },
   })
 
-const it = testEffect(Layer.empty)
+const it = testEffect(database)
 
 describe("sign-in page", () => {
   it.live("serves the sign-in form for browsers", () =>
@@ -132,7 +150,8 @@ describe("sign-in page", () => {
 
   it.live("accepts basic auth and signed-in session cookies on protected pages", () =>
     Effect.gen(function* () {
-      const token = ServerSession.issue(true)
+      const { db } = yield* Database.Service
+      const token = yield* ServerSession.issue(db, true, credentials)
       const [basic, session] = yield* Effect.all(
         [
           app({ password: "secret" }).request("/", {
@@ -183,7 +202,102 @@ describe("sign-in page", () => {
       expect(setCookie.toLowerCase()).toContain("httponly")
       expect(setCookie.toLowerCase()).toContain("samesite=lax")
       expect(setCookie.toLowerCase()).toContain("path=/")
-      expect(ServerSession.isValid(token)).toBe(true)
+      const { db } = yield* Database.Service
+      expect(yield* ServerSession.isValid(db, token, credentials)).toBe(true)
+    }),
+  )
+
+  it.live("keeps a remembered session across server lifetimes and revokes it on sign-out", () =>
+    Effect.gen(function* () {
+      const signedIn = yield* formPost("username=opencode&password=secret&remember=on")
+      const token = /opencode_session=([^;]+)/.exec(signedIn.headers.get("set-cookie") ?? "")?.[1] ?? ""
+
+      // Each app() builds a new database connection, as a restarted server does.
+      const resumed = yield* app({ password: "secret" }).request("/", {
+        headers: { accept: "text/html", cookie: `opencode_session=${token}` },
+      })
+      expect(resumed.status).toBe(200)
+
+      const signedOut = yield* app({ password: "secret" }).request("/sign-out", {
+        method: "POST",
+        headers: { cookie: `opencode_session=${token}` },
+      })
+      expect(signedOut.status).toBe(302)
+
+      const revoked = yield* app({ password: "secret" }).request("/", {
+        headers: { accept: "text/html", cookie: `opencode_session=${token}` },
+      })
+      expect(revoked.status).toBe(302)
+      expect(revoked.headers.get("location")).toBe("/sign-in")
+    }),
+  )
+
+  it.live("invalidates a remembered session when the server password changes", () =>
+    Effect.gen(function* () {
+      const signedIn = yield* formPost("username=opencode&password=secret&remember=on")
+      const token = /opencode_session=([^;]+)/.exec(signedIn.headers.get("set-cookie") ?? "")?.[1] ?? ""
+
+      const rotated = yield* app({ password: "new-secret" }).request("/", {
+        headers: { accept: "text/html", cookie: `opencode_session=${token}` },
+      })
+      expect(rotated.status).toBe(302)
+      expect(rotated.headers.get("location")).toBe("/sign-in")
+
+      const restored = yield* app({ password: "secret" }).request("/", {
+        headers: { accept: "text/html", cookie: `opencode_session=${token}` },
+      })
+      expect(restored.status).toBe(302)
+    }),
+  )
+
+  it.live("does not revive an unused remembered cookie when credentials are restored", () =>
+    Effect.gen(function* () {
+      for (const changed of [{ password: "new-secret" }, { password: "secret", username: "new-user" }]) {
+        const signedIn = yield* formPost("username=opencode&password=secret&remember=on")
+        const token = /opencode_session=([^;]+)/.exec(signedIn.headers.get("set-cookie") ?? "")?.[1] ?? ""
+
+        // Build the server with changed credentials without presenting the old cookie.
+        expect((yield* app(changed).request("/sign-in")).status).toBe(200)
+        const restored = yield* app({ password: "secret" }).request("/", {
+          headers: { accept: "text/html", cookie: `opencode_session=${token}` },
+        })
+        expect(restored.status).toBe(302)
+      }
+    }),
+  )
+
+  it.live("revokes a remembered session on sign-out even after credentials change", () =>
+    Effect.gen(function* () {
+      const signedIn = yield* formPost("username=opencode&password=secret&remember=on")
+      const token = /opencode_session=([^;]+)/.exec(signedIn.headers.get("set-cookie") ?? "")?.[1] ?? ""
+      const signedOut = yield* app({ password: "new-secret" }).request("/sign-out", {
+        method: "POST",
+        headers: { cookie: `opencode_session=${token}` },
+      })
+      expect(signedOut.status).toBe(302)
+
+      const restored = yield* app({ password: "secret" }).request("/", {
+        headers: { accept: "text/html", cookie: `opencode_session=${token}` },
+      })
+      expect(restored.status).toBe(302)
+    }),
+  )
+
+  it.live("rejects an expired remembered session even when the browser still has its cookie", () =>
+    Effect.gen(function* () {
+      const response = yield* formPost("username=opencode&password=secret&remember=on")
+      const token = /opencode_session=([^;]+)/.exec(response.headers.get("set-cookie") ?? "")?.[1] ?? ""
+      const { db } = yield* Database.Service
+      yield* db
+        .update(AuthSessionTable)
+        .set({ expires_at: Date.now() - 1 })
+        .where(eq(AuthSessionTable.token_hash, createHash("sha256").update(token).digest("hex")))
+
+      const expired = yield* app({ password: "secret" }).request("/", {
+        headers: { accept: "text/html", cookie: `opencode_session=${token}` },
+      })
+      expect(expired.status).toBe(302)
+      expect(expired.headers.get("location")).toBe("/sign-in")
     }),
   )
 
@@ -195,7 +309,8 @@ describe("sign-in page", () => {
 
       expect(response.status).toBe(302)
       expect(setCookie.toLowerCase()).not.toContain("max-age")
-      expect(ServerSession.isValid(token)).toBe(true)
+      const { db } = yield* Database.Service
+      expect(yield* ServerSession.isValid(db, token, credentials)).toBe(true)
     }),
   )
 
@@ -235,7 +350,8 @@ describe("sign-in page", () => {
 
   it.live("signs out and clears the session cookie", () =>
     Effect.gen(function* () {
-      const token = ServerSession.issue(true)
+      const { db } = yield* Database.Service
+      const token = yield* ServerSession.issue(db, true, credentials)
       const response = yield* app({ password: "secret" }).request("/sign-out", {
         method: "POST",
         headers: { cookie: `opencode_session=${token}` },
@@ -245,7 +361,7 @@ describe("sign-in page", () => {
       expect(response.headers.get("location")).toBe("/sign-in")
       const setCookie = response.headers.get("set-cookie") ?? ""
       expect(setCookie.toLowerCase()).toContain("max-age=0")
-      expect(ServerSession.isValid(token)).toBe(false)
+      expect(yield* ServerSession.isValid(db, token, credentials)).toBe(false)
     }),
   )
 
@@ -341,7 +457,8 @@ describe("sign-in page", () => {
       // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion
       const context = Context.make(Clock.Clock, clock) as Context.Context<unknown>
       const a = app({ password: "secret" }, context)
-      const token = ServerSession.issue(true)
+      const { db } = yield* Database.Service
+      const token = yield* ServerSession.issue(db, true, credentials)
       for (let i = 0; i < 10; i++)
         expect((yield* a.request("/", { headers: { authorization: `Basic ${btoa("opencode:wrong")}` } })).status).toBe(
           401,

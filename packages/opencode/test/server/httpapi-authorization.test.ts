@@ -1,4 +1,5 @@
 import { NodeHttpServer } from "@effect/platform-node"
+import { Database } from "@opencode-ai/core/database/database"
 import { ServerRateLimit } from "@opencode-ai/server/auth/rate-limit"
 import { ServerSession } from "@opencode-ai/server/auth/session"
 import { describe, expect } from "bun:test"
@@ -51,15 +52,24 @@ const serverHandlers = HttpApiBuilder.group(ServerApi, "test.v2", (handlers) =>
 const apiLayer = HttpRouter.serve(
   HttpApiBuilder.layer(Api).pipe(Layer.provide(handlers), Layer.provide(authorizationLayer)),
   { disableListenLog: true, disableLogger: true },
-).pipe(Layer.provideMerge(NodeHttpServer.layerTest), Layer.provideMerge(ServerRateLimit.layer))
+).pipe(
+  Layer.provideMerge(NodeHttpServer.layerTest),
+  Layer.provideMerge(ServerRateLimit.layer),
+  Layer.provideMerge(Database.layerFromPath(":memory:")),
+)
 
 const v2ApiLayer = HttpRouter.serve(
   HttpApiBuilder.layer(ServerApi).pipe(Layer.provide(serverHandlers), Layer.provide(serverAuthorizationLayer)),
   { disableListenLog: true, disableLogger: true },
-).pipe(Layer.provideMerge(NodeHttpServer.layerTest), Layer.provideMerge(ServerRateLimit.layer))
+).pipe(
+  Layer.provideMerge(NodeHttpServer.layerTest),
+  Layer.provideMerge(ServerRateLimit.layer),
+  Layer.provideMerge(Database.layerFromPath(":memory:")),
+)
 
 const noAuthLayer = ServerAuth.Config.configLayer({ password: Option.none(), username: "opencode" })
-const secretLayer = ServerAuth.Config.configLayer({ password: Option.some("secret"), username: "opencode" })
+const secretConfig = { password: Option.some("secret"), username: "opencode" }
+const secretLayer = ServerAuth.Config.configLayer(secretConfig)
 const kitSecretLayer = ServerAuth.Config.configLayer({ password: Option.some("secret"), username: "kit" })
 
 const it = testEffect(apiLayer.pipe(Layer.provide(noAuthLayer)))
@@ -108,9 +118,11 @@ describe("HttpApi authorization middleware", () => {
 
   itSecret.live("accepts signed-in session cookies", () =>
     Effect.gen(function* () {
+      const { db } = yield* Database.Service
+      const session = yield* ServerSession.issue(db, true, secretConfig)
       const [valid, invalid] = yield* Effect.all(
         [
-          getProbe({ cookie: `opencode_session=${ServerSession.issue(true)}` }),
+          getProbe({ cookie: `opencode_session=${session}` }),
           getProbe({ cookie: "opencode_session=not-a-session" }),
         ],
         { concurrency: "unbounded" },
@@ -191,8 +203,10 @@ describe("HttpApi authorization middleware", () => {
 
   itV2Secret.live("accepts signed-in session cookies", () =>
     Effect.gen(function* () {
+      const { db } = yield* Database.Service
+      const session = yield* ServerSession.issue(db, true, secretConfig)
       const response = yield* HttpClientRequest.get("/api/probe").pipe(
-        HttpClientRequest.setHeader("cookie", `opencode_session=${ServerSession.issue(true)}`),
+        HttpClientRequest.setHeader("cookie", `opencode_session=${session}`),
         HttpClient.execute,
       )
       const body = yield* response.json

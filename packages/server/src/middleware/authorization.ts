@@ -1,6 +1,7 @@
 import { ServerAuth } from "../auth"
 import { ServerRateLimit } from "../auth/rate-limit"
 import { ServerSession } from "../auth/session"
+import { Database } from "@opencode-ai/core/database/database"
 import { UnauthorizedError } from "@opencode-ai/protocol/errors"
 import { Authorization } from "@opencode-ai/protocol/middleware/authorization"
 export { Authorization } from "@opencode-ai/protocol/middleware/authorization"
@@ -59,8 +60,10 @@ export const authorizationLayer = Layer.effect(
   Authorization,
   Effect.gen(function* () {
     const config = yield* ServerAuth.Config
-    if (!ServerAuth.required(config)) return Authorization.of((effect) => effect)
     const rateLimit = yield* ServerRateLimit.Service
+    const { db } = yield* Database.Service
+    yield* ServerSession.configure(db, config)
+    if (!ServerAuth.required(config)) return Authorization.of((effect) => effect)
     return Authorization.of((effect) =>
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
@@ -68,7 +71,7 @@ export const authorizationLayer = Layer.effect(
         // credential checks here; the connect handler consumes and validates the ticket.
         if (hasPtyConnectTicketURL(new URL(request.url, "http://localhost"))) return yield* effect
         const token = ServerSession.tokenFromCookies(request.cookies)
-        if (token !== undefined && ServerSession.isValid(token)) return yield* effect
+        if (token !== undefined && (yield* ServerSession.isValid(db, token, config))) return yield* effect
         if (!attemptedAuth(request)) return yield* unauthorized(0)
         const now = yield* Clock.currentTimeMillis
         const retryAfter = rateLimit.retryAfterSeconds(now)
