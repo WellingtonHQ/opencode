@@ -1,5 +1,6 @@
 import { ServerRateLimit } from "@opencode-ai/server/auth/rate-limit"
 import { ServerSession } from "@opencode-ai/server/auth/session"
+import { Database } from "@opencode-ai/core/database/database"
 import { ServerAuth } from "@/server/auth"
 import { Clock, Effect, Option, Stream } from "effect"
 import { Cookies, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
@@ -108,6 +109,7 @@ function postSignIn(
   request: HttpServerRequest.HttpServerRequest,
   config: ServerAuth.Info,
   rateLimit: ServerRateLimit.RateLimit,
+  db: Database.Interface["db"],
 ) {
   return Effect.gen(function* () {
     if (!ServerAuth.required(config)) return HttpServerResponse.redirect("/")
@@ -133,7 +135,7 @@ function postSignIn(
       return signInPage(next, "Invalid username or password")
     }
     rateLimit.reset()
-    const token = ServerSession.issue(remember)
+    const token = yield* ServerSession.issue(db, remember, config)
     const options: { httpOnly: boolean; sameSite: "lax"; path: string; maxAge?: number } = {
       httpOnly: true,
       sameSite: "lax",
@@ -147,28 +149,30 @@ function postSignIn(
   })
 }
 
-function postSignOut(request: HttpServerRequest.HttpServerRequest): Effect.Effect<HttpServerResponse.HttpServerResponse> {
-  const token = ServerSession.tokenFromCookies(request.cookies)
-  if (token !== undefined) ServerSession.revoke(token)
-  const cleared = Cookies.makeCookieUnsafe(ServerSession.COOKIE_NAME, "", {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 0,
-  })
-  return Effect.succeed(
-    HttpServerResponse.redirect("/sign-in", {
+function postSignOut(request: HttpServerRequest.HttpServerRequest, db: Database.Interface["db"]) {
+  return Effect.gen(function* () {
+    const token = ServerSession.tokenFromCookies(request.cookies)
+    if (token !== undefined) yield* ServerSession.revoke(db, token)
+    const cleared = Cookies.makeCookieUnsafe(ServerSession.COOKIE_NAME, "", {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    })
+    return HttpServerResponse.redirect("/sign-in", {
       cookies: Cookies.setCookie(Cookies.empty, cleared),
-    }),
-  )
+    })
+  })
 }
 
 export const signInRoute = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const config = yield* ServerAuth.Config
     const rateLimit = yield* ServerRateLimit.Service
+    const { db } = yield* Database.Service
+    yield* ServerSession.configure(db, config)
     yield* router.add("GET", "/sign-in", (request) => Effect.succeed(getSignIn(request, config)))
-    yield* router.add("POST", "/sign-in", (request) => postSignIn(request, config, rateLimit))
-    yield* router.add("POST", "/sign-out", postSignOut)
+    yield* router.add("POST", "/sign-in", (request) => postSignIn(request, config, rateLimit, db))
+    yield* router.add("POST", "/sign-out", (request) => postSignOut(request, db))
   }),
 )

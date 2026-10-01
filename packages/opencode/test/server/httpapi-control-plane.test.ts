@@ -1,4 +1,5 @@
 import { NodeHttpServer } from "@effect/platform-node"
+import { Database } from "@opencode-ai/core/database/database"
 import { describe, expect } from "bun:test"
 import { Context, Effect, Layer, Option, Ref } from "effect"
 import { HttpBody, HttpClient, HttpClientRequest, HttpRouter } from "effect/unstable/http"
@@ -38,6 +39,7 @@ const apiLayer = HttpRouter.serve(
 ).pipe(
   Layer.provideMerge(NodeHttpServer.layerTest),
   Layer.provide(ServerRateLimit.layer),
+  Layer.provide(Database.layerFromPath(":memory:")),
   Layer.provide(Layer.mock(Auth.Service)({})),
   Layer.provide(Layer.mock(Config.Service)({})),
   Layer.provide(Layer.mock(Installation.Service)({})),

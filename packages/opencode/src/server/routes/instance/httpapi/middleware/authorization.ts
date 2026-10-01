@@ -1,5 +1,6 @@
 import { ServerRateLimit } from "@opencode-ai/server/auth/rate-limit"
 import { ServerSession } from "@opencode-ai/server/auth/session"
+import { Database } from "@opencode-ai/core/database/database"
 import { ServerAuth } from "@/server/auth"
 import { Clock, Effect, Encoding, Layer, Redacted } from "effect"
 import { HttpEffect, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
@@ -14,9 +15,9 @@ export {
 const AUTH_TOKEN_QUERY = "auth_token"
 const UNAUTHORIZED = 401
 
-function sessionAuthorized(request: HttpServerRequest.HttpServerRequest) {
+function sessionAuthorized(request: HttpServerRequest.HttpServerRequest, db: Database.Interface["db"], config: ServerAuth.Info) {
   const token = ServerSession.tokenFromCookies(request.cookies)
-  return token !== undefined && ServerSession.isValid(token)
+  return token === undefined ? Effect.succeed(false) : ServerSession.isValid(db, token, config)
 }
 
 function isBrowserDocument(request: HttpServerRequest.HttpServerRequest) {
@@ -73,11 +74,12 @@ function validateCredential<A, E, R>(
   credential: ServerAuth.DecodedCredentials,
   config: ServerAuth.Info,
   rateLimit: ServerRateLimit.RateLimit,
+  db: Database.Interface["db"],
 ) {
   if (!ServerAuth.required(config)) return effect
-  if (sessionAuthorized(request)) return effect
-  if (!attemptedAuth(request)) return unauthorized(0)
   return Effect.gen(function* () {
+    if (yield* sessionAuthorized(request, db, config)) return yield* effect
+    if (!attemptedAuth(request)) return yield* unauthorized(0)
     const now = yield* Clock.currentTimeMillis
     const retryAfter = rateLimit.retryAfterSeconds(now)
     if (retryAfter === 0) {
@@ -125,14 +127,15 @@ function validateRawCredential<A, E, R>(
   credential: ServerAuth.DecodedCredentials,
   config: ServerAuth.Info,
   rateLimit: ServerRateLimit.RateLimit,
+  db: Database.Interface["db"],
 ) {
   if (!ServerAuth.required(config)) return effect
-  if (sessionAuthorized(request)) return effect
-  if (!attemptedAuth(request)) {
-    if (isBrowserDocument(request)) return Effect.succeed(redirectToSignIn(request))
-    return Effect.succeed(HttpServerResponse.empty({ status: UNAUTHORIZED }))
-  }
   return Effect.gen(function* () {
+    if (yield* sessionAuthorized(request, db, config)) return yield* effect
+    if (!attemptedAuth(request)) {
+      if (isBrowserDocument(request)) return redirectToSignIn(request)
+      return HttpServerResponse.empty({ status: UNAUTHORIZED })
+    }
     const now = yield* Clock.currentTimeMillis
     const retryAfter = rateLimit.retryAfterSeconds(now)
     if (retryAfter > 0)
@@ -153,6 +156,8 @@ export const authorizationRouterMiddleware = HttpRouter.middleware()(
   Effect.gen(function* () {
     const config = yield* ServerAuth.Config
     const rateLimit = yield* ServerRateLimit.Service
+    const { db } = yield* Database.Service
+    yield* ServerSession.configure(db, config)
     if (!ServerAuth.required(config)) return (effect) => effect
 
     return (effect) =>
@@ -161,7 +166,7 @@ export const authorizationRouterMiddleware = HttpRouter.middleware()(
         const url = new URL(request.url, "http://localhost")
         if (isPublicUIPath(request.method, url.pathname)) return yield* effect
         return yield* credentialFromURL(url, request).pipe(
-          Effect.flatMap((credential) => validateRawCredential(effect, request, credential, config, rateLimit)),
+          Effect.flatMap((credential) => validateRawCredential(effect, request, credential, config, rateLimit, db)),
         )
       })
   }),
@@ -171,13 +176,15 @@ export const authorizationLayer = Layer.effect(
   Authorization,
   Effect.gen(function* () {
     const config = yield* ServerAuth.Config
-    if (!ServerAuth.required(config)) return Authorization.of((effect) => effect)
     const rateLimit = yield* ServerRateLimit.Service
+    const { db } = yield* Database.Service
+    yield* ServerSession.configure(db, config)
+    if (!ServerAuth.required(config)) return Authorization.of((effect) => effect)
     return Authorization.of((effect) =>
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
         return yield* credentialFromRequest(request).pipe(
-          Effect.flatMap((credential) => validateCredential(effect, request, credential, config, rateLimit)),
+          Effect.flatMap((credential) => validateCredential(effect, request, credential, config, rateLimit, db)),
         )
       }),
     )
@@ -188,15 +195,17 @@ export const ptyConnectAuthorizationLayer = Layer.effect(
   PtyConnectAuthorization,
   Effect.gen(function* () {
     const config = yield* ServerAuth.Config
-    if (!ServerAuth.required(config)) return PtyConnectAuthorization.of((effect) => effect)
     const rateLimit = yield* ServerRateLimit.Service
+    const { db } = yield* Database.Service
+    yield* ServerSession.configure(db, config)
+    if (!ServerAuth.required(config)) return PtyConnectAuthorization.of((effect) => effect)
     return PtyConnectAuthorization.of((effect) =>
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
         const url = new URL(request.url, "http://localhost")
         if (hasPtyConnectTicketURL(url)) return yield* effect
         return yield* credentialFromURL(url, request).pipe(
-          Effect.flatMap((credential) => validateCredential(effect, request, credential, config, rateLimit)),
+          Effect.flatMap((credential) => validateCredential(effect, request, credential, config, rateLimit, db)),
         )
       }),
     )

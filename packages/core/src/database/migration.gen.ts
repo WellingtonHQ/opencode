@@ -42,5 +42,8 @@ export const migrations = (
     import("./migration/20260622202450_simplify_session_input"),
     import("./migration/20260910074445_medical_the_santerians"),
     import("./migration/20260911071846_add_schedule_task_model"),
+    import("./migration/20260927235637_auth_session"),
+    import("./migration/20260930001258_auth_session_credentials"),
+    import("./migration/20260930001910_auth_config"),
   ])
 ).map((module) => module.default) satisfies DatabaseMigration.Migration[]
