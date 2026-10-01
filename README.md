@@ -43,6 +43,20 @@
 
 ---
 
+### What's different in this fork
+
+This is a fork of [anomalyco/opencode](https://github.com/anomalyco/opencode), maintained for private deployments. It tracks upstream `dev` and adds the following on top:
+
+- **Web sign-in page** — Opening a password-protected server in a browser now shows a real `/sign-in` page (username, password, "Remember me") instead of the native HTTP basic-auth prompt. Sessions are cookie-based (`opencode_session`, 12h or 30 days with remember-me), and expired sessions redirect same-origin clients back to sign-in.
+- **Rate-limited authentication** — Failed sign-ins are counted across every login channel (sign-in form, basic auth, `auth_token` query). After ten failures the server locks out new credential attempts for a minute (with a retry hint) while existing sessions keep working.
+- **Self-hosted desktop app** — The desktop sidecar serves this fork's built web UI locally instead of proxying to the upstream hosted app, so fork features work inside the desktop app too. It falls back to the upstream proxy when no local build is present (e.g. the published npm CLI).
+- **MCP tool output in sessions** — MCP tools now render their output directly in session messages, and large or single-line outputs (like JSON) get a byte-bounded head/tail preview instead of an empty one.
+- **Global auto-accept permissions setting** — A new global toggle to auto-approve permission prompts (alongside the existing per-session and per-directory settings), translated into all app languages. The in-app terminal also follows light/dark themes.
+- **Private-deployment build & deploy tooling**
+  - `packages/opencode/build-mac.sh` and `build-windows.bat` build standalone CLI binaries from source (`add-to-path.ps1`/`.bat` set up Windows PATH); the node build script was hardened to ship the embedded UI map.
+  - The desktop server username is configurable via `OPENCODE_SERVER_USERNAME`, and `OPENCODE_PORT` was renamed to `OPENCODE_SERVER_PORT` for consistency with the other server env vars.
+  - `packages/desktop/deploy-env.sh` syncs your `.env` `OPENCODE_*` variables into the macOS GUI session (via a LaunchAgent), so private-server settings are picked up by the desktop app across reboots.
+
 ### Installation
 
 ```bash

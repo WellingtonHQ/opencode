@@ -1,5 +1,9 @@
 import { createHash } from "node:crypto"
-import { describe, expect } from "bun:test"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { afterAll, describe, expect } from "bun:test"
+import { Database } from "@opencode-ai/core/database/database"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { ConfigProvider, Effect, Layer, Option } from "effect"
 import { ServerRateLimit } from "@opencode-ai/server/auth/rate-limit"
@@ -44,6 +48,13 @@ const testStateLayer = Layer.effectDiscard(
 
 const fsUtilLayer = AppNodeBuilder.build(FSUtil.node)
 const it = testEffect(Layer.mergeAll(testStateLayer, fsUtilLayer, RuntimeFlags.layer()))
+const authDirectory = mkdtempSync(join(tmpdir(), "opencode-ui-auth-test-"))
+const authDatabase = Database.layerFromPath(join(authDirectory, "auth.db"))
+const authDisposers: Array<() => Promise<void>> = []
+afterAll(async () => {
+  await Promise.all(authDisposers.map((dispose) => dispose()))
+  rmSync(authDirectory, { recursive: true, force: true })
+})
 
 function authConfigLayer(input?: { password?: string; username?: string }) {
   return ServerAuth.Config.configLayer({
@@ -94,7 +105,7 @@ function uiApp(input?: {
   client?: Layer.Layer<HttpClient.HttpClient>
   disableEmbeddedWebUi?: boolean
 }) {
-  const handler = HttpRouter.toWebHandler(
+  const web = HttpRouter.toWebHandler(
     HttpRouter.use((router) =>
       Effect.gen(function* () {
         const fs = yield* FSUtil.Service
@@ -107,6 +118,7 @@ function uiApp(input?: {
     ).pipe(
       Layer.provide(authorizationRouterMiddleware.layer.pipe(Layer.provide(authConfigLayer(input)))),
       Layer.provide(ServerRateLimit.layer),
+      Layer.provide(authDatabase),
       Layer.provide([
         fsUtilLayer,
         input?.client ?? httpClient(new Response("ui")),
@@ -115,12 +127,13 @@ function uiApp(input?: {
       ]),
     ),
     { disableLogger: true },
-  ).handler
+  )
+  authDisposers.push(web.dispose)
   return {
     request(input: string | URL | Request, init?: RequestInit) {
       return Effect.promise(() =>
         Promise.resolve(
-          handler(
+          web.handler(
             input instanceof Request ? input : new Request(new URL(input, "http://localhost"), init),
             HttpApiApp.context,
           ),
@@ -397,7 +410,10 @@ describe("HttpApi UI fallback", () => {
 
   it.live("accepts a signed-in session cookie for the web UI", () =>
     Effect.gen(function* () {
-      const token = ServerSession.issue(true)
+      const token = yield* Effect.gen(function* () {
+        const { db } = yield* Database.Service
+        return yield* ServerSession.issue(db, true, { username: "opencode", password: Option.some("secret") })
+      }).pipe(Effect.provide(authDatabase))
       const response = yield* uiApp({
         password: "secret",
         username: "opencode",
