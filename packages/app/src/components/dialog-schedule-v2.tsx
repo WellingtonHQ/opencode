@@ -1,4 +1,5 @@
 import type { ScheduleTaskWithLatest } from "@opencode-ai/sdk/v2/client"
+import { Project } from "@opencode-ai/schema/project"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@opencode-ai/ui/v2/dialog-v2"
@@ -8,14 +9,17 @@ import { Icon } from "@opencode-ai/ui/v2/icon"
 import { SegmentedControlV2, SegmentedControlItemV2 } from "@opencode-ai/ui/v2/segmented-control-v2"
 import { TextareaV2 } from "@opencode-ai/ui/v2/textarea-v2"
 import { TextInputV2 } from "@opencode-ai/ui/v2/text-input-v2"
-import { For, Show, createMemo } from "solid-js"
+import { For, Show, createMemo, createResource } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLanguage } from "@/context/language"
 import type { ModelKey, ModelSelection } from "@/context/local"
 import { useModels } from "@/context/models"
 import { useServerSDK } from "@/context/server-sdk"
+import { displayName } from "@/pages/layout/helpers"
+import { pathKey } from "@/utils/path-key"
 import { showToast } from "@/utils/toast"
 import { ModelSelectorPopoverV2 } from "./dialog-select-model"
+import { ProjectSelectorPopoverV2 } from "./dialog-select-project-v2"
 import {
   scheduleSpecToFormValues,
   validateScheduleForm,
@@ -39,6 +43,13 @@ export function DialogScheduleV2(props: {
   const dialog = useDialog()
   const models = useModels()
   const [store, setStore] = createStore<DialogScheduleStore>(initialValues(props.editing))
+  const [projects] = createResource(
+    () => sdk().url,
+    // The "global" project is the fallback for directories without a git repo and resolves to the
+    // filesystem root, so it is not a directory a scheduled prompt can run in.
+    async () => ((await sdk().client.project.list()).data ?? []).filter((project) => project.id !== Project.ID.global),
+    { initialValue: [] },
+  )
 
   // Feeds the shared model popover without touching the composer's own selection:
   // `current` and `set` read/write this dialog's store, everything else delegates to the catalog.
@@ -69,6 +80,16 @@ export function DialogScheduleV2(props: {
     const item = models.find(store.model)
     // A saved selection can outlive a disconnected provider; show its key rather than "Default".
     return item ? item.name : `${store.model.providerID}/${store.model.modelID}`
+  })
+
+  const projectLabel = createMemo(() => {
+    const key = pathKey(store.directory)
+    const selection = key
+      ? projects().find((project) => pathKey(project.worktree) === key || project.sandboxes?.some((sandbox) => pathKey(sandbox) === key))
+      : undefined
+    if (selection) return displayName(selection)
+    if (store.directory) return store.directory
+    return language.t("common.default")
   })
 
   const dayLabels = createMemo(() => {
@@ -167,7 +188,19 @@ export function DialogScheduleV2(props: {
 
           <Field>
             <Field.Label>{language.t("dialog.schedule.directory.label")}</Field.Label>
-            <TextInputV2 class="!w-full" value={store.directory} onInput={(event) => setStore("directory", event.currentTarget.value)} />
+            <ProjectSelectorPopoverV2
+              projects={projects}
+              current={() => store.directory}
+              onSelect={(directory) => setStore("directory", directory)}
+              trigger={(triggerProps) => (
+                <ButtonV2 {...triggerProps} type="button" variant="ghost-muted" size="normal" class="!w-full justify-start gap-1">
+                  <span class="min-w-0 flex-1 truncate text-left leading-5" aria-label={language.t("dialog.schedule.directory.label")}>
+                    {projectLabel()}
+                  </span>
+                  <Icon name="chevron-down" size="small" class="shrink-0 opacity-60" />
+                </ButtonV2>
+              )}
+            />
           </Field>
 
           <Field>
