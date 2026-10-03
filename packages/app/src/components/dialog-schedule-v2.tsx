@@ -189,7 +189,7 @@ export function DialogScheduleV2(props: {
             <div class="select-none text-[13px] font-[530] leading-none tracking-[-0.04px] text-v2-text-text-base">
               {language.t("dialog.schedule.kind.label")}
             </div>
-            <SegmentedControlV2 value={store.kind} onChange={setKind}>
+            <SegmentedControlV2 value={store.kind} onChange={setKind} class="segmented-control-v2--full-width">
               <For each={FORM_KINDS}>
                 {(kind) => (
                   <SegmentedControlItemV2 value={kind}>{kindLabel(kind, language)}</SegmentedControlItemV2>

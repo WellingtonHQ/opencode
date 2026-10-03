@@ -25,7 +25,7 @@
   justify-content: center;
   align-items: center;
   padding: 0 12px;
-  flex: 1 1 0;
+  flex: 1 1 auto;
   min-width: 0;
   height: 28px;
   margin: 0;
@@ -67,14 +67,10 @@
 }
 
 [data-slot="segmented-control-v2-item-label"] {
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-  align-items: center;
-  padding: 0;
-  min-width: 0;
+  display: block;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: center;
 }
