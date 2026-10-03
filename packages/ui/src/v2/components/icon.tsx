@@ -61,6 +61,10 @@ const icons = {
     viewBox: "0 0 16 16",
     body: `<path d="M5 6.5L8 9.5L11 6.5" stroke="currentColor"/>`,
   },
+  "chevron-left": {
+    viewBox: "0 0 16 16",
+    body: `<path d="M9.5 5L6.5 8L9.5 11" stroke="currentColor"/>`,
+  },
   collapse: {
     viewBox: "0 0 16 16",
     body: `<path d="M8 1V6M11 3L8 6L5 3" stroke="currentColor"/><path d="M8 15V10M11 13L8 10L5 13" stroke="currentColor"/><path d="M4 8H6" stroke="currentColor"/><path d="M7 8H9" stroke="currentColor"/><path d="M10 8H12" stroke="currentColor"/>`,

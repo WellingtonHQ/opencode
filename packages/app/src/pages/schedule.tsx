@@ -7,6 +7,7 @@ import { Icon } from "@opencode-ai/ui/v2/icon"
 import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
 import { Switch } from "@opencode-ai/ui/v2/switch-v2"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
+import { useNavigate } from "@solidjs/router"
 import { For, Show, createMemo, createResource, createSignal, onCleanup } from "solid-js"
 import { DialogScheduleV2 } from "@/components/dialog-schedule-v2"
 import { useLanguage } from "@/context/language"
@@ -39,6 +40,7 @@ function ScheduleNoServer() {
 
 function SchedulesContent() {
   const language = useLanguage()
+  const navigate = useNavigate()
   const sdk = useServerSDK()
   const dialog = useDialog()
   const [tick, setTick] = createSignal(0)
@@ -129,7 +131,17 @@ function SchedulesContent() {
   return (
     <div class="mx-auto flex min-h-full w-full max-w-[760px] flex-col gap-8 px-4 py-10 lg:px-6">
       <header class="flex shrink-0 items-center justify-between gap-4 pl-1.5 pr-3">
-        <h1 class="text-v2-text-text-base [font-size:16px] [font-weight:560] tracking-[-0.04px]">{language.t("schedule.title")}</h1>
+        <div class="flex min-w-0 items-center gap-2">
+          <TooltipV2 value={language.t("common.goBack")}>
+            <IconButtonV2
+              variant="ghost-muted"
+              icon={<Icon name="chevron-left" size="small" />}
+              onClick={() => navigate("/")}
+              aria-label={language.t("common.goBack")}
+            />
+          </TooltipV2>
+          <h1 class="truncate text-v2-text-text-base [font-size:16px] [font-weight:560] tracking-[-0.04px]">{language.t("schedule.title")}</h1>
+        </div>
         <ButtonV2 variant="contrast" icon="plus" onClick={showCreate}>
           {language.t("schedule.new")}
         </ButtonV2>
