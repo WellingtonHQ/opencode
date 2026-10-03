@@ -311,7 +311,7 @@ export function DialogScheduleV2(props: {
 }
 
 function initialValues(editing: ScheduleTaskWithLatest | undefined): DialogScheduleStore {
-  const base = editing ? scheduleSpecToFormValues(editing.spec) : { kind: "one_shot" as const, dateStr: "", timeHhMm: "09:00", weekDays: [] as boolean[], cronExpr: "" }
+  const base = editing ? scheduleSpecToFormValues(editing.spec) : newOneShotDefaults()
   return {
     name: editing?.name ?? "",
     promptText: editing?.promptText ?? "",
@@ -321,6 +321,18 @@ function initialValues(editing: ScheduleTaskWithLatest | undefined): DialogSched
     timeHhMm: base.timeHhMm || "09:00",
     weekDays: base.weekDays.length ? base.weekDays : Array.from({ length: 7 }, () => false),
     saving: false,
+  }
+}
+
+function newOneShotDefaults() {
+  // Default a fresh one-shot to the next whole minute so it is in the future when submitted.
+  const at = new Date(Date.now() + 60_000)
+  return {
+    kind: "one_shot" as const,
+    dateStr: `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, "0")}-${String(at.getDate()).padStart(2, "0")}`,
+    timeHhMm: `${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`,
+    weekDays: [] as boolean[],
+    cronExpr: "",
   }
 }
 
