@@ -1689,6 +1689,17 @@ PART_MAPPING["text"] = function TextPartDisplay(props) {
     })
   })
 
+  const timestamp = createMemo(() => {
+    if (props.message.role !== "assistant") return ""
+    const message = props.message as AssistantMessage
+    const ms = typeof message.time.completed === "number" ? message.time.completed : message.time.created
+    if (typeof ms !== "number") return ""
+    const d = new Date(ms)
+    const pad = (n: number) => String(n).padStart(2, "0")
+    const hour12 = d.getHours() % 12 || 12
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(hour12)}:${pad(d.getMinutes())}:${pad(d.getSeconds())} ${d.getHours() < 12 ? "AM" : "PM"}`
+  })
+
   const meta = createMemo(() => {
     if (props.message.role !== "assistant") return ""
     const agent = (props.message as AssistantMessage).agent
@@ -1697,6 +1708,7 @@ PART_MAPPING["text"] = function TextPartDisplay(props) {
       model(),
       duration(),
       interrupted() ? i18n.t("ui.message.interrupted") : "",
+      timestamp(),
     ]
     return items.filter((x) => !!x).join(" \u00B7 ")
   })
