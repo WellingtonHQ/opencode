@@ -14,7 +14,9 @@ export async function nextRunAt(spec: Schedule.Spec, anchorMs: number, zone?: st
     spec.kind === "weekly"
       ? new Set(spec.days.map((day) => dayToDateWeekday(day)))
       : undefined
-  for (let offset = 0; offset < 7; offset++) {
+  // A weekly spec with a single day can be exactly seven days ahead when the anchor sits just
+  // after that day's slot, so the window must span eight offsets.
+  for (let offset = 0; offset < 8; offset++) {
     const candidate = DateTime.fromMillis(anchorMs, zone ? { zone } : undefined)
       .startOf("day")
       .plus({ days: offset })

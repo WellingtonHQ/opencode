@@ -42,6 +42,11 @@ describe("schedule time", () => {
     expect(await nextRunAt({ kind: "weekly", days: [3], hour: 9, minute: 0 }, anchor, NY)).toBe(Date.UTC(2026, 4, 6, 13, 0))
   })
 
+  test("weekly finds the next match exactly seven days ahead when the anchor is just past the slot", async () => {
+    const anchor = Date.UTC(2026, 4, 7, 5, 0, 5) // local Thu 2026-05-07 01:00:05 EDT
+    expect(await nextRunAt({ kind: "weekly", days: [4], hour: 1, minute: 0 }, anchor, NY)).toBe(Date.UTC(2026, 4, 14, 5, 0))
+  })
+
   test("weekly with no days never matches", async () => {
     const anchor = Date.UTC(2026, 4, 1, 16, 0)
     expect(await nextRunAt({ kind: "weekly", days: [], hour: 9, minute: 0 }, anchor, NY)).toBeNull()
