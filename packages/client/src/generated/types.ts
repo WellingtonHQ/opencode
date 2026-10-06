@@ -2318,6 +2318,14 @@ export type ServerScheduleListOutput = ReadonlyArray<{
   readonly lastSessionId?: string
   readonly lastError?: string
   readonly runCount: number
+  readonly recentRuns?: ReadonlyArray<{
+    readonly taskID: string
+    readonly sessionID?: string
+    readonly status: "running" | "completed" | "failed"
+    readonly startedAtMs: number
+    readonly finishedAtMs?: number
+    readonly errorText?: string
+  }>
 }>
 
 export type ServerScheduleGetInput = { readonly scheduleID: { readonly scheduleID: string }["scheduleID"] }
@@ -2340,6 +2348,14 @@ export type ServerScheduleGetOutput = {
   readonly lastSessionId?: string
   readonly lastError?: string
   readonly runCount: number
+  readonly recentRuns?: ReadonlyArray<{
+    readonly taskID: string
+    readonly sessionID?: string
+    readonly status: "running" | "completed" | "failed"
+    readonly startedAtMs: number
+    readonly finishedAtMs?: number
+    readonly errorText?: string
+  }>
 }
 
 export type ServerScheduleCreateInput = {
@@ -2465,6 +2481,14 @@ export type ServerScheduleCreateOutput = {
   readonly lastSessionId?: string
   readonly lastError?: string
   readonly runCount: number
+  readonly recentRuns?: ReadonlyArray<{
+    readonly taskID: string
+    readonly sessionID?: string
+    readonly status: "running" | "completed" | "failed"
+    readonly startedAtMs: number
+    readonly finishedAtMs?: number
+    readonly errorText?: string
+  }>
 }
 
 export type ServerScheduleUpdateInput = {
@@ -2615,6 +2639,14 @@ export type ServerScheduleUpdateOutput = {
   readonly lastSessionId?: string
   readonly lastError?: string
   readonly runCount: number
+  readonly recentRuns?: ReadonlyArray<{
+    readonly taskID: string
+    readonly sessionID?: string
+    readonly status: "running" | "completed" | "failed"
+    readonly startedAtMs: number
+    readonly finishedAtMs?: number
+    readonly errorText?: string
+  }>
 }
 
 export type ServerScheduleRemoveInput = { readonly scheduleID: { readonly scheduleID: string }["scheduleID"] }
@@ -2637,6 +2669,14 @@ export type ServerScheduleRemoveOutput = {
   readonly lastSessionId?: string
   readonly lastError?: string
   readonly runCount: number
+  readonly recentRuns?: ReadonlyArray<{
+    readonly taskID: string
+    readonly sessionID?: string
+    readonly status: "running" | "completed" | "failed"
+    readonly startedAtMs: number
+    readonly finishedAtMs?: number
+    readonly errorText?: string
+  }>
 }
 
 export type ServerScheduleRunNowInput = { readonly scheduleID: { readonly scheduleID: string }["scheduleID"] }
@@ -2659,6 +2699,14 @@ export type ServerScheduleRunNowOutput = {
   readonly lastSessionId?: string
   readonly lastError?: string
   readonly runCount: number
+  readonly recentRuns?: ReadonlyArray<{
+    readonly taskID: string
+    readonly sessionID?: string
+    readonly status: "running" | "completed" | "failed"
+    readonly startedAtMs: number
+    readonly finishedAtMs?: number
+    readonly errorText?: string
+  }>
 }
 
 export type PermissionsListRequestsInput = {
