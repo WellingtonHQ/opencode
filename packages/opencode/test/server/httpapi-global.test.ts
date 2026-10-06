@@ -1,7 +1,8 @@
 import { NodeHttpServer } from "@effect/platform-node"
+import { AppState } from "@opencode-ai/core/app-state"
 import { Database } from "@opencode-ai/core/database/database"
 import { describe, expect } from "bun:test"
-import { Context, Effect, Layer, Option } from "effect"
+import { Context, Effect, Layer, Option, Ref } from "effect"
 import { HttpBody, HttpClient, HttpClientRequest, HttpRouter } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { Auth } from "../../src/auth"
@@ -19,6 +20,8 @@ import { authorizationLayer } from "../../src/server/routes/instance/httpapi/mid
 import { schemaErrorLayer } from "../../src/server/routes/instance/httpapi/middleware/schema-error"
 import { testEffect } from "../lib/effect"
 
+const autoApprove = Ref.makeUnsafe(false)
+
 const apiLayer = HttpRouter.serve(
   HttpApiBuilder.layer(RootHttpApi).pipe(
     Layer.provide([controlHandlers, controlPlaneHandlers, globalHandlers]),
@@ -32,6 +35,12 @@ const apiLayer = HttpRouter.serve(
   Layer.provideMerge(NodeHttpServer.layerTest),
   Layer.provide(ServerRateLimit.layer),
   Layer.provide(Database.layerFromPath(":memory:")),
+  Layer.provide(
+    Layer.mock(AppState.Service)({
+      autoApprove: () => Ref.get(autoApprove),
+      setAutoApprove: (enabled) => Ref.set(autoApprove, enabled),
+    }),
+  ),
   Layer.provide(Layer.mock(Auth.Service)({})),
   Layer.provide(Layer.mock(Config.Service)({})),
   Layer.provide(Layer.mock(MoveSession.Service)({})),
@@ -47,6 +56,25 @@ const apiLayer = HttpRouter.serve(
 const it = testEffect(apiLayer)
 
 describe("global HttpApi", () => {
+  it.live("reads and writes the permission auto-approve setting", () =>
+    Effect.gen(function* () {
+      const initial = yield* HttpClientRequest.get(GlobalPaths.autoApprove).pipe(HttpClient.execute)
+      expect(initial.status).toBe(200)
+      expect(yield* initial.json).toEqual({ enabled: false })
+
+      const updated = yield* HttpClientRequest.put(GlobalPaths.autoApprove).pipe(
+        HttpClientRequest.bodyJsonUnsafe({ enabled: true }),
+        HttpClient.execute,
+      )
+      expect(updated.status).toBe(200)
+      expect(yield* updated.json).toEqual({ enabled: true })
+
+      const reloaded = yield* HttpClientRequest.get(GlobalPaths.autoApprove).pipe(HttpClient.execute)
+      expect(reloaded.status).toBe(200)
+      expect(yield* reloaded.json).toEqual({ enabled: true })
+    }),
+  )
+
   it.live("upgrades to the requested version", () =>
     Effect.gen(function* () {
       const response = yield* HttpClientRequest.post(GlobalPaths.upgrade).pipe(

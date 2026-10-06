@@ -1,6 +1,7 @@
 import { Config } from "@/config/config"
 import { GlobalBus, type GlobalEvent as GlobalBusEvent } from "@/bus/global"
 import { EffectBridge } from "@/effect/bridge"
+import { AppState } from "@opencode-ai/core/app-state"
 import { EventV2 } from "@opencode-ai/core/event"
 import { Installation } from "@/installation"
 import { disposeAllInstancesAndEmitGlobalDisposed } from "@/server/global-lifecycle"
@@ -11,7 +12,7 @@ import { HttpServerResponse } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import * as Sse from "effect/unstable/encoding/Sse"
 import { RootHttpApi } from "../api"
-import { GlobalUpgradeInput } from "../groups/global"
+import { GlobalAutoApprove, GlobalUpgradeInput } from "../groups/global"
 
 function eventData(data: unknown): Sse.Event {
   return {
@@ -62,6 +63,7 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
     const config = yield* Config.Service
     const installation = yield* Installation.Service
     const bridge = yield* EffectBridge.make()
+    const appState = yield* AppState.Service
 
     const health = Effect.fn("GlobalHttpApi.health")(function* () {
       return { healthy: true as const, version: InstallationVersion }
@@ -79,6 +81,15 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       const result = yield* config.updateGlobal(ctx.payload)
       if (result.changed) bridge.fork(disposeAllInstancesAndEmitGlobalDisposed({ swallowErrors: true }))
       return result.info
+    })
+
+    const autoApproveGet = Effect.fn("GlobalHttpApi.autoApproveGet")(function* () {
+      return { enabled: yield* appState.autoApprove() }
+    })
+
+    const autoApproveSet = Effect.fn("GlobalHttpApi.autoApproveSet")(function* (ctx: { payload: typeof GlobalAutoApprove.Type }) {
+      yield* appState.setAutoApprove(ctx.payload.enabled)
+      return { enabled: ctx.payload.enabled }
     })
 
     const dispose = Effect.fn("GlobalHttpApi.dispose")(function* () {
@@ -120,6 +131,8 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       .handleRaw("event", event)
       .handle("configGet", configGet)
       .handle("configUpdate", configUpdate)
+      .handle("autoApproveGet", autoApproveGet)
+      .handle("autoApproveSet", autoApproveSet)
       .handle("dispose", dispose)
       .handle("upgrade", upgrade)
   }),

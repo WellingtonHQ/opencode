@@ -4,6 +4,7 @@ import { describe, expect } from "bun:test"
 import { Context, Effect, Layer, Option, Ref } from "effect"
 import { HttpBody, HttpClient, HttpClientRequest, HttpRouter } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
+import { AppState } from "@opencode-ai/core/app-state"
 import { MoveSession } from "@opencode-ai/core/control-plane/move-session"
 import { AbsolutePath } from "@opencode-ai/core/schema"
 import { SessionV2 } from "@opencode-ai/core/session"
@@ -40,6 +41,7 @@ const apiLayer = HttpRouter.serve(
   Layer.provideMerge(NodeHttpServer.layerTest),
   Layer.provide(ServerRateLimit.layer),
   Layer.provide(Database.layerFromPath(":memory:")),
+  Layer.provide(Layer.mock(AppState.Service)({})),
   Layer.provide(Layer.mock(Auth.Service)({})),
   Layer.provide(Layer.mock(Config.Service)({})),
   Layer.provide(Layer.mock(Installation.Service)({})),

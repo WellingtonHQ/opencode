@@ -48,6 +48,8 @@ const GlobalEventSchema = Schema.Struct({
   ]),
 }).annotate({ identifier: "GlobalEvent" })
 
+export const GlobalAutoApprove = Schema.Struct({ enabled: Schema.Boolean }).annotate({ identifier: "GlobalAutoApprove" })
+
 export const GlobalUpgradeInput = Schema.Struct({
   target: Schema.String.check(
     Schema.makeFilter((value) => (semver.valid(value) === null ? "Expected a semantic version" : undefined)),
@@ -69,6 +71,7 @@ export const GlobalPaths = {
   health: "/global/health",
   event: "/global/event",
   config: "/global/config",
+  autoApprove: "/global/permissions/auto-approve",
   dispose: "/global/dispose",
   upgrade: "/global/upgrade",
 } as const
@@ -112,6 +115,26 @@ export const GlobalApi = HttpApi.make("global").add(
           identifier: "global.config.update",
           summary: "Update global configuration",
           description: "Update global OpenCode configuration settings and preferences.",
+        }),
+      ),
+      HttpApiEndpoint.get("autoApproveGet", GlobalPaths.autoApprove, {
+        success: described(GlobalAutoApprove, "Current permission auto-approve setting"),
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.auto-approve.get",
+          summary: "Get permission auto-approve",
+          description: "Read the global switch that makes headless runs approve their own permission requests.",
+        }),
+      ),
+      HttpApiEndpoint.put("autoApproveSet", GlobalPaths.autoApprove, {
+        payload: GlobalAutoApprove,
+        success: described(GlobalAutoApprove, "Updated permission auto-approve setting"),
+        error: HttpApiError.BadRequest,
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.auto-approve.set",
+          summary: "Set permission auto-approve",
+          description: "Enable or disable automatic approval of permission requests for headless runs.",
         }),
       ),
       HttpApiEndpoint.post("dispose", GlobalPaths.dispose, {

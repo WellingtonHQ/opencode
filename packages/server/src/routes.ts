@@ -1,10 +1,12 @@
 import { Database } from "@opencode-ai/core/database/database"
+import { makeGlobalNode } from "@opencode-ai/core/effect/app-node"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { httpClient } from "@opencode-ai/core/effect/app-node-platform"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { EventV2 } from "@opencode-ai/core/event"
 import { Credential } from "@opencode-ai/core/credential"
 import { ScheduleTask } from "@opencode-ai/core/schedule"
+import { PromptRunner } from "@opencode-ai/core/schedule/executor"
 import { PermissionSaved } from "@opencode-ai/core/permission/saved"
 import { PtyTicket } from "@opencode-ai/core/pty/ticket"
 import { SessionV2 } from "@opencode-ai/core/session"
@@ -14,7 +16,7 @@ import { SessionExecutionLocal } from "@opencode-ai/core/session/execution/local
 import { ToolOutputStore } from "@opencode-ai/core/tool-output-store"
 import { HttpRouter, HttpServer } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
-import { Layer, Option } from "effect"
+import { Effect, Layer, Option } from "effect"
 import { Api } from "./api"
 import { ServerAuth } from "./auth"
 import { ServerRateLimit } from "./auth/rate-limit"
@@ -39,6 +41,17 @@ const applicationServices = LayerNode.group([
   LocationServiceMap.node,
 ])
 
+// Scheduled prompt execution runs on the V1 session engine, which only exists in the opencode app.
+// This server exposes schedule management and records a clear failure when a run is requested.
+const schedulePromptRunner = makeGlobalNode({
+  service: PromptRunner.Service,
+  layer: Layer.effect(
+    PromptRunner.Service,
+    Effect.succeed(PromptRunner.Service.of({ run: () => Effect.fail(new Error("Scheduled prompt execution is not supported by this server")) })),
+  ),
+  deps: [],
+})
+
 export function createRoutes(password?: string) {
   return makeRoutes(
     password
@@ -52,7 +65,10 @@ export function createEmbeddedRoutes() {
 }
 
 function makeRoutes<AuthError, AuthServices>(auth: Layer.Layer<ServerAuth.Config, AuthError, AuthServices>) {
-  const serviceLayer = AppNodeBuilder.build(applicationServices, [[SessionExecution.node, SessionExecutionLocal.node]])
+  const serviceLayer = AppNodeBuilder.build(applicationServices, [
+    [SessionExecution.node, SessionExecutionLocal.node],
+    [PromptRunner.node, schedulePromptRunner],
+  ])
 
   return HttpApiBuilder.layer(Api, { openapiPath: "/openapi.json" }).pipe(
     Layer.provide(handlers),
