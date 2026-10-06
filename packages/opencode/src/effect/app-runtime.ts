@@ -2,6 +2,7 @@ import { Layer, ManagedRuntime } from "effect"
 import { attach } from "./run-service"
 import * as Observability from "@opencode-ai/core/observability"
 
+import { AppState } from "@opencode-ai/core/app-state"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Database } from "@opencode-ai/core/database/database"
 import { Auth } from "@/auth"
@@ -60,6 +61,7 @@ export const AppLayer = AppNodeBuilderV1.build(
     Npm.node,
     FSUtil.node,
     Database.node,
+    AppState.node,
     Auth.node,
     Account.node,
     Config.node,

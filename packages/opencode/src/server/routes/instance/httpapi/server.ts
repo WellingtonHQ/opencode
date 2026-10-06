@@ -49,6 +49,8 @@ import { ToolRegistry } from "@/tool/registry"
 import { Truncate } from "@/tool/truncate"
 import { Worktree } from "@/worktree"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+import { SchedulePromptRunner } from "@/schedule/prompt-runner"
+import { AppState } from "@opencode-ai/core/app-state"
 import { MoveSession } from "@opencode-ai/core/control-plane/move-session"
 import { Database } from "@opencode-ai/core/database/database"
 import { AppNodeBuilderV1 } from "@/effect/app-node-builder-v1"
@@ -63,6 +65,7 @@ import { ProjectCopy } from "@opencode-ai/core/project/copy"
 import { PtyTicket } from "@opencode-ai/core/pty/ticket"
 import { Ripgrep } from "@opencode-ai/core/ripgrep"
 import { ScheduleTask } from "@opencode-ai/core/schedule"
+import { PromptRunner } from "@opencode-ai/core/schedule/executor"
 import { SessionProjector } from "@opencode-ai/core/session/projector"
 import { SessionV2 } from "@opencode-ai/core/session"
 import { SessionExecution } from "@opencode-ai/core/session/execution"
@@ -217,6 +220,7 @@ const app = LayerNode.group([
   Npm.node,
   FSUtil.node,
   Database.node,
+  AppState.node,
   Auth.node,
   Account.node,
   Config.node,
@@ -305,6 +309,7 @@ export function createRoutes(
       AppNodeBuilderV1.build(LayerNode.group([SessionV2.node, ScheduleTask.node]), [
         [LocationServiceMap.node, locationServiceMapV2],
         [SessionExecution.node, SessionExecutionLocal.node],
+        [PromptRunner.node, SchedulePromptRunner.node],
       ]),
     ),
     Layer.provide(locationServiceMapV2),
