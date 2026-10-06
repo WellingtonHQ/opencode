@@ -31,3 +31,21 @@ export const ScheduleTaskTable = sqliteTable(
   },
   (table) => [index("scheduled_task_next_run_at_ms_idx").on(table.next_run_at_ms)],
 )
+
+export const ScheduleRunTable = sqliteTable(
+  "schedule_run",
+  {
+    id: text().primaryKey(),
+    task_id: text()
+      .$type<Schedule.ID>()
+      .notNull()
+      .references(() => ScheduleTaskTable.id, { onDelete: "cascade" }),
+    session_id: text().$type<Session.ID>(),
+    status: text().$type<Schedule.RunStatus>().notNull(),
+    started_at: integer().notNull(),
+    finished_at: integer(),
+    error_text: text(),
+    ...Timestamps,
+  },
+  (table) => [index("schedule_run_task_id_idx").on(table.task_id)],
+)

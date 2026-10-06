@@ -1,13 +1,14 @@
 export * as ScheduleTask from "./schedule"
 
-import { asc, and, eq, lte, sql } from "drizzle-orm"
-import { Context, Duration, Effect, Layer, Schema } from "effect"
+import { asc, and, desc, eq, lte, notInArray, sql } from "drizzle-orm"
+import { Cause, Context, Duration, Effect, Exit, Layer, Scope, Schema } from "effect"
 import { Schedule } from "@opencode-ai/schema/schedule"
 import { Database } from "./database/database"
 import { EventV2 } from "./event"
 import { makeGlobalNode } from "./effect/app-node"
-import { SessionV2 } from "./session"
-import { ScheduleTaskTable } from "./schedule/sql"
+import { Identifier } from "./id/id"
+import { PromptRunner } from "./schedule/executor"
+import { ScheduleRunTable, ScheduleTaskTable } from "./schedule/sql"
 import { nextRunAt } from "./schedule/time"
 
 export const ID = Schedule.ID
@@ -22,9 +23,11 @@ export class LimitExceededError extends Schema.TaggedErrorClass<LimitExceededErr
 }) {}
 
 type Row = typeof ScheduleTaskTable.$inferSelect
+type RunRow = typeof ScheduleRunTable.$inferSelect
 
 const TICK_MS = 15_000
 const MAX_TASKS = 50
+const MAX_RUNS = 10
 
 export interface Interface {
   /** Returns every scheduled task. */
@@ -48,22 +51,71 @@ const layer = Layer.effect(
   Effect.gen(function* () {
     const { db } = yield* Database.Service
     const events = yield* EventV2.Service
-    const sessions = yield* SessionV2.Service
+    const runner = yield* PromptRunner.Service
+    const scope = yield* Scope.Scope
 
-    const infoFrom = (row: Row): Schedule.Info => ({
-      id: row.id,
-      ...(row.name ? { name: row.name } : {}),
-      prompt: row.prompt,
-      spec: specFrom(row),
-      ...(row.agent_id ? { agentId: row.agent_id } : {}),
-      ...(row.model ? { model: row.model } : {}),
-      directory: row.directory,
-      enabled: row.enabled,
-      nextRunAtMs: row.next_run_at_ms ?? undefined,
-      lastRunAtMs: row.last_run_at_ms ?? undefined,
-      ...(row.last_session_id ? { lastSessionId: row.last_session_id } : {}),
-      ...(row.last_error !== null && row.last_error !== undefined ? { lastError: row.last_error } : {}),
-      runCount: row.run_count,
+    const runFrom = (row: RunRow): Schedule.Run => ({
+      taskID: row.task_id,
+      ...(row.session_id ? { sessionID: row.session_id } : {}),
+      status: row.status,
+      startedAtMs: row.started_at,
+      ...(row.finished_at !== null && row.finished_at !== undefined ? { finishedAtMs: row.finished_at } : {}),
+      ...(row.error_text !== null && row.error_text !== undefined ? { errorText: row.error_text } : {}),
+    })
+
+    const runsFor = Effect.fn("ScheduleTask.runsFor")(function* (taskID: ID) {
+      const rows = yield* db
+        .select()
+        .from(ScheduleRunTable)
+        .where(eq(ScheduleRunTable.task_id, taskID))
+        .orderBy(desc(ScheduleRunTable.started_at), desc(ScheduleRunTable.id))
+        .limit(MAX_RUNS)
+        .all()
+        .pipe(Effect.orDie)
+      return rows.map(runFrom)
+    })
+
+    const infoFrom = Effect.fn("ScheduleTask.infoFrom")(function* (row: Row) {
+      const recentRuns = yield* runsFor(row.id)
+      return {
+        id: row.id,
+        ...(row.name ? { name: row.name } : {}),
+        prompt: row.prompt,
+        spec: specFrom(row),
+        ...(row.agent_id ? { agentId: row.agent_id } : {}),
+        ...(row.model ? { model: row.model } : {}),
+        directory: row.directory,
+        enabled: row.enabled,
+        nextRunAtMs: row.next_run_at_ms ?? undefined,
+        lastRunAtMs: row.last_run_at_ms ?? undefined,
+        ...(row.last_session_id ? { lastSessionId: row.last_session_id } : {}),
+        ...(row.last_error !== null && row.last_error !== undefined ? { lastError: row.last_error } : {}),
+        runCount: row.run_count,
+        ...(recentRuns.length > 0 ? { recentRuns } : {}),
+      }
+    })
+
+    // Inserts the new run row and prunes that task's history to the MAX_RUNS most recent rows.
+    const recordRun = Effect.fn("ScheduleTask.recordRun")(function* (taskID: ID, runID: string, startedAtMs: number) {
+      yield* db
+        .insert(ScheduleRunTable)
+        .values({ id: runID, task_id: taskID, status: "running", started_at: startedAtMs })
+        .run()
+        .pipe(Effect.orDie)
+      const keep = yield* db
+        .select({ id: ScheduleRunTable.id })
+        .from(ScheduleRunTable)
+        .where(eq(ScheduleRunTable.task_id, taskID))
+        .orderBy(desc(ScheduleRunTable.started_at), desc(ScheduleRunTable.id))
+        .limit(MAX_RUNS)
+        .all()
+        .pipe(Effect.orDie)
+      if (keep.length < MAX_RUNS) return
+      yield* db
+        .delete(ScheduleRunTable)
+        .where(and(eq(ScheduleRunTable.task_id, taskID), notInArray(ScheduleRunTable.id, keep.map((row) => row.id))))
+        .run()
+        .pipe(Effect.orDie)
     })
 
     const specFrom = (row: Row): Schedule.Spec => {
@@ -128,29 +180,49 @@ const layer = Layer.effect(
         .pipe(Effect.orDie)
       if (!claimedRow) return undefined
 
-      const outcome = yield* Effect.gen(function* () {
-        const session = yield* sessions.create({
-          location: { directory: claimedRow.directory },
-          ...(claimedRow.agent_id ? { agent: claimedRow.agent_id } : {}),
-          ...(claimedRow.model ? { model: claimedRow.model } : {}),
-        })
-        yield* sessions.prompt({ sessionID: session.id, prompt: { text: claimedRow.prompt } })
-        return session.id
-      }).pipe(
-        Effect.map((sessionID) => ({ sessionID, lastError: undefined as string | undefined })),
-        Effect.catch((error) => Effect.succeed({ sessionID: undefined, lastError: error instanceof Error ? error.message : String(error) })),
-      )
-      yield* db
-        .update(ScheduleTaskTable)
-        .set({ last_session_id: outcome.sessionID ?? null, last_error: outcome.lastError ?? null })
-        .where(eq(ScheduleTaskTable.id, claimedRow.id))
-        .run()
-        .pipe(Effect.orDie)
-      const fresh = yield* db.select().from(ScheduleTaskTable).where(eq(ScheduleTaskTable.id, claimedRow.id)).get().pipe(Effect.orDie)
-      if (!fresh) return undefined
-      const info = infoFrom(fresh)
-      yield* announce(info)
-      return info
+      const runID = Identifier.create("run", "ascending")
+      yield* recordRun(claimedRow.id, runID, now).pipe(Effect.orDie)
+
+      const title = "[scheduled] " + (claimedRow.name ?? claimedRow.prompt.slice(0, 50))
+      // Execution is forked into the service scope so tick never blocks and run-now responses
+      // return before the prompt finishes.
+      yield* Effect.gen(function* () {
+        const exit = yield* runner
+          .run({
+            directory: claimedRow.directory,
+            title,
+            promptText: claimedRow.prompt,
+            ...(claimedRow.agent_id ? { agentId: claimedRow.agent_id } : {}),
+            ...(claimedRow.model ? { model: claimedRow.model } : {}),
+          })
+          .pipe(Effect.exit)
+        const sessionID = Exit.isSuccess(exit) ? exit.value : undefined
+        const failure = Exit.isFailure(exit) ? Cause.squash(exit.cause) : undefined
+        const lastError = failure === undefined ? undefined : failure instanceof Error ? failure.message : String(failure)
+        yield* db
+          .update(ScheduleRunTable)
+          .set({
+            session_id: sessionID ?? null,
+            status: lastError === undefined ? "completed" : "failed",
+            finished_at: Date.now(),
+            error_text: lastError ?? null,
+          })
+          .where(eq(ScheduleRunTable.id, runID))
+          .run()
+          .pipe(Effect.orDie)
+        yield* db
+          .update(ScheduleTaskTable)
+          .set({ last_session_id: sessionID ?? null, last_error: lastError ?? null })
+          .where(eq(ScheduleTaskTable.id, claimedRow.id))
+          .run()
+          .pipe(Effect.orDie)
+        const fresh = yield* db.select().from(ScheduleTaskTable).where(eq(ScheduleTaskTable.id, claimedRow.id)).get().pipe(Effect.orDie)
+        if (!fresh) return
+        const info = yield* infoFrom(fresh)
+        yield* announce(info)
+      }).pipe(Effect.forkIn(scope))
+
+      return yield* infoFrom(claimedRow)
     })
 
     // Publishes schedule.changed scoped to the task's directory so location-filtered event streams see it.
@@ -175,16 +247,25 @@ const layer = Layer.effect(
       }
     })
 
+    // A server restart interrupts in-flight runs; their rows would otherwise stay "running" forever.
+    yield* db
+      .update(ScheduleRunTable)
+      .set({ status: "failed", finished_at: Date.now(), error_text: "Interrupted by server restart" })
+      .where(eq(ScheduleRunTable.status, "running"))
+      .run()
+      .pipe(Effect.orDie)
+
     yield* runTicks().pipe(Effect.forkScoped)
 
     return Service.of({
       list: Effect.fn("ScheduleTask.list")(function* () {
         const rows = yield* db.select().from(ScheduleTaskTable).orderBy(asc(ScheduleTaskTable.time_created)).all().pipe(Effect.orDie)
-        return rows.map(infoFrom)
+        return yield* Effect.forEach(rows, (row) => infoFrom(row))
       }),
       get: Effect.fn("ScheduleTask.get")(function* (id) {
         const row = yield* db.select().from(ScheduleTaskTable).where(eq(ScheduleTaskTable.id, id)).get().pipe(Effect.orDie)
-        return row ? infoFrom(row) : undefined
+        if (!row) return undefined
+        return yield* infoFrom(row)
       }),
       create: Effect.fn("ScheduleTask.create")(function* (input) {
         const now = Date.now()
@@ -244,14 +325,14 @@ const layer = Layer.effect(
           .get()
           .pipe(Effect.orDie)
         if (!updatedRow) return undefined
-        const info = infoFrom(updatedRow)
+        const info = yield* infoFrom(updatedRow)
         yield* announce(info)
         return info
       }),
       remove: Effect.fn("ScheduleTask.remove")(function* (id) {
         const removed = yield* db.delete(ScheduleTaskTable).where(eq(ScheduleTaskTable.id, id)).returning().get().pipe(Effect.orDie)
         if (!removed) return undefined
-        const info = infoFrom(removed)
+        const info = yield* infoFrom(removed)
         yield* announce(info)
         return info
       }),
@@ -264,4 +345,4 @@ const layer = Layer.effect(
   }),
 )
 
-export const node = makeGlobalNode({ service: Service, layer, deps: [Database.node, EventV2.node, SessionV2.node] })
+export const node = makeGlobalNode({ service: Service, layer, deps: [Database.node, EventV2.node, PromptRunner.node] })

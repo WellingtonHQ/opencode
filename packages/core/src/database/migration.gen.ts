@@ -45,5 +45,6 @@ export const migrations = (
     import("./migration/20260927235637_auth_session"),
     import("./migration/20260930001258_auth_session_credentials"),
     import("./migration/20260930001910_auth_config"),
+    import("./migration/20261005063756_add_app_setting_and_schedule_run"),
   ])
 ).map((module) => module.default) satisfies DatabaseMigration.Migration[]
