@@ -53,6 +53,19 @@ export const Spec = Schema.Union([OnceSpec, DailySpec, WeeklySpec, CronSpec])
   .annotate({ identifier: "Schedule.Spec" })
 export type Spec = typeof Spec.Type
 
+export const RunStatus = Schema.Literals(["running", "completed", "failed"]).annotate({ identifier: "Schedule.Run.Status" })
+export type RunStatus = typeof RunStatus.Type
+
+export interface Run extends Schema.Schema.Type<typeof Run> {}
+export const Run = Schema.Struct({
+  taskID: ID,
+  sessionID: Session.ID.pipe(optional),
+  status: RunStatus,
+  startedAtMs: NonNegativeInt,
+  finishedAtMs: NonNegativeInt.pipe(optional),
+  errorText: optional(Schema.String),
+}).annotate({ identifier: "Schedule.Run" })
+
 export interface Info extends Schema.Schema.Type<typeof Info> {}
 export const Info = Schema.Struct({
   id: ID,
@@ -68,6 +81,7 @@ export const Info = Schema.Struct({
   lastSessionId: Session.ID.pipe(optional),
   lastError: optional(Schema.String),
   runCount: NonNegativeInt,
+  recentRuns: optional(Schema.Array(Run)),
 }).annotate({ identifier: "Schedule.Info" })
 
 export interface CreateInput extends Schema.Schema.Type<typeof CreateInput> {}
