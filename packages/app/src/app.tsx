@@ -61,6 +61,7 @@ import DirectoryLayout, { DirectoryDataProvider } from "@/pages/directory-layout
 import LegacyLayout from "@/pages/layout"
 import NewLayout from "@/pages/layout-new"
 import { ErrorPage } from "./pages/error"
+import { AutoApproveSync } from "@/utils/auto-approve"
 import { useCheckServerHealth } from "./utils/server-health"
 import { legacySessionHref, legacySessionServer, requireServerKey, sessionHref } from "./utils/session-route"
 import { createSessionLineage } from "@/pages/session/session-lineage"
@@ -318,6 +319,7 @@ function SharedProviders(props: ParentProps) {
         <DesktopCommands />
         <HighlightsProvider>{props.children}</HighlightsProvider>
       </CommandProvider>
+      <AutoApproveSync />
     </>
   )
 }

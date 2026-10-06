@@ -27,6 +27,7 @@ import {
   terminalInput,
   useSettings,
 } from "@/context/settings"
+import { useAutoApproveToggle } from "@/utils/auto-approve"
 import { decode64 } from "@/utils/base64"
 import { playSoundById, SOUND_OPTIONS } from "@/utils/sound"
 import { ExternalLink } from "./external-link"
@@ -90,6 +91,7 @@ export const SettingsGeneral: Component = () => {
   const dialog = useDialog()
   const params = useParams()
   const settings = useSettings()
+  const toggleAutoAcceptGlobal = useAutoApproveToggle()
 
   const updater = useUpdaterAction()
 
@@ -330,7 +332,7 @@ export const SettingsGeneral: Component = () => {
           description={language.t("toast.permissions.autoaccept.on.description")}
         >
           <div data-action="settings-auto-accept-permissions-global">
-            <Switch checked={settings.permissions.autoApprove()} onChange={(checked) => settings.permissions.setAutoApprove(checked)} />
+            <Switch checked={settings.permissions.autoApprove()} onChange={(checked) => toggleAutoAcceptGlobal(checked)} />
           </div>
         </SettingsRow>
 

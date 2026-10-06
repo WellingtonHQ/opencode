@@ -1188,4 +1188,11 @@ export const dict: Record<string, string> = {
   "schedule.dialog.submit.add": "Create",
   "schedule.summary.daily": "Daily at {{time}}",
   "schedule.summary.weekly": "{{days}} at {{time}}",
+  "schedule.status.running": "Running",
+  "schedule.status.completed": "Completed",
+  "schedule.status.failed": "Failed",
+  "schedule.panel.autoAccept.on": "Auto-accept on",
+  "schedule.panel.autoAccept.off": "Auto-accept off",
+  "schedule.panel.autoAccept.tooltip.on": "Scheduled runs will approve permission requests automatically.",
+  "schedule.panel.autoAccept.tooltip.off": "Permission requests from scheduled runs wait for approval in their session.",
 }

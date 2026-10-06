@@ -9,6 +9,7 @@ import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { useUpdaterAction } from "../updater-action"
 import { useSettings } from "@/context/settings"
+import { useAutoApproveToggle } from "@/utils/auto-approve"
 import { ExternalLink } from "../external-link"
 import { SettingsListV2 } from "./parts/list"
 import { SettingsRowV2 } from "./parts/row"
@@ -281,6 +282,7 @@ export const SettingsGeneralV2: Component<{
   const mobile = createMediaQuery("(max-width: 767px)")
   const updater = useUpdaterAction()
   const permissionScope = createPermissionScopeController(() => props.sessionID)
+  const toggleAutoAcceptGlobal = useAutoApproveToggle()
   const shell = createShellSettingsController()
   const appearance = createAppearanceSettingsController()
   const sounds = createSoundSettingsController()
@@ -338,7 +340,7 @@ export const SettingsGeneralV2: Component<{
           <div data-action="settings-auto-accept-permissions-global">
             <Switch
               checked={settings.permissions.autoApprove()}
-              onChange={(checked) => settings.permissions.setAutoApprove(checked)}
+              onChange={(checked) => toggleAutoAcceptGlobal(checked)}
             />
           </div>
         </SettingsRowV2>

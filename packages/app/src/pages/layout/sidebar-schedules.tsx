@@ -2,6 +2,7 @@ import { For, Show, createEffect, onCleanup, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Icon } from "@opencode-ai/ui/icon"
 import { IconButton } from "@opencode-ai/ui/icon-button"
+import { Spinner } from "@opencode-ai/ui/spinner"
 import { Switch } from "@opencode-ai/ui/v2/switch-v2"
 import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@opencode-ai/ui/v2/dialog-v2"
@@ -12,12 +13,14 @@ import { Schedule } from "@opencode-ai/schema/schedule"
 import { formatClock, formatDateTime, scheduleApi, weekdayLabels } from "@/utils/schedule"
 import { formatServerError } from "@/utils/server-errors"
 import { useLanguage } from "@/context/language"
+import { useSettings } from "@/context/settings"
 import { useServerSDK } from "@/context/server-sdk"
 
 export const SidebarSchedules = (props: { defaultDirectory?: string }): JSX.Element => {
   const serverSDK = useServerSDK()
   const language = useLanguage()
   const dialog = useDialog()
+  const settings = useSettings()
   let seq = 0
 
   const [state, setState] = createStore<{ items?: Schedule.Info[]; error: boolean; busy?: string }>({
@@ -116,8 +119,67 @@ export const SidebarSchedules = (props: { defaultDirectory?: string }): JSX.Elem
     return undefined
   }
 
+  function latestRunStatus(item: Schedule.Info): { status: Schedule.RunStatus; errorText?: string } | undefined {
+    const run = item.recentRuns?.[0]
+    if (run) return { status: run.status, errorText: run.errorText }
+    if (item.lastError !== undefined) return { status: "failed", errorText: item.lastError }
+    if (item.lastRunAtMs !== undefined) return { status: "completed" }
+    return undefined
+  }
+
+  function statusLabel(status: Schedule.RunStatus): string {
+    switch (status) {
+      case "running":
+        return language.t("schedule.status.running")
+      case "completed":
+        return language.t("schedule.status.completed")
+      case "failed":
+        return language.t("schedule.status.failed")
+    }
+  }
+
+  const runStatusIndicator = (item: Schedule.Info) => {
+    const run = latestRunStatus(item)
+    if (!run) return null
+    const label = statusLabel(run.status)
+    const tip = run.status === "failed" && run.errorText ? run.errorText : label
+    const icon =
+      run.status === "running" ? (
+        <Spinner class="size-2.5 text-icon-base" />
+      ) : run.status === "completed" ? (
+        <Icon name="circle-check" class="size-3 text-icon-success-base" />
+      ) : (
+        <Icon name="warning" class="size-3 text-icon-critical-base" />
+      )
+    return (
+      <Tooltip placement="top" value={tip}>
+        <span aria-label={label} class="flex size-4 shrink-0 items-center justify-center">
+          {icon}
+        </span>
+      </Tooltip>
+    )
+  }
+
+  const policyIndicator = () => {
+    const enabled = settings.permissions.autoApprove()
+    return (
+      <Tooltip
+        placement="top"
+        value={enabled ? language.t("schedule.panel.autoAccept.tooltip.on") : language.t("schedule.panel.autoAccept.tooltip.off")}
+      >
+        <span
+          aria-label={enabled ? language.t("schedule.panel.autoAccept.on") : language.t("schedule.panel.autoAccept.off")}
+          class="flex items-center justify-center"
+        >
+          <Icon name="shield" class={`size-3.5 ${enabled ? "text-icon-success-base" : "text-text-weak"}`} />
+        </span>
+      </Tooltip>
+    )
+  }
+
   const row = (item: Schedule.Info) => (
     <div class="flex w-full items-center gap-2 py-1.5">
+      {runStatusIndicator(item)}
       <button
         type="button"
         class="min-w-0 flex-1 text-left focus:outline-none"
@@ -159,9 +221,12 @@ export const SidebarSchedules = (props: { defaultDirectory?: string }): JSX.Elem
     <div class="flex h-full min-h-0 w-full flex-col">
       <div class="flex items-center justify-between px-3 pt-3 pb-1">
         <span class="text-12-medium text-text-weak">{language.t("sidebar.schedules")}</span>
-        <Tooltip placement="top" value={language.t("schedule.panel.new")}>
-          <IconButton icon="plus" variant="ghost" onClick={() => openEditor()} aria-label={language.t("schedule.panel.new")} />
-        </Tooltip>
+        <div class="flex items-center gap-1">
+          {policyIndicator()}
+          <Tooltip placement="top" value={language.t("schedule.panel.new")}>
+            <IconButton icon="plus" variant="ghost" onClick={() => openEditor()} aria-label={language.t("schedule.panel.new")} />
+          </Tooltip>
+        </div>
       </div>
       <Show
         when={state.items && state.items.length > 0}
