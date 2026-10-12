@@ -75,3 +75,20 @@
     animation-range: calc(100% - 1.1px) calc(100% - 1px);
   }
 }
+
+[data-component="menu-v2-content"].mobile-titlebar-tab-menu {
+  width: min(360px, calc(100vw - 24px));
+  max-height: min(68vh, 480px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+[data-component="menu-v2-item"].mobile-titlebar-tab-option {
+  height: 44px;
+  padding-inline: 10px;
+  gap: 10px;
+}
+
+[data-component="menu-v2-item"].mobile-titlebar-tab-option [data-slot="menu-v2-item-content"] {
+  overflow: hidden;
+}
