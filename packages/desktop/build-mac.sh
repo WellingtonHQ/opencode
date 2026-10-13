@@ -4,8 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "=== Installing dependencies ==="
-cd "$SCRIPT_DIR/.."
-bun install
+cd "$SCRIPT_DIR/../.."
+bun install --frozen-lockfile
 
 echo "=== Prebuilding ==="
 cd "$SCRIPT_DIR"

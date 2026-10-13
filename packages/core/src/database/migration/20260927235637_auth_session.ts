@@ -1,5 +1,5 @@
 import { Effect } from "effect"
-import type { DatabaseMigration } from "../migration"
+import type { DatabaseMigration } from "../migration.js"
 
 export default {
   id: "20260927235637_auth_session",
