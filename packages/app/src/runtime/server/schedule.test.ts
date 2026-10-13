@@ -24,6 +24,11 @@ describe("nextRunAfter", () => {
     expect(weekdayLabels([4], "en-US", "America/Los_Angeles")).toEqual(["Thu"])
   })
 
+  test("resolves DST gaps forward and ambiguous local times to their first occurrence", () => {
+    expect(parseDateTimeLocal("2026-03-08T02:30", "America/New_York")).toBe(Date.UTC(2026, 2, 8, 7, 30))
+    expect(parseDateTimeLocal("2025-11-02T01:30", "America/New_York")).toBe(Date.UTC(2025, 10, 2, 5, 30))
+  })
+
   test("returns a future once spec unchanged", () => {
     const atMs = NOW + 60_000
     expect(nextRunAfter({ kind: "once", atMs }, NOW)).toBe(atMs)

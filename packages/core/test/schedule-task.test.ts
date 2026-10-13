@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import path from "path"
-import { Effect, Fiber, Layer, Stream } from "effect"
-import { eq } from "drizzle-orm"
+import { Effect, Exit, Fiber, Layer, Stream } from "effect"
+import { eq, sql } from "drizzle-orm"
 import { Agent } from "@opencode/schema/agent"
 import { Identifier } from "@opencode/schema/identifier"
 import { Model } from "@opencode/schema/model"
@@ -13,13 +13,18 @@ import { Bus } from "@opencode/core/bus"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { LocationServiceMap } from "@opencode/core/location-service-map"
 import { Project } from "@opencode/core/project"
+import { ProjectTable } from "@opencode/core/project/sql"
 import { ScheduleTask } from "@opencode/core/schedule"
 import { ScheduleRunTable, ScheduleTaskTable } from "@opencode/core/schedule/sql"
 import { Session } from "@opencode/core/session"
 import { SessionExecution } from "@opencode/core/session/execution"
+import { SessionRestart } from "@opencode/core/session/execution/restart"
+import { SessionEvent } from "@opencode/core/session/event"
 import { SessionProjector } from "@opencode/core/session/projector"
+import { SessionTable } from "@opencode/core/session/sql"
 import { SessionStore } from "@opencode/core/session/store"
 import { AbsolutePath } from "@opencode/core/schema"
+import { makeGlobalNode } from "@opencode/util/effect/app-node"
 import { tmpdir } from "./fixture/tmpdir"
 import { promptLocationNode } from "./fixture/prompt-location"
 import { globalProjectNode } from "./lib/project"
@@ -59,6 +64,62 @@ const failedExecution = Layer.succeed(
 const failing = testEffect(node(failedExecution))
 
 const directory = AbsolutePath.make("/schedules")
+
+const recoveredExecutionNode = (outcomes: ReadonlyMap<Session.ID, "succeeded" | "failed">) =>
+  makeGlobalNode({
+    service: SessionExecution.Service,
+    layer: Layer.effect(
+      SessionExecution.Service,
+      Effect.gen(function* () {
+        const bus = yield* Bus.Service
+        const store = yield* SessionStore.Service
+        return SessionExecution.Service.of({
+          active: Effect.succeed(new Set()),
+          isActive: () => Effect.succeed(false),
+          resume: (sessionID) =>
+            outcomes.get(sessionID) === "failed"
+              ? bus
+                  .publish(
+                    SessionEvent.Execution.Failed,
+                    { sessionID, error: { type: "test.failure", message: "recovered provider failure" } },
+                    { commit: () => store.release(sessionID) },
+                  )
+                  .pipe(Effect.asVoid)
+              : bus
+                  .publish(SessionEvent.Execution.Succeeded, { sessionID }, { commit: () => store.release(sessionID) })
+                  .pipe(Effect.asVoid),
+          wake: () => Effect.void,
+          interrupt: () => Effect.succeed(false),
+          awaitIdle: () => Effect.void,
+        })
+      }),
+    ),
+    deps: [Bus.node, SessionStore.node],
+  })
+
+const restartNode = (
+  file: string,
+  execution: LayerNode.Replacement = SessionExecution.node.replace(SessionExecution.noopLayer),
+) =>
+  AppNodeBuilder.build(
+    LayerNode.group([
+      Database.node,
+      Bus.node,
+      Project.node,
+      SessionProjector.node,
+      SessionStore.node,
+      Session.node,
+      ScheduleTask.node,
+      SessionRestart.node,
+    ]),
+    [
+      Bus.node.replace(Bus.configured({ persist: true })),
+      Project.node.replace(globalProjectNode),
+      LocationServiceMap.node.replace(promptLocationNode),
+      execution,
+      Database.node.replace(Database.configured({ path: file })),
+    ],
+  )
 
 // Fires the task and waits for its completion announcement; returns the announced record.
 const fireAndAwait = (tasks: ScheduleTask.Interface, bus: Bus.Interface, id: Schedule.ID) =>
@@ -226,6 +287,31 @@ describe("ScheduleTask", () => {
     }),
   )
 
+  it.effect("rolls back a one-shot claim when inserting its run record fails", () =>
+    Effect.gen(function* () {
+      const tasks = yield* ScheduleTask.Service
+      const { db } = yield* Database.Service
+      const created = yield* tasks.create({ prompt: "atomic", spec: { kind: "once", atMs: Date.now() + 60_000 }, directory })
+      yield* db
+        .run(sql`
+          CREATE TRIGGER reject_schedule_run
+          BEFORE INSERT ON schedule_run
+          BEGIN
+            SELECT RAISE(ABORT, 'forced run insert failure');
+          END;
+        `)
+        .pipe(Effect.orDie)
+
+      const exit = yield* tasks.runNow(created.id).pipe(Effect.exit)
+      expect(Exit.isFailure(exit)).toBe(true)
+
+      const task = yield* db.select().from(ScheduleTaskTable).where(eq(ScheduleTaskTable.id, created.id)).get().pipe(Effect.orDie)
+      const runs = yield* db.select().from(ScheduleRunTable).where(eq(ScheduleRunTable.task_id, created.id)).all().pipe(Effect.orDie)
+      expect(task).toMatchObject({ enabled: true, next_run_at_ms: created.nextRunAtMs, run_count: 0 })
+      expect(runs).toEqual([])
+    }),
+  )
+
   failing.effect("records a failed Session execution on both the run and the task", () =>
     Effect.gen(function* () {
       const tasks = yield* ScheduleTask.Service
@@ -285,23 +371,6 @@ describe("ScheduleTask", () => {
   test("marks runs left running by a previous process as failed on startup", async () => {
     await using tmp = await tmpdir()
     const filename = path.join(tmp.path, "restart.sqlite")
-    // Each runtime builds the full service stack against one shared database file.
-    const layerFor = (file: string) =>
-      AppNodeBuilder.build(LayerNode.group([
-        Database.node,
-        Bus.node,
-        Project.node,
-        SessionProjector.node,
-        SessionStore.node,
-        Session.node,
-        ScheduleTask.node,
-      ]), [
-        Bus.node.replace(Bus.configured({ persist: true })),
-        Project.node.replace(globalProjectNode),
-        LocationServiceMap.node.replace(promptLocationNode),
-        SessionExecution.node.replace(SessionExecution.noopLayer),
-        Database.node.replace(Database.configured({ path: file })),
-      ])
 
     // First process: seed the task and an in-flight run row, then die.
     const taskID = Schedule.ID.create()
@@ -317,14 +386,173 @@ describe("ScheduleTask", () => {
         .values({ id: `run_${Identifier.ascending()}`, task_id: taskID, status: "running", started_at: Date.now() })
         .run()
         .pipe(Effect.orDie)
-    }).pipe(Effect.provide(layerFor(filename)), Effect.runPromise)
+    }).pipe(Effect.provide(restartNode(filename)), Effect.runPromise)
 
     // Second process (restart): the orphaned run must be failed.
     const info = await Effect.gen(function* () {
       const tasks = yield* ScheduleTask.Service
       return yield* tasks.get(taskID)
-    }).pipe(Effect.provide(layerFor(filename)), Effect.runPromise)
+    }).pipe(Effect.provide(restartNode(filename)), Effect.runPromise)
     if (info === undefined) throw new Error("task disappeared")
     expect(info.recentRuns?.[0]).toMatchObject({ status: "failed", errorText: "Interrupted by server restart" })
+  })
+
+  test("reconciles recovered scheduled Sessions from their terminal outcomes", async () => {
+    await using tmp = await tmpdir()
+    const filename = path.join(tmp.path, "recovered-schedules.sqlite")
+    const taskIDs = {
+      orphan: Schedule.ID.create(),
+      unrecoverable: Schedule.ID.create(),
+      success: Schedule.ID.create(),
+      failure: Schedule.ID.create(),
+      alreadyCompleted: Schedule.ID.create(),
+    }
+    const sessionIDs = {
+      unrecoverable: Session.ID.make("ses_schedule_unrecoverable"),
+      success: Session.ID.make("ses_schedule_recovered_success"),
+      failure: Session.ID.make("ses_schedule_recovered_failure"),
+      alreadyCompleted: Session.ID.make("ses_schedule_already_completed"),
+    }
+
+    await Effect.gen(function* () {
+      const { db } = yield* Database.Service
+      yield* db
+        .insert(ProjectTable)
+        .values({ id: Project.ID.global, worktree: directory, sandboxes: [] })
+        .onConflictDoNothing()
+        .run()
+        .pipe(Effect.orDie)
+      yield* db
+        .insert(ScheduleTaskTable)
+        .values(
+          Object.values(taskIDs).map((id) => ({
+            id,
+            prompt: "restart",
+            kind: "once" as const,
+            at_ms: Date.now() + 60_000,
+            timezone: "UTC",
+            directory,
+          })),
+        )
+        .run()
+        .pipe(Effect.orDie)
+      yield* db
+        .insert(SessionTable)
+        .values([
+          {
+            id: sessionIDs.unrecoverable,
+            project_id: Project.ID.global,
+            slug: sessionIDs.unrecoverable,
+            directory,
+            version: "test",
+          },
+          ...[sessionIDs.success, sessionIDs.failure].map((id) => ({
+            id,
+            project_id: Project.ID.global,
+            slug: id,
+            directory,
+            version: "test",
+            time_suspended: Date.now(),
+          })),
+          {
+            id: sessionIDs.alreadyCompleted,
+            project_id: Project.ID.global,
+            slug: sessionIDs.alreadyCompleted,
+            directory,
+            version: "test",
+            idle_outcome: "succeeded" as const,
+          },
+        ])
+        .run()
+        .pipe(Effect.orDie)
+      yield* db
+        .insert(ScheduleRunTable)
+        .values([
+          { id: `run_${Identifier.ascending()}`, task_id: taskIDs.orphan, status: "running", started_at: Date.now() },
+          {
+            id: `run_${Identifier.ascending()}`,
+            task_id: taskIDs.unrecoverable,
+            session_id: sessionIDs.unrecoverable,
+            status: "running",
+            started_at: Date.now(),
+          },
+          {
+            id: `run_${Identifier.ascending()}`,
+            task_id: taskIDs.success,
+            session_id: sessionIDs.success,
+            status: "running",
+            started_at: Date.now(),
+          },
+          {
+            id: `run_${Identifier.ascending()}`,
+            task_id: taskIDs.failure,
+            session_id: sessionIDs.failure,
+            status: "running",
+            started_at: Date.now(),
+          },
+          {
+            id: `run_${Identifier.ascending()}`,
+            task_id: taskIDs.alreadyCompleted,
+            session_id: sessionIDs.alreadyCompleted,
+            status: "running",
+            started_at: Date.now(),
+          },
+        ])
+        .run()
+        .pipe(Effect.orDie)
+    }).pipe(Effect.provide(restartNode(filename)), Effect.runPromise)
+
+    const execution = recoveredExecutionNode(
+      new Map([
+        [sessionIDs.success, "succeeded"],
+        [sessionIDs.failure, "failed"],
+      ]),
+    )
+    const reconciled = await Effect.gen(function* () {
+      const tasks = yield* ScheduleTask.Service
+      const bus = yield* Bus.Service
+      const restart = yield* SessionRestart.Service
+      const listener = yield* bus
+        .subscribe([SessionEvent.Execution.Succeeded, SessionEvent.Execution.Failed])
+        .pipe(
+          Stream.filter((event) => event.data.sessionID === sessionIDs.success || event.data.sessionID === sessionIDs.failure),
+          Stream.take(2),
+          Stream.runCollect,
+          Effect.forkScoped,
+        )
+      yield* Effect.yieldNow
+
+      expect((yield* tasks.get(taskIDs.success))?.recentRuns?.[0]?.status).toBe("running")
+      expect((yield* tasks.get(taskIDs.failure))?.recentRuns?.[0]?.status).toBe("running")
+      expect((yield* tasks.get(taskIDs.orphan))?.recentRuns?.[0]).toMatchObject({
+        status: "failed",
+        errorText: "Interrupted by server restart",
+      })
+      expect((yield* tasks.get(taskIDs.unrecoverable))?.recentRuns?.[0]).toMatchObject({
+        status: "failed",
+        sessionID: sessionIDs.unrecoverable,
+        errorText: "No recoverable Session execution was found after server restart",
+      })
+      expect((yield* tasks.get(taskIDs.alreadyCompleted))?.recentRuns?.[0]?.status).toBe("completed")
+
+      yield* restart.resumeSuspendedSessions
+      yield* Fiber.join(listener)
+
+      return {
+        success: yield* tasks.get(taskIDs.success),
+        failure: yield* tasks.get(taskIDs.failure),
+      }
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(restartNode(filename, SessionExecution.node.replace(execution))),
+      Effect.runPromise,
+    )
+
+    expect(reconciled.success?.recentRuns?.[0]).toMatchObject({ status: "completed", sessionID: sessionIDs.success })
+    expect(reconciled.failure?.recentRuns?.[0]).toMatchObject({
+      status: "failed",
+      sessionID: sessionIDs.failure,
+      errorText: "recovered provider failure",
+    })
   })
 })

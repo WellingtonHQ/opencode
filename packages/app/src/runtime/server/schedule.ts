@@ -118,13 +118,23 @@ function dateParts(value: number, timezone: string) {
 
 function localTimeToTimestamp(year: number, month: number, day: number, hour: number, minute: number, timezone: string) {
   const local = Date.UTC(year, month - 1, day, hour, minute)
-  let instant = local
-  for (let attempt = 0; attempt < 4; attempt++) {
+  const dayMs = 24 * 60 * 60 * 1000
+  const offsets = new Set(
+    [local - 2 * dayMs, local - dayMs, local, local + dayMs, local + 2 * dayMs].map((instant) => {
+      const parts = dateParts(instant, timezone)
+      return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute) - instant
+    }),
+  )
+  const candidates = Array.from(offsets, (offset) => {
+    const instant = local - offset
     const parts = dateParts(instant, timezone)
-    const represented = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute)
-    const adjustment = local - represented
-    if (adjustment === 0) return instant
-    instant += adjustment
-  }
-  return instant
+    return { instant, local: Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute) }
+  })
+  const exact = candidates.filter((candidate) => candidate.local === local).sort((a, b) => a.instant - b.instant)[0]
+  if (exact) return exact.instant
+  return (
+    candidates
+      .filter((candidate) => candidate.local > local)
+      .sort((a, b) => a.local - b.local || a.instant - b.instant)[0]?.instant ?? Number.NaN
+  )
 }

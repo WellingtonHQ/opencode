@@ -107,11 +107,12 @@ export const runNow = Runtime.handler(Commands.commands.schedule.commands["run-n
     const task = yield* request(server.endpoint.url, (signal) =>
       sdk.schedule.runNow({ scheduleID: input.id }, { signal }),
     )
-    if (task.lastError) {
-      process.stdout.write(`Ran ${task.id}, but the run recorded an error:${EOL}${task.lastError}${EOL}`)
+    const run = task.recentRuns?.[0]
+    if (run?.status === "failed") {
+      process.stdout.write(`Run for ${task.id} failed:${EOL}${run.errorText ?? "Unknown error"}${EOL}`)
       return
     }
-    write(`Ran ${task.id}`)
+    write(run?.status === "completed" ? `Completed run for ${task.id}` : `Started run for ${task.id}`)
   }).pipe(Effect.catch(report)),
 )
 

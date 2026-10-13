@@ -11,6 +11,8 @@ import { Location } from "./location.js"
 import { ScheduleRunTable, ScheduleTaskTable } from "./schedule/sql.js"
 import { nextRunAt } from "./schedule/time.js"
 import { Session } from "./session.js"
+import { SessionEvent } from "./session/event.js"
+import { SessionTable } from "./session/sql.js"
 
 export const ID = Schedule.ID
 export type ID = Schedule.ID
@@ -99,27 +101,65 @@ const layer = Layer.effect(
       }
     })
 
-    // Inserts the new run row and prunes that task's history to the MAX_RUNS most recent rows.
-    const recordRun = Effect.fn("ScheduleTask.recordRun")(function* (taskID: ID, runID: string, startedAtMs: number) {
-      yield* db
-        .insert(ScheduleRunTable)
-        .values({ id: runID, task_id: taskID, status: "running", started_at: startedAtMs })
-        .run()
+    const announce = (info: Schedule.Info) =>
+      bus.publish(Schedule.Event.Changed, { info }, { location: { directory: info.directory } }).pipe(Effect.asVoid)
+
+    const announceTask = Effect.fn("ScheduleTask.announceTask")(function* (taskID: ID) {
+      const row = yield* db.select().from(ScheduleTaskTable).where(eq(ScheduleTaskTable.id, taskID)).get().pipe(Effect.orDie)
+      if (!row) return
+      yield* announce(yield* infoFrom(row))
+    })
+
+    const finishRun = Effect.fn("ScheduleTask.finishRun")(function* (
+      runID: string,
+      sessionID: Session.ID | undefined,
+      status: Exclude<Schedule.RunStatus, "running">,
+      errorText: string | undefined,
+      finishedAtMs: number,
+    ) {
+      return yield* db
+        .transaction(() =>
+          Effect.gen(function* () {
+            const run = yield* db
+              .update(ScheduleRunTable)
+              .set({
+                session_id: sessionID ?? null,
+                status,
+                finished_at: finishedAtMs,
+                error_text: errorText ?? null,
+              })
+              .where(and(eq(ScheduleRunTable.id, runID), eq(ScheduleRunTable.status, "running")))
+              .returning({ taskID: ScheduleRunTable.task_id })
+              .get()
+              .pipe(Effect.orDie)
+            if (!run) return undefined
+            yield* db
+              .update(ScheduleTaskTable)
+              .set({ last_session_id: sessionID ?? null, last_error: errorText ?? null })
+              .where(eq(ScheduleTaskTable.id, run.taskID))
+              .run()
+              .pipe(Effect.orDie)
+            return run.taskID
+          }),
+        )
         .pipe(Effect.orDie)
-      const keep = yield* db
+    })
+
+    const finishSessionRun = Effect.fn("ScheduleTask.finishSessionRun")(function* (
+      sessionID: Session.ID,
+      status: Exclude<Schedule.RunStatus, "running">,
+      errorText: string | undefined,
+      finishedAtMs: number,
+    ) {
+      const run = yield* db
         .select({ id: ScheduleRunTable.id })
         .from(ScheduleRunTable)
-        .where(eq(ScheduleRunTable.task_id, taskID))
-        .orderBy(desc(ScheduleRunTable.started_at), desc(ScheduleRunTable.id))
-        .limit(MAX_RUNS)
-        .all()
+        .where(and(eq(ScheduleRunTable.session_id, sessionID), eq(ScheduleRunTable.status, "running")))
+        .get()
         .pipe(Effect.orDie)
-      if (keep.length < MAX_RUNS) return
-      yield* db
-        .delete(ScheduleRunTable)
-        .where(and(eq(ScheduleRunTable.task_id, taskID), notInArray(ScheduleRunTable.id, keep.map((row) => row.id))))
-        .run()
-        .pipe(Effect.orDie)
+      if (!run) return
+      const taskID = yield* finishRun(run.id, sessionID, status, errorText, finishedAtMs)
+      if (taskID) yield* announceTask(taskID)
     })
 
     const specFrom = (row: Row): Schedule.Spec => {
@@ -173,26 +213,58 @@ const layer = Layer.effect(
       const now = Date.now()
       const spec = specFrom(row)
       const nextRunMs = spec.kind === "once" ? null : yield* computeNext(spec, now, row.timezone).pipe(Effect.orDie)
+      const runID = `run_${Identifier.ascending()}`
       const claimedRow = yield* db
-        .update(ScheduleTaskTable)
-        .set({
-          last_run_at_ms: now,
-          run_count: sql`${ScheduleTaskTable.run_count} + 1`,
-          next_run_at_ms: nextRunMs,
-          ...(spec.kind === "once" ? { enabled: false } : {}),
-        })
-        .where(
-          claimNextMs === undefined
-            ? eq(ScheduleTaskTable.id, row.id)
-            : and(eq(ScheduleTaskTable.id, row.id), eq(ScheduleTaskTable.next_run_at_ms, claimNextMs)),
+        .transaction(() =>
+          Effect.gen(function* () {
+            const claimed = yield* db
+              .update(ScheduleTaskTable)
+              .set({
+                last_run_at_ms: now,
+                run_count: sql`${ScheduleTaskTable.run_count} + 1`,
+                next_run_at_ms: nextRunMs,
+                ...(spec.kind === "once" ? { enabled: false } : {}),
+              })
+              .where(
+                claimNextMs === undefined
+                  ? eq(ScheduleTaskTable.id, row.id)
+                  : and(eq(ScheduleTaskTable.id, row.id), eq(ScheduleTaskTable.next_run_at_ms, claimNextMs)),
+              )
+              .returning()
+              .get()
+              .pipe(Effect.orDie)
+            if (!claimed) return undefined
+
+            yield* db
+              .insert(ScheduleRunTable)
+              .values({ id: runID, task_id: claimed.id, status: "running", started_at: now })
+              .run()
+              .pipe(Effect.orDie)
+            const keep = yield* db
+              .select({ id: ScheduleRunTable.id })
+              .from(ScheduleRunTable)
+              .where(eq(ScheduleRunTable.task_id, claimed.id))
+              .orderBy(desc(ScheduleRunTable.started_at), desc(ScheduleRunTable.id))
+              .limit(MAX_RUNS)
+              .all()
+              .pipe(Effect.orDie)
+            if (keep.length >= MAX_RUNS) {
+              yield* db
+                .delete(ScheduleRunTable)
+                .where(
+                  and(
+                    eq(ScheduleRunTable.task_id, claimed.id),
+                    notInArray(ScheduleRunTable.id, keep.map((item) => item.id)),
+                  ),
+                )
+                .run()
+                .pipe(Effect.orDie)
+            }
+            return claimed
+          }),
         )
-        .returning()
-        .get()
         .pipe(Effect.orDie)
       if (!claimedRow) return undefined
-
-      const runID = `run_${Identifier.ascending()}`
-      yield* recordRun(claimedRow.id, runID, now).pipe(Effect.orDie)
 
       const title = "[scheduled] " + (claimedRow.name ?? claimedRow.prompt.slice(0, 50))
       // Execution is forked into the service scope so tick never blocks and run-now responses
@@ -231,37 +303,22 @@ const layer = Layer.effect(
               yield* sessions.prompt({ sessionID: created.value.id, text: claimedRow.prompt, resume: false })
               yield* sessions.resume(created.value.id)
             }).pipe(Effect.exit)
+        const interrupted = Exit.isFailure(exit) && Cause.hasInterrupts(exit.cause)
+        if (interrupted) return
         const failure = Exit.isFailure(exit) ? Cause.squash(exit.cause) : undefined
         const lastError = failure === undefined ? undefined : failure instanceof Error ? failure.message : String(failure)
-        yield* db
-          .update(ScheduleRunTable)
-          .set({
-            session_id: sessionID ?? null,
-            status: lastError === undefined ? "completed" : "failed",
-            finished_at: Date.now(),
-            error_text: lastError ?? null,
-          })
-          .where(eq(ScheduleRunTable.id, runID))
-          .run()
-          .pipe(Effect.orDie)
-        yield* db
-          .update(ScheduleTaskTable)
-          .set({ last_session_id: sessionID ?? null, last_error: lastError ?? null })
-          .where(eq(ScheduleTaskTable.id, claimedRow.id))
-          .run()
-          .pipe(Effect.orDie)
-        const fresh = yield* db.select().from(ScheduleTaskTable).where(eq(ScheduleTaskTable.id, claimedRow.id)).get().pipe(Effect.orDie)
-        if (!fresh) return
-        const info = yield* infoFrom(fresh)
-        yield* announce(info)
+        const taskID = yield* finishRun(
+          runID,
+          sessionID,
+          lastError === undefined ? "completed" : "failed",
+          lastError,
+          Date.now(),
+        )
+        if (taskID) yield* announceTask(taskID)
       }).pipe(Effect.forkIn(scope))
 
       return yield* infoFrom(claimedRow)
     })
-
-    // Publishes schedule.changed scoped to the task's directory so location-filtered event streams see it.
-    const announce = (info: Schedule.Info) =>
-      bus.publish(Schedule.Event.Changed, { info }, { location: { directory: info.directory } }).pipe(Effect.asVoid)
 
     const tick = Effect.fn("ScheduleTask.tick")(function* () {
       const now = Date.now()
@@ -282,13 +339,59 @@ const layer = Layer.effect(
       }
     })
 
-    // A server restart interrupts in-flight runs; their rows would otherwise stay "running" forever.
-    yield* db
-      .update(ScheduleRunTable)
-      .set({ status: "failed", finished_at: Date.now(), error_text: "Interrupted by server restart" })
+    const unsubscribe = yield* bus.listen((event) => {
+      if (Schema.is(SessionEvent.Execution.Succeeded)(event))
+        return finishSessionRun(event.data.sessionID, "completed", undefined, event.created)
+      if (Schema.is(SessionEvent.Execution.Failed)(event))
+        return finishSessionRun(event.data.sessionID, "failed", event.data.error.message, event.created)
+      if (Schema.is(SessionEvent.Execution.Interrupted)(event) && event.data.reason !== "shutdown")
+        return finishSessionRun(
+          event.data.sessionID,
+          "failed",
+          `Session execution interrupted (${event.data.reason})`,
+          event.created,
+        )
+      return Effect.void
+    })
+    yield* Scope.addFinalizer(scope, unsubscribe)
+
+    // Preserve claimed V2 Sessions for SessionRestart to resume. Finished Sessions
+    // use their projected terminal outcome; records without one cannot be recovered.
+    const running = yield* db
+      .select()
+      .from(ScheduleRunTable)
       .where(eq(ScheduleRunTable.status, "running"))
-      .run()
+      .all()
       .pipe(Effect.orDie)
+    yield* Effect.forEach(
+      running,
+      Effect.fnUntraced(function* (run) {
+        if (!run.session_id) {
+          const taskID = yield* finishRun(run.id, undefined, "failed", "Interrupted by server restart", Date.now())
+          if (taskID) yield* announceTask(taskID)
+          return
+        }
+        const session = yield* db
+          .select({ time_suspended: SessionTable.time_suspended, idle_outcome: SessionTable.idle_outcome })
+          .from(SessionTable)
+          .where(eq(SessionTable.id, run.session_id))
+          .get()
+          .pipe(Effect.orDie)
+        if (session && session.time_suspended !== null) return
+        const status = session?.idle_outcome === "succeeded" ? "completed" : "failed"
+        const errorText =
+          session?.idle_outcome === "failed"
+            ? "Scheduled Session failed before its run record was finalized"
+            : session?.idle_outcome === "interrupted"
+              ? "Scheduled Session execution was interrupted"
+              : status === "failed"
+                ? "No recoverable Session execution was found after server restart"
+                : undefined
+        const taskID = yield* finishRun(run.id, run.session_id, status, errorText, Date.now())
+        if (taskID) yield* announceTask(taskID)
+      }),
+      { discard: true },
+    )
 
     yield* runTicks().pipe(Effect.forkScoped)
 

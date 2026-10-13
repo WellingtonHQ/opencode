@@ -148,6 +148,41 @@ describe("schedule command", () => {
       await server.stop(true)
     }
   })
+
+  test("run-now reports the current run state instead of a previous task error", async () => {
+    const previousError = "previous attempt failed"
+    const taskID = "task_cli_run"
+    const server = Bun.serve({
+      port: 0,
+      fetch(request) {
+        const url = new URL(request.url)
+        if (url.pathname === "/api/info")
+          return Response.json({ version: OPENCODE_VERSION, pid: process.pid, urls: [], paths: { tmp: "/tmp" } })
+        if (url.pathname === `/api/schedule/${taskID}/run-now`)
+          return Response.json({
+            id: taskID,
+            prompt: "Summarize the open PRs",
+            spec: { kind: "daily", hour: 9, minute: 30 },
+            timezone: "UTC",
+            directory: process.cwd(),
+            enabled: true,
+            runCount: 2,
+            lastError: previousError,
+            recentRuns: [{ taskID, status: "running", startedAtMs: Date.now() }],
+          } satisfies ScheduleListOutput[number])
+        return new Response("Not found", { status: 404 })
+      },
+    })
+
+    try {
+      const result = await cli(["schedule", "run-now", taskID, "--server", server.url.toString()])
+      expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: "" })
+      expect(result.stdout).toContain(`Started run for ${taskID}`)
+      expect(result.stdout).not.toContain(previousError)
+    } finally {
+      await server.stop(true)
+    }
+  })
 })
 
 async function cli(args: string[], env: Record<string, string> = {}) {
