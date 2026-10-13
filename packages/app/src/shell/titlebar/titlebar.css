@@ -20,6 +20,30 @@
   overflow: hidden;
 }
 
+.mobile-titlebar-tab-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 2px;
+}
+
+[data-component="menu-v2-item"].mobile-titlebar-tab-option {
+  min-width: 0;
+  flex: 1;
+}
+
+[data-component="menu-v2-item"].mobile-titlebar-tab-option[aria-current="page"] {
+  background: var(--v2-overlay-simple-overlay-hover);
+}
+
+[data-component="menu-v2-item"].mobile-titlebar-tab-close {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  justify-content: center;
+  padding: 0;
+}
+
 [data-slot="vertical-tabs-sidebar"] [data-slot="vertical-tabs"] {
   display: flex;
   flex: 1;
