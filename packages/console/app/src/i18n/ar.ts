@@ -377,7 +377,7 @@ export const dict = {
   "go.faq.a5.museRetention":
     "أسعار توكنات مخفّضة للغاية مقابل منح الإذن باستخدام مطالباتك وإكمالات النموذج لتدريب نماذج Meta المستقبلية.",
   "go.faq.a5.learnMore": "اعرف المزيد",
-  "go.faq.a5.deepseekRetention": "تُجدَّد اتفاقية ZDR شهريًا. الاتفاقية الحالية سارية حتى 30 سبتمبر 2026.",
+  "go.faq.a5.deepseekRetention": "تُجدَّد اتفاقية ZDR شهريًا. الاتفاقية الحالية سارية حتى 31 أكتوبر 2026.",
   "go.faq.a5.beforeExceptions":
     "تتم استضافة نماذج Go في الولايات المتحدة. يتبع المزودون سياسة عدم الاحتفاظ بالبيانات ولا يستخدمون بياناتك لتدريب النماذج، مع",
   "go.faq.a5.exceptionsLink": "الاستثناءات التالية",
@@ -774,6 +774,7 @@ export const dict = {
   "download.platform.macosAppleSilicon": "macOS (Apple Silicon)",
   "download.platform.macosIntel": "macOS (Intel)",
   "download.platform.windowsX64": "Windows (x64)",
+  "download.platform.windowsArm64": "Windows (ARM64)",
   "download.platform.linuxDeb": "Linux (.deb)",
   "download.platform.linuxRpm": "Linux (.rpm)",
 
@@ -853,10 +854,6 @@ export const dict = {
   "changelog.hero.subtitle": "تحديثات وتحسينات جديدة لـ OpenCode",
   "changelog.empty": "لم يتم العثور على مدخلات في سجل التغييرات.",
   "changelog.viewJson": "عرض JSON",
-  "changelog.highlights": "أبرز التغييرات",
-  "changelog.error": "تعذر تحميل سجل التغييرات حاليًا.",
-  "changelog.viewOnGithub": "عرضه على GitHub",
-  "changelog.v1": "ملاحظات إصدارات OpenCode 1 موجودة في GitHub Releases",
 
   "bench.list.title": "المعيار",
   "bench.list.heading": "المعايير",

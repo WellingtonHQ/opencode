@@ -382,7 +382,7 @@ export const dict = {
   "go.faq.a5.museRetention":
     "Heavily discounted token pricing in exchange for permission to use your prompts and completions to train future Meta models.",
   "go.faq.a5.deepseekRetention":
-    "ZDR agreement is renewed monthly. The current agreement is valid through September 30, 2026.",
+    "ZDR agreement is renewed monthly. The current agreement is valid through October 31, 2026.",
   "go.faq.a5.learnMore": "Learn more",
 
   "go.faq.a5.beforeExceptions":
@@ -784,6 +784,7 @@ export const dict = {
   "download.platform.macosAppleSilicon": "macOS (Apple Silicon)",
   "download.platform.macosIntel": "macOS (Intel)",
   "download.platform.windowsX64": "Windows (x64)",
+  "download.platform.windowsArm64": "Windows (ARM64)",
   "download.platform.linuxDeb": "Linux (.deb)",
   "download.platform.linuxRpm": "Linux (.rpm)",
 
@@ -866,10 +867,6 @@ export const dict = {
   "changelog.hero.subtitle": "New updates and improvements to OpenCode",
   "changelog.empty": "No changelog entries found.",
   "changelog.viewJson": "View JSON",
-  "changelog.highlights": "Highlights",
-  "changelog.error": "The changelog could not be loaded right now.",
-  "changelog.viewOnGithub": "View it on GitHub",
-  "changelog.v1": "OpenCode 1 release notes are on GitHub Releases",
 
   "bench.list.title": "Benchmark",
   "bench.list.heading": "Benchmarks",

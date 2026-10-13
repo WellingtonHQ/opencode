@@ -382,7 +382,7 @@ export const dict = {
     "I log di monitoraggio degli abusi vengono generati per l'utilizzo di tutte le funzionalità API e conservati per un massimo di 30 giorni.",
   "go.faq.a5.learnMore": "Scopri di più",
   "go.faq.a5.deepseekRetention":
-    "L'accordo ZDR viene rinnovato mensilmente. L'accordo attuale è valido fino al 30 settembre 2026.",
+    "L'accordo ZDR viene rinnovato mensilmente. L'accordo attuale è valido fino al 31 ottobre 2026.",
   "go.faq.a5.museRetention":
     "Prezzi dei token fortemente scontati in cambio dell'autorizzazione a utilizzare i tuoi prompt e completamenti per addestrare futuri modelli Meta.",
   "go.faq.a5.beforeExceptions":
@@ -787,6 +787,7 @@ export const dict = {
   "download.platform.macosAppleSilicon": "macOS (Apple Silicon)",
   "download.platform.macosIntel": "macOS (Intel)",
   "download.platform.windowsX64": "Windows (x64)",
+  "download.platform.windowsArm64": "Windows (ARM64)",
   "download.platform.linuxDeb": "Linux (.deb)",
   "download.platform.linuxRpm": "Linux (.rpm)",
 
@@ -865,10 +866,6 @@ export const dict = {
   "changelog.hero.subtitle": "Nuovi aggiornamenti e miglioramenti a OpenCode",
   "changelog.empty": "Nessuna voce del changelog trovata.",
   "changelog.viewJson": "Vedi JSON",
-  "changelog.highlights": "In evidenza",
-  "changelog.error": "Al momento non è possibile caricare il changelog.",
-  "changelog.viewOnGithub": "Visualizzalo su GitHub",
-  "changelog.v1": "Le note di rilascio di OpenCode 1 sono su GitHub Releases",
 
   "bench.list.title": "Benchmark",
   "bench.list.heading": "Benchmark",
