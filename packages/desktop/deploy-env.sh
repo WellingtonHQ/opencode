@@ -60,8 +60,8 @@ chmod 600 "$plist"
 launchctl bootout "$domain/$label" 2>/dev/null || true
 launchctl bootstrap "$domain" "$plist"
 
-echo "--- session env ---"
+echo "--- configured session variables ---"
 for key in $keys; do
-  printf '%s = %s\n' "$key" "$(launchctl getenv "$key")"
+  printf '%s\n' "$key"
 done
 echo "done — quit + relaunch OpenCode to pick up the new values."

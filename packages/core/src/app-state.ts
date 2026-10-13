@@ -1,10 +1,10 @@
-export * as AppState from "./app-state"
+export * as AppState from "./app-state.js"
 
 import { eq } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
-import { Database } from "./database/database"
-import { makeGlobalNode } from "./effect/app-node"
-import { AppSettingTable } from "./app-state/sql"
+import { Database } from "./database/database.js"
+import { makeGlobalNode } from "@opencode/util/effect/app-node"
+import { AppSettingTable } from "./app-state/sql.js"
 
 const AUTO_APPROVE_KEY = "permissions.auto-approve"
 

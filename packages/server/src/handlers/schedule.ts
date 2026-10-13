@@ -1,7 +1,7 @@
-import { ScheduleTask } from "@opencode-ai/core/schedule"
-import { InvalidRequestError, ScheduleLimitExceededError, ScheduleNotFoundError } from "@opencode-ai/protocol/errors"
+import { ScheduleTask } from "@opencode/core/schedule"
+import { InvalidRequestError, ScheduleLimitExceededError, ScheduleNotFoundError } from "@opencode/protocol/errors"
 import { Effect } from "effect"
-import { HttpApiBuilder } from "effect/unstable/httpapi"
+import { HttpApiBuilder } from "effect/http-api"
 import { Api } from "../api"
 
 const badSpec = <A, R>(effect: Effect.Effect<A, ScheduleTask.InvalidSpecError, R>) =>
@@ -71,6 +71,6 @@ export const ScheduleHandler = HttpApiBuilder.group(Api, "server.schedule", (han
     ),
 )
 
-function notFound(scheduleID: string) {
+function notFound(scheduleID: ScheduleTask.ID) {
   return new ScheduleNotFoundError({ scheduleID, message: "Scheduled task not found" })
 }

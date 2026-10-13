@@ -1,24 +1,25 @@
-export * as ScheduleTask from "./schedule"
+export * as ScheduleTask from "./schedule.js"
 
 import { asc, and, desc, eq, lte, notInArray, sql } from "drizzle-orm"
 import { Cause, Context, Duration, Effect, Exit, Layer, Scope, Schema } from "effect"
-import { Schedule } from "@opencode-ai/schema/schedule"
-import { Database } from "./database/database"
-import { EventV2 } from "./event"
-import { makeGlobalNode } from "./effect/app-node"
-import { Identifier } from "./id/id"
-import { PromptRunner } from "./schedule/executor"
-import { ScheduleRunTable, ScheduleTaskTable } from "./schedule/sql"
-import { nextRunAt } from "./schedule/time"
+import { Schedule } from "@opencode/schema/schedule"
+import { Identifier } from "@opencode/schema/identifier"
+import { makeGlobalNode } from "@opencode/util/effect/app-node"
+import { Bus } from "./bus.js"
+import { Database } from "./database/database.js"
+import { Location } from "./location.js"
+import { ScheduleRunTable, ScheduleTaskTable } from "./schedule/sql.js"
+import { nextRunAt } from "./schedule/time.js"
+import { Session } from "./session.js"
 
 export const ID = Schedule.ID
 export type ID = Schedule.ID
 
-export class InvalidSpecError extends Schema.TaggedErrorClass<InvalidSpecError>()("Schedule.InvalidSpecError", {
+export class InvalidSpecError extends Schema.TaggedError<InvalidSpecError>()("Schedule.InvalidSpecError", {
   message: Schema.String,
 }) {}
 
-export class LimitExceededError extends Schema.TaggedErrorClass<LimitExceededError>()("Schedule.LimitExceededError", {
+export class LimitExceededError extends Schema.TaggedError<LimitExceededError>()("Schedule.LimitExceededError", {
   message: Schema.String,
 }) {}
 
@@ -29,6 +30,8 @@ const TICK_MS = 15_000
 const MAX_TASKS = 50
 const MAX_RUNS = 10
 
+const localTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+
 export interface Interface {
   /** Returns every scheduled task. */
   readonly list: () => Effect.Effect<Schedule.Info[]>
@@ -36,7 +39,7 @@ export interface Interface {
   readonly get: (id: ID) => Effect.Effect<Schedule.Info | undefined>
   /** Creates a scheduled task and computes its first next run time. */
   readonly create: (input: Schedule.CreateInput) => Effect.Effect<Schedule.Info, InvalidSpecError | LimitExceededError>
-  /** Updates one or more fields of a scheduled task; recomputes the next run when the spec changes. */
+  /** Updates one or more fields of a scheduled task; recomputes the next run when the spec or time zone changes. */
   readonly update: (id: ID, updates: Schedule.UpdateInput) => Effect.Effect<Schedule.Info | undefined, InvalidSpecError>
   /** Removes a scheduled task and returns the removed record. */
   readonly remove: (id: ID) => Effect.Effect<Schedule.Info | undefined>
@@ -50,8 +53,8 @@ const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const { db } = yield* Database.Service
-    const events = yield* EventV2.Service
-    const runner = yield* PromptRunner.Service
+    const bus = yield* Bus.Service
+    const sessions = yield* Session.Service
     const scope = yield* Scope.Scope
 
     const runFrom = (row: RunRow): Schedule.Run => ({
@@ -82,6 +85,7 @@ const layer = Layer.effect(
         ...(row.name ? { name: row.name } : {}),
         prompt: row.prompt,
         spec: specFrom(row),
+        timezone: row.timezone,
         ...(row.agent_id ? { agentId: row.agent_id } : {}),
         ...(row.model ? { model: row.model } : {}),
         directory: row.directory,
@@ -141,19 +145,26 @@ const layer = Layer.effect(
             ? { kind: spec.kind, at_ms: null, hour: spec.hour, minute: spec.minute, days: spec.days.join(","), expr: null }
             : { kind: spec.kind, at_ms: null, hour: null, minute: null, days: null, expr: spec.expr }
 
-    const validateSpec = Effect.fn("ScheduleTask.validateSpec")(function* (spec: Schedule.Spec, anchorMs: number) {
-      if (spec.kind === "once" && spec.atMs <= anchorMs)
-        return yield* Effect.fail(new InvalidSpecError({ message: `The one-shot time ${new Date(spec.atMs).toISOString()} has already passed` }))
-      const next = yield* Effect.tryPromise(() => nextRunAt(spec, anchorMs)).pipe(
+    const computeNext = Effect.fn("ScheduleTask.computeNext")(function* (
+      spec: Schedule.Spec,
+      anchorMs: number,
+      timezone: string,
+    ) {
+      if (!Schema.is(Schedule.TimeZone)(timezone))
+        return yield* new InvalidSpecError({ message: `Invalid IANA time zone: ${timezone}` })
+      return yield* Effect.tryPromise(() => nextRunAt(spec, anchorMs, timezone)).pipe(
         Effect.mapError((error) => new InvalidSpecError({ message: error instanceof Error ? error.message : String(error) })),
       )
-      return next
     })
 
-    // Undefined means the spec was not updated and the stored next run time stays untouched.
-    const recomputeNext = Effect.fn("ScheduleTask.recomputeNext")(function* (spec?: Schedule.Spec) {
-      if (spec === undefined) return yield* Effect.succeed(undefined as number | null | undefined)
-      return yield* validateSpec(spec, Date.now())
+    const validateSpec = Effect.fn("ScheduleTask.validateSpec")(function* (
+      spec: Schedule.Spec,
+      anchorMs: number,
+      timezone: string,
+    ) {
+      if (spec.kind === "once" && spec.atMs <= anchorMs)
+        return yield* Effect.fail(new InvalidSpecError({ message: `The one-shot time ${new Date(spec.atMs).toISOString()} has already passed` }))
+      return yield* computeNext(spec, anchorMs, timezone)
     })
 
     // Claims the row by conditionally bumping its next run time; a concurrent tick that moves the
@@ -161,7 +172,7 @@ const layer = Layer.effect(
     const fire = Effect.fn("ScheduleTask.fire")(function* (row: Row, claimNextMs?: number) {
       const now = Date.now()
       const spec = specFrom(row)
-      const nextRunMs = spec.kind === "once" ? null : yield* Effect.tryPromise(() => nextRunAt(spec, now)).pipe(Effect.orDie)
+      const nextRunMs = spec.kind === "once" ? null : yield* computeNext(spec, now, row.timezone).pipe(Effect.orDie)
       const claimedRow = yield* db
         .update(ScheduleTaskTable)
         .set({
@@ -180,23 +191,46 @@ const layer = Layer.effect(
         .pipe(Effect.orDie)
       if (!claimedRow) return undefined
 
-      const runID = Identifier.create("run", "ascending")
+      const runID = `run_${Identifier.ascending()}`
       yield* recordRun(claimedRow.id, runID, now).pipe(Effect.orDie)
 
       const title = "[scheduled] " + (claimedRow.name ?? claimedRow.prompt.slice(0, 50))
       // Execution is forked into the service scope so tick never blocks and run-now responses
       // return before the prompt finishes.
       yield* Effect.gen(function* () {
-        const exit = yield* runner
-          .run({
-            directory: claimedRow.directory,
+        const created = yield* Effect.exit(
+          sessions.create({
             title,
-            promptText: claimedRow.prompt,
-            ...(claimedRow.agent_id ? { agentId: claimedRow.agent_id } : {}),
+            location: Location.Ref.make({ directory: claimedRow.directory }),
+            ...(claimedRow.agent_id ? { agent: claimedRow.agent_id } : {}),
             ...(claimedRow.model ? { model: claimedRow.model } : {}),
-          })
-          .pipe(Effect.exit)
-        const sessionID = Exit.isSuccess(exit) ? exit.value : undefined
+          }),
+        )
+        const sessionID = Exit.isSuccess(created) ? created.value.id : undefined
+        const exit = Exit.isFailure(created)
+          ? created
+          : yield* Effect.gen(function* () {
+              yield* db
+                .transaction(() =>
+                  Effect.gen(function* () {
+                    yield* db
+                      .update(ScheduleRunTable)
+                      .set({ session_id: created.value.id })
+                      .where(eq(ScheduleRunTable.id, runID))
+                      .run()
+                      .pipe(Effect.orDie)
+                    yield* db
+                      .update(ScheduleTaskTable)
+                      .set({ last_session_id: created.value.id })
+                      .where(eq(ScheduleTaskTable.id, claimedRow.id))
+                      .run()
+                      .pipe(Effect.orDie)
+                  }),
+                )
+                .pipe(Effect.orDie)
+              yield* sessions.prompt({ sessionID: created.value.id, text: claimedRow.prompt, resume: false })
+              yield* sessions.resume(created.value.id)
+            }).pipe(Effect.exit)
         const failure = Exit.isFailure(exit) ? Cause.squash(exit.cause) : undefined
         const lastError = failure === undefined ? undefined : failure instanceof Error ? failure.message : String(failure)
         yield* db
@@ -226,7 +260,8 @@ const layer = Layer.effect(
     })
 
     // Publishes schedule.changed scoped to the task's directory so location-filtered event streams see it.
-    const announce = (info: Schedule.Info) => events.publish(Schedule.Event.Changed, { info }, { location: { directory: info.directory } }).pipe(Effect.asVoid)
+    const announce = (info: Schedule.Info) =>
+      bus.publish(Schedule.Event.Changed, { info }, { location: { directory: info.directory } }).pipe(Effect.asVoid)
 
     const tick = Effect.fn("ScheduleTask.tick")(function* () {
       const now = Date.now()
@@ -269,7 +304,8 @@ const layer = Layer.effect(
       }),
       create: Effect.fn("ScheduleTask.create")(function* (input) {
         const now = Date.now()
-        const next = yield* validateSpec(input.spec, now)
+        const timezone = input.timezone ?? localTimeZone()
+        const next = yield* validateSpec(input.spec, now, timezone)
         const total = yield* db.select({ value: sql<number>`COUNT(*)` }).from(ScheduleTaskTable).get().pipe(Effect.orDie)
         if ((total?.value ?? 0) >= MAX_TASKS)
           return yield* Effect.fail(new LimitExceededError({ message: `The maximum number of scheduled tasks (${MAX_TASKS}) has been reached` }))
@@ -281,6 +317,7 @@ const layer = Layer.effect(
             name: input.name ?? null,
             prompt: input.prompt,
             ...specColumns(input.spec),
+            timezone,
             agent_id: input.agentId ?? null,
             model: input.model ?? null,
             directory: input.directory,
@@ -294,6 +331,7 @@ const layer = Layer.effect(
           ...(input.name !== undefined ? { name: input.name } : {}),
           prompt: input.prompt,
           spec: input.spec,
+          timezone,
           ...(input.agentId !== undefined ? { agentId: input.agentId } : {}),
           ...(input.model !== undefined ? { model: input.model } : {}),
           directory: input.directory,
@@ -305,15 +343,23 @@ const layer = Layer.effect(
         return info
       }),
       update: Effect.fn("ScheduleTask.update")(function* (id, updates) {
-        const specNext = yield* recomputeNext(updates.spec)
         const row = yield* db.select().from(ScheduleTaskTable).where(eq(ScheduleTaskTable.id, id)).get().pipe(Effect.orDie)
         if (!row) return undefined
+        const timezone = updates.timezone ?? row.timezone
+        const spec = updates.spec ?? specFrom(row)
+        const specNext =
+          updates.spec === undefined
+            ? updates.timezone === undefined
+              ? undefined
+              : yield* computeNext(spec, Date.now(), timezone)
+            : yield* validateSpec(spec, Date.now(), timezone)
         const updatedRow = yield* db
           .update(ScheduleTaskTable)
           .set({
             ...(updates.name !== undefined ? { name: updates.name } : {}),
             ...(updates.prompt !== undefined ? { prompt: updates.prompt } : {}),
             ...(updates.spec !== undefined ? specColumns(updates.spec) : {}),
+            ...(updates.timezone !== undefined ? { timezone: updates.timezone } : {}),
             ...(specNext !== undefined ? { next_run_at_ms: specNext } : {}),
             ...(updates.agentId !== undefined ? { agent_id: updates.agentId } : {}),
             ...(updates.model !== undefined ? { model: updates.model } : {}),
@@ -345,4 +391,4 @@ const layer = Layer.effect(
   }),
 )
 
-export const node = makeGlobalNode({ service: Service, layer, deps: [Database.node, EventV2.node, PromptRunner.node] })
+export const node = makeGlobalNode({ service: Service, layer, deps: [Database.node, Bus.node, Session.node] })

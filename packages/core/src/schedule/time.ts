@@ -1,15 +1,15 @@
 import { DateTime } from "luxon"
-import type { Schedule } from "@opencode-ai/schema/schedule"
+import type { Schedule } from "@opencode/schema/schedule"
 
 // Computes the next run instant strictly after `anchorMs`. Returns null when the
 // spec can never match again (past one-shot or impossible cron pattern). Cron
-// patterns are wall-clock expressions evaluated in `zone` (default: server local
+// patterns are wall-clock expressions evaluated in `timezone` (default: server local
 // zone). Nonexistent wall times during DST spring-forward are shifted forward to
 // the next valid instant by Luxon; ambiguous fall-back times resolve to a single
 // deterministic occurrence. Malformed cron expressions throw.
-export async function nextRunAt(spec: Schedule.Spec, anchorMs: number, zone?: string): Promise<number | null> {
+export async function nextRunAt(spec: Schedule.Spec, anchorMs: number, timezone?: string): Promise<number | null> {
   if (spec.kind === "once") return spec.atMs > anchorMs ? spec.atMs : null
-  if (spec.kind === "cron") return cronNextRun(spec.expr, anchorMs, zone)
+  if (spec.kind === "cron") return cronNextRun(spec.expr, anchorMs, timezone)
   const weekdays =
     spec.kind === "weekly"
       ? new Set(spec.days.map((day) => dayToDateWeekday(day)))
@@ -17,7 +17,7 @@ export async function nextRunAt(spec: Schedule.Spec, anchorMs: number, zone?: st
   // A weekly spec with a single day can be exactly seven days ahead when the anchor sits just
   // after that day's slot, so the window must span eight offsets.
   for (let offset = 0; offset < 8; offset++) {
-    const candidate = DateTime.fromMillis(anchorMs, zone ? { zone } : undefined)
+    const candidate = DateTime.fromMillis(anchorMs, timezone ? { zone: timezone } : undefined)
       .startOf("day")
       .plus({ days: offset })
       .set({ hour: spec.hour, minute: spec.minute, second: 0, millisecond: 0 })
@@ -34,11 +34,11 @@ function dayToDateWeekday(day: number) {
   return day === 0 ? 7 : day
 }
 
-async function cronNextRun(expr: string, anchorMs: number, zone?: string): Promise<number | null> {
+async function cronNextRun(expr: string, anchorMs: number, timezone?: string): Promise<number | null> {
   const { Cron } = await import("croner")
   const pattern = new Cron(
     expr,
-    zone === undefined ? { mode: "5-part" } : { mode: "5-part", timezone: zone },
+    timezone === undefined ? { mode: "5-part" } : { mode: "5-part", timezone },
   )
   const next = pattern.nextRun(new Date(anchorMs))
   return next === null || next === undefined ? null : next.getTime()

@@ -3,8 +3,8 @@ import type { Agent } from "@opencode-ai/schema/agent"
 import type { Model } from "@opencode-ai/schema/model"
 import type { Schedule } from "@opencode-ai/schema/schedule"
 import type { Session } from "@opencode-ai/schema/session"
-import * as DatabasePath from "../database/path"
-import { Timestamps } from "../database/schema.sql"
+import * as DatabasePath from "../database/path.js"
+import { Timestamps } from "../database/schema.sql.js"
 
 export const ScheduleTaskTable = sqliteTable(
   "scheduled_task",
@@ -13,6 +13,7 @@ export const ScheduleTaskTable = sqliteTable(
     name: text(),
     prompt: text().notNull(),
     kind: text().$type<Schedule.Kind>().notNull(),
+    timezone: text().$type<Schedule.TimeZone>().notNull(),
     at_ms: integer(),
     hour: integer(),
     minute: integer(),

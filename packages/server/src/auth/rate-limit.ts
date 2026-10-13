@@ -3,7 +3,7 @@ export * as ServerRateLimit from "./rate-limit"
 import { Context, Effect, Layer } from "effect"
 
 // Failed credential attempts are counted across every login channel (sign-in
-// form, basic auth, auth_token query) so a brute-force cannot be split across
+// form, Basic, Bearer, cookies, auth_token query) so a brute-force cannot be split across
 // them. After MAX_FAILURES the server stops checking credentials for
 // LOCKOUT_MS; existing sessions keep working.
 const MAX_FAILURES = 10
@@ -17,7 +17,7 @@ export interface RateLimit {
 
 export class Service extends Context.Service<Service, RateLimit>()("@opencode/ServerAuthRateLimit") {}
 
-function makeRateLimit(): RateLimit {
+export function make(): RateLimit {
   let failures = 0
   let lockedUntil = 0
   return {
@@ -26,7 +26,13 @@ function makeRateLimit(): RateLimit {
       if (failures >= MAX_FAILURES) lockedUntil = now + LOCKOUT_MS
     },
     retryAfterSeconds(now) {
-      if (now >= lockedUntil) return 0
+      if (now >= lockedUntil) {
+        if (lockedUntil > 0) {
+          failures = 0
+          lockedUntil = 0
+        }
+        return 0
+      }
       return Math.max(1, Math.ceil((lockedUntil - now) / 1000))
     },
     reset() {
@@ -36,4 +42,4 @@ function makeRateLimit(): RateLimit {
   }
 }
 
-export const layer = Layer.effect(Service, Effect.sync(() => Service.of(makeRateLimit())))
+export const layer = Layer.effect(Service, Effect.sync(() => Service.of(make())))

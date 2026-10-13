@@ -1,12 +1,31 @@
-import { Schedule } from "@opencode-ai/schema/schedule"
+import { Schedule } from "@opencode/schema/schedule"
 import { Schema } from "effect"
-import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
-import { InvalidRequestError, ScheduleLimitExceededError, ScheduleNotFoundError } from "../errors"
+import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/http-api"
+import { InvalidRequestError, ScheduleLimitExceededError, ScheduleNotFoundError } from "../errors.js"
+
+// Keep the wire shape canonical while leaving the custom Intl-based time-zone check to Core.
+const TimeZone = Schema.String
+const ScheduleID = Schedule.ID.annotate({ identifier: "Schedule.ID" })
+const Run = Schema.Struct({ ...Schedule.Run.fields, taskID: ScheduleID })
+const Info = Schema.Struct({
+  ...Schedule.Info.fields,
+  id: ScheduleID,
+  timezone: TimeZone,
+  recentRuns: Schema.Array(Run).pipe(Schema.optional),
+})
+const CreateInput = Schema.Struct({
+  ...Schedule.CreateInput.fields,
+  timezone: TimeZone.pipe(Schema.optional),
+})
+const UpdateInput = Schema.Struct({
+  ...Schedule.UpdateInput.fields,
+  timezone: TimeZone.pipe(Schema.optional),
+})
 
 export const ScheduleGroup = HttpApiGroup.make("server.schedule")
   .add(
     HttpApiEndpoint.get("schedule.list", "/api/schedule", {
-      success: Schema.Array(Schedule.Info),
+      success: Schema.Array(Info),
     })
       .annotateMerge(
         OpenApi.annotations({
@@ -18,8 +37,8 @@ export const ScheduleGroup = HttpApiGroup.make("server.schedule")
   )
   .add(
     HttpApiEndpoint.get("schedule.get", "/api/schedule/:scheduleID", {
-      params: { scheduleID: Schedule.ID },
-      success: Schedule.Info,
+      params: { scheduleID: ScheduleID },
+      success: Info,
       error: ScheduleNotFoundError,
     })
       .annotateMerge(
@@ -32,8 +51,8 @@ export const ScheduleGroup = HttpApiGroup.make("server.schedule")
   )
   .add(
     HttpApiEndpoint.post("schedule.create", "/api/schedule", {
-      payload: Schedule.CreateInput,
-      success: Schedule.Info,
+      payload: CreateInput,
+      success: Info,
       error: [InvalidRequestError, ScheduleLimitExceededError],
     })
       .annotateMerge(
@@ -46,9 +65,9 @@ export const ScheduleGroup = HttpApiGroup.make("server.schedule")
   )
   .add(
     HttpApiEndpoint.patch("schedule.update", "/api/schedule/:scheduleID", {
-      params: { scheduleID: Schedule.ID },
-      payload: Schedule.UpdateInput,
-      success: Schedule.Info,
+      params: { scheduleID: ScheduleID },
+      payload: UpdateInput,
+      success: Info,
       error: [InvalidRequestError, ScheduleNotFoundError],
     })
       .annotateMerge(
@@ -61,8 +80,8 @@ export const ScheduleGroup = HttpApiGroup.make("server.schedule")
   )
   .add(
     HttpApiEndpoint.delete("schedule.remove", "/api/schedule/:scheduleID", {
-      params: { scheduleID: Schedule.ID },
-      success: Schedule.Info,
+      params: { scheduleID: ScheduleID },
+      success: Info,
       error: ScheduleNotFoundError,
     })
       .annotateMerge(
@@ -75,8 +94,8 @@ export const ScheduleGroup = HttpApiGroup.make("server.schedule")
   )
   .add(
     HttpApiEndpoint.post("schedule.runNow", "/api/schedule/:scheduleID/run-now", {
-      params: { scheduleID: Schedule.ID },
-      success: Schedule.Info,
+      params: { scheduleID: ScheduleID },
+      success: Info,
       error: ScheduleNotFoundError,
     })
       .annotateMerge(

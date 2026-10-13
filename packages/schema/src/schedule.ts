@@ -1,18 +1,30 @@
-export * as Schedule from "./schedule"
+export * as Schedule from "./schedule.js"
 
 import { Schema } from "effect"
-import { Agent } from "./agent"
-import { Model } from "./model"
-import { define, inventory } from "./event"
-import { Session } from "./session"
-import { ascending } from "./identifier"
-import { AbsolutePath, NonNegativeInt, optional, statics } from "./schema"
+import { Agent } from "./agent.js"
+import { Model } from "./model.js"
+import { ephemeral, inventory } from "./event.js"
+import { Session } from "./session.js"
+import { ascending } from "./identifier.js"
+import { AbsolutePath, NonNegativeInt, optional, statics } from "./schema.js"
 
-export const ID = Schema.String.check(Schema.isStartsWith("task_")).pipe(
+export const ID = Schema.String.check(Schema.isStartingWith("task_")).pipe(
   Schema.brand("Schedule.ID"),
   statics((schema) => ({ create: () => schema.make("task_" + ascending()) })),
 )
 export type ID = typeof ID.Type
+
+export const TimeZone = Schema.String.check(
+  Schema.makeFilter((value) => {
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: value })
+      return undefined
+    } catch {
+      return "Expected a valid IANA time zone"
+    }
+  }),
+).annotate({ identifier: "Schedule.TimeZone" })
+export type TimeZone = typeof TimeZone.Type
 
 export const Kind = Schema.Literals(["once", "daily", "weekly", "cron"]).annotate({ identifier: "Schedule.Kind" })
 export type Kind = typeof Kind.Type
@@ -72,6 +84,7 @@ export const Info = Schema.Struct({
   name: optional(Schema.String),
   prompt: Schema.String,
   spec: Spec,
+  timezone: TimeZone,
   agentId: Agent.ID.pipe(optional),
   model: Model.Ref.pipe(optional),
   directory: AbsolutePath,
@@ -89,6 +102,7 @@ export const CreateInput = Schema.Struct({
   name: optional(Schema.String),
   prompt: Schema.String,
   spec: Spec,
+  timezone: TimeZone.pipe(optional),
   agentId: Agent.ID.pipe(optional),
   model: Model.Ref.pipe(optional),
   directory: AbsolutePath,
@@ -99,6 +113,7 @@ export const UpdateInput = Schema.Struct({
   name: optional(Schema.String),
   prompt: optional(Schema.String),
   spec: Spec.pipe(optional),
+  timezone: TimeZone.pipe(optional),
   agentId: Agent.ID.pipe(optional),
   // Absent leaves the stored model untouched; null clears it back to the default.
   model: optional(Schema.NullOr(Model.Ref)),
@@ -106,7 +121,7 @@ export const UpdateInput = Schema.Struct({
   enabled: Schema.Boolean.pipe(optional),
 }).annotate({ identifier: "Schedule.UpdateInput" })
 
-const Changed = define({
+const Changed = ephemeral({
   type: "schedule.changed",
   schema: { info: Info },
 })

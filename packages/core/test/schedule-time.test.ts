@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { nextRunAt } from "@opencode-ai/core/schedule/time"
+import { nextRunAt } from "@opencode/core/schedule/time"
 
 const NY = "America/New_York"
 
