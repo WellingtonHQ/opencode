@@ -448,6 +448,7 @@ export function MobileTitlebarTabSwitcher(props: {
   title: string
   avatar?: JSX.Element
   onNavigate: (tab: Tab) => void
+  onClose: (tab: Tab) => void
   onCloseAutoFocus?: (event: Event) => void
   children?: JSX.Element
 }) {
@@ -476,16 +477,26 @@ export function MobileTitlebarTabSwitcher(props: {
         <Menu.Content class="mobile-titlebar-tab-menu" onCloseAutoFocus={props.onCloseAutoFocus}>
           <Menu.Group>
             <Menu.GroupLabel>{language.t("home.sessions.search.sessions")}</Menu.GroupLabel>
-            <Menu.RadioGroup
-              value={currentKey()}
-              onChange={(key) => {
-                const tab = props.tabs.find((item) => tabKey(item) === key)
-
-                if (tab) props.onNavigate(tab)
-              }}
-            >
-              <For each={props.tabs}>{(tab) => <MobileTitlebarTabOption tab={tab} />}</For>
-            </Menu.RadioGroup>
+            <For each={props.tabs}>
+              {(tab) => (
+                <Menu.Group class="mobile-titlebar-tab-row">
+                  <Menu.Item
+                    class="mobile-titlebar-tab-option"
+                    aria-current={currentKey() === tabKey(tab) ? "page" : undefined}
+                    onSelect={() => props.onNavigate(tab)}
+                  >
+                    <MobileTitlebarTabOption tab={tab} />
+                  </Menu.Item>
+                  <Menu.Item
+                    class="mobile-titlebar-tab-close"
+                    aria-label={language.t("common.closeTab")}
+                    onSelect={() => props.onClose(tab)}
+                  >
+                    <Icon name="xmark-small" size="small" />
+                  </Menu.Item>
+                </Menu.Group>
+              )}
+            </For>
           </Menu.Group>
           {props.children}
         </Menu.Content>
@@ -547,7 +558,7 @@ function MobileTitlebarTabOption(props: { tab: Tab }) {
   })
 
   return (
-    <Menu.RadioItem value={key()} class="mobile-titlebar-tab-option">
+    <>
       <span class="flex size-4 shrink-0 items-center justify-center" aria-hidden="true">
         <Show when={props.tab.type === "session" && directory()} fallback={<Icon name="edit" size="small" />}>
           {(dir) => (
@@ -570,7 +581,7 @@ function MobileTitlebarTabOption(props: { tab: Tab }) {
           <bdi dir="auto">{serverLabel()}</bdi>
         </span>
       </Show>
-    </Menu.RadioItem>
+    </>
   )
 }
 

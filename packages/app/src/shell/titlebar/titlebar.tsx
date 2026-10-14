@@ -575,6 +575,11 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                             </Show>
                           }
                           onNavigate={(tab) => tabs.select(tab)}
+                          onClose={(tab) => {
+                            const index = tabsStore.findIndex((item) => tabKey(item) === tabKey(tab))
+
+                            if (index !== -1) tabsStoreActions.closeTab(index)
+                          }}
                           onCloseAutoFocus={(event) => {
                             if (mobileTabs.open) event.preventDefault()
                           }}
