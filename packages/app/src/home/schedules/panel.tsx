@@ -193,7 +193,7 @@ export function SchedulePanel(props: { server: ServerConnection.Any; defaultDire
       </Switch>
       <Tooltip placement="top" value={language.t("schedule.row.runNow")}>
         <IconButton
-          icon="play"
+          icon={<Icon name="play" />}
           variant="ghost"
           size="small"
           disabled={state.busy === item.id}
@@ -203,7 +203,7 @@ export function SchedulePanel(props: { server: ServerConnection.Any; defaultDire
       </Tooltip>
       <Tooltip placement="top" value={language.t("schedule.delete.title")}>
         <IconButton
-          icon="trash"
+          icon={<Icon name="trash" />}
           variant="ghost"
           size="small"
           onClick={() => dialog.show(() => <DeleteScheduleDialog item={item} server={props.server} onDone={load} />)}
@@ -220,7 +220,12 @@ export function SchedulePanel(props: { server: ServerConnection.Any; defaultDire
         <div class="flex items-center gap-1">
           {policyIndicator()}
           <Tooltip placement="top" value={language.t("schedule.panel.new")}>
-            <IconButton icon="plus" variant="ghost" onClick={() => openEditor()} aria-label={language.t("schedule.panel.new")} />
+            <IconButton
+              icon={<Icon name="plus" />}
+              variant="ghost"
+              onClick={() => openEditor()}
+              aria-label={language.t("schedule.panel.new")}
+            />
           </Tooltip>
         </div>
       </div>
