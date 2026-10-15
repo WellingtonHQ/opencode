@@ -64,6 +64,7 @@ for (const scenario of ["typing", "cursor-movement", "cursor-noop", "submit-clea
     await page.addInitScript(
       ({ key, value, counts }) => {
         localStorage.setItem(key, JSON.stringify(value))
+        localStorage.setItem("settings.v3", JSON.stringify({ general: { enterKeyBehavior: "submit" } }))
 
         const probe: Probe = { active: false, encodes: 0, bytes: 0, inputs: 0, keyups: 0 }
 

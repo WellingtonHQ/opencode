@@ -526,7 +526,7 @@ for (const failed of [false, true]) {
     )
 
     try {
-      await editor.press("Enter")
+      await editor.press("ControlOrMeta+Enter")
       expect((await requested).postDataJSON()).toMatchObject({ text })
       await expect(page.locator('[data-timeline-row="UserMessage"]').filter({ hasText: text })).toBeInViewport()
       await expect(working).toHaveRole("status")

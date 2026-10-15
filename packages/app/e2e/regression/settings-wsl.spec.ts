@@ -280,6 +280,6 @@ test("an open session moves to the controller a new SSH sign-in creates", async 
   await expectSessionTitle(page, box.title)
   const editor = page.locator('[data-component="composer-editor"]')
   await editor.fill("after sign-in")
-  await editor.press("Enter")
+  await editor.press("ControlOrMeta+Enter")
   await expect.poll(() => prompts).toEqual(["after sign-in"])
 })

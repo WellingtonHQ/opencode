@@ -27,6 +27,38 @@ async function expectCaretVisible(input: Locator) {
     .toBe(true)
 }
 
+test("Enter inserts a newline by default, and Mod+Enter submits normally", async ({ page }) => {
+  const sessionID = "ses_composerenterbehavior"
+
+  const { editor } = await openSession(page, {
+    name: "ComposerEnterBehavior",
+    provider: provider({ id: "enter-model", name: "Enter Model" }),
+  })
+
+  await editor.fill("first line")
+  await editor.press("Enter")
+  await expect
+    .poll(() =>
+      editor.evaluate((element) => {
+        if (!(element instanceof HTMLElement)) return ""
+
+        return element.innerText
+      }),
+    )
+    .toContain("\n")
+
+  const submitted = page.waitForRequest(
+    (request) =>
+      request.method() === "POST" && new URL(request.url()).pathname === `/api/session/${sessionID}/prompt`,
+  )
+
+  await editor.press("ControlOrMeta+Enter")
+
+  const body = (await submitted).postDataJSON()
+  expect(body).toMatchObject({ text: "first line\n" })
+  await expect(editor).toBeEmpty()
+})
+
 test("keeps a 25000-line crash report editable in a new session", async ({ page }) => {
   const input = await draft(page)
   const text = "Thread 0 Crashed:\n" + "0   Example  0x0000000100000000 frame + 32\n".repeat(25000) + "End of report"

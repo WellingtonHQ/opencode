@@ -7,6 +7,7 @@ import { useLanguage } from "@/runtime/i18n/language"
 import { usePlatform } from "@/runtime/platform/platform"
 import { ExtensionSettingsSections } from "@/runtime/extension/settings-page-view"
 import {
+  type EnterKeyBehavior,
   type FollowUpBehavior,
   type TerminalPlacement,
   type WorkspaceDefaultDestination,
@@ -150,7 +151,10 @@ const FollowUpBehaviorSetting: Component = () => {
     <SettingsRow
       title={language.t("settings.general.row.followUpBehavior.title")}
       description={language.t("settings.general.row.followUpBehavior.description", {
-        keybind: formatKeybind("mod+enter", language.t),
+        keybind: formatKeybind(
+          settings.general.enterKeyBehavior() === "newline" ? "mod+shift+enter" : "mod+enter",
+          language.t,
+        ),
       })}
     >
       <Select
@@ -162,6 +166,36 @@ const FollowUpBehaviorSetting: Component = () => {
         placement="bottom-end"
         gutter={6}
         onSelect={(option) => option && settings.general.setFollowUpBehavior(option.value)}
+      />
+    </SettingsRow>
+  )
+}
+
+const EnterKeyBehaviorSetting: Component = () => {
+  const language = useLanguage()
+  const settings = useSettings()
+
+  const options = createMemo((): { value: EnterKeyBehavior; label: string }[] => [
+    { value: "submit", label: language.t("settings.general.row.enterKeyBehavior.submit") },
+    { value: "newline", label: language.t("settings.general.row.enterKeyBehavior.newline") },
+  ])
+
+  return (
+    <SettingsRow
+      title={language.t("settings.general.row.enterKeyBehavior.title")}
+      description={language.t("settings.general.row.enterKeyBehavior.description", {
+        keybind: formatKeybind("mod+enter", language.t),
+      })}
+    >
+      <Select
+        data-action="settings-enter-key-behavior"
+        options={options()}
+        current={options().find((option) => option.value === settings.general.enterKeyBehavior())}
+        value={(option) => option.value}
+        label={(option) => option.label}
+        placement="bottom-end"
+        gutter={6}
+        onSelect={(option) => option && settings.general.setEnterKeyBehavior(option.value)}
       />
     </SettingsRow>
   )
@@ -267,6 +301,7 @@ export const SettingsGeneral: Component<{ server: Accessor<ServerConnection.Any 
         </SettingsRow>
 
         <TerminalPlacementSetting />
+        <EnterKeyBehaviorSetting />
         <FollowUpBehaviorSetting />
 
         <Show when={desktop()}>

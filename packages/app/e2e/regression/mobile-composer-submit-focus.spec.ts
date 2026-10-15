@@ -25,7 +25,7 @@ for (const { width, direction } of [
         new URL(response.url()).pathname === `/api/session/${fixture.targetID}/prompt`,
     )
 
-    await editor.press("Enter")
+    await editor.press("ControlOrMeta+Enter")
     expect((await admitted).ok()).toBe(true)
     await expect(editor).toBeEmpty()
 

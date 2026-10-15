@@ -862,6 +862,19 @@ test("the tab layout preference switches to vertical tabs and survives reload", 
   await expect(page.locator('[data-slot="titlebar-tabs"]')).toHaveCount(0)
 })
 
+test("the composer Enter behavior can be changed and survives reload", async ({ page }) => {
+  const { settings } = await open(page)
+  const behavior = settings.locator('[data-action="settings-enter-key-behavior"]')
+
+  await expect(behavior).toContainText("Insert newline")
+  await behavior.click()
+  await page.getByRole("option", { name: "Submit prompt", exact: true }).click()
+  await expect(behavior).toContainText("Submit prompt")
+
+  await page.reload()
+  await expect(behavior).toContainText("Submit prompt")
+})
+
 for (const viewport of [
   { name: "desktop", width: 1280, height: 720, bottom: false },
   { name: "mobile", width: 390, height: 844, bottom: true },

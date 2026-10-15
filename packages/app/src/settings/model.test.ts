@@ -95,6 +95,7 @@ describe("settings schema", () => {
         showCustomAgents: false,
         mobileTitlebarPosition: "top",
         terminalPlacement: "side",
+        enterKeyBehavior: "newline",
         followUpBehavior: "steer",
       },
       appearance: {
@@ -140,6 +141,7 @@ describe("settings schema", () => {
       showTerminal: true,
       autoSave: false,
       timelineDetail: timelinePresets[2].value,
+      enterKeyBehavior: "newline",
       followUpBehavior: "steer",
     })
     expect(settings.appearance).toEqual({

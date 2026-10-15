@@ -91,7 +91,12 @@ test("the dark new session panel exposes no lighter background at its rounded co
 test("a pending worktree session shows immediately, keeps its draft, and hands off to the created session", async ({
   page,
 }) => {
-  const mock = await openWorktreeDraft(page, { ...pendingDraft, createdSessionTitle: "" })
+  const mock = await openWorktreeDraft(page, {
+    ...pendingDraft,
+    createdSessionTitle: "",
+    seed: { settings: { general: { enterKeyBehavior: "submit" } } },
+  })
+
   const label = page.locator('[data-titlebar-tab-slot][data-active="true"] [data-titlebar-tab-title]')
   await expect(label).toHaveText("Session")
   const pending = await submitPending(page, mock)
