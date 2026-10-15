@@ -408,6 +408,11 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
       },
       submit: {
         available,
+        shouldSubmitOnEnter: () =>
+          !!parseClientSlashCommand(
+            slashCommands(),
+            prompt.current().map((part) => ("content" in part ? part.content : "")).join(""),
+          ),
         stopping,
         working: adapter.working,
         queue: options?.queue,
@@ -418,8 +423,8 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
           if (queue?.undoing()) return
 
           // Confirming an edit re-admits the queued prompt instead of sending
-          // the composer value as a new prompt. Enter keeps it queued in
-          // place; the alternate action sends it as a steer.
+          // the composer value as a new prompt. Normal submission keeps it
+          // queued in place; the alternate action sends it as a steer.
           if (queue?.editing()) {
             queue.confirmEdit(submitOptions?.alternate ? "steer" : "queue")
 

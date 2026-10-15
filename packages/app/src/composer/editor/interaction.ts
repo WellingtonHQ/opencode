@@ -40,6 +40,7 @@ export type ComposerEditorView = {
   variant?: ComposerSelectControl
   submit: {
     available?: Accessor<boolean>
+    shouldSubmitOnEnter?: Accessor<boolean>
     stopping: Accessor<boolean>
     working?: Accessor<boolean>
     queue?: ComposerQueue

@@ -15,6 +15,8 @@ export type WorkspaceLastUsed = Settings["workspaces"]["lastUsed"][string]
 
 export type TerminalPlacement = Settings["general"]["terminalPlacement"]
 
+export type EnterKeyBehavior = Settings["general"]["enterKeyBehavior"]
+
 export type FollowUpBehavior = Settings["general"]["followUpBehavior"]
 
 export type TabLayout = Settings["appearance"]["tabLayout"]
@@ -115,6 +117,7 @@ const generalSchema = Persistence.struct({
   // Owned by the review extension, which copies it out once; kept so settings rewrites cannot drop it first.
   mobileDiffWrap: Persistence.optional(Schema.Boolean),
   terminalPlacement: Schema.Literals(["side", "bottom"]),
+  enterKeyBehavior: Schema.Literals(["submit", "newline"]),
   followUpBehavior: Schema.Literals(["queue", "steer"]),
 })
 
@@ -270,6 +273,7 @@ export const defaultSettings: Settings = {
     showCustomAgents: false,
     mobileTitlebarPosition: "top",
     terminalPlacement: "side",
+    enterKeyBehavior: "newline",
     followUpBehavior: "steer",
   },
   appearance: { fontSize: 14, mono: "", sans: "", terminal: "", tabLayout: "horizontal" },
@@ -345,6 +349,10 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         ),
         setTerminalPlacement(value: TerminalPlacement) {
           setStore("general", "terminalPlacement", value)
+        },
+        enterKeyBehavior: withFallback(() => store.general?.enterKeyBehavior, defaultSettings.general.enterKeyBehavior),
+        setEnterKeyBehavior(value: EnterKeyBehavior) {
+          setStore("general", "enterKeyBehavior", value)
         },
         followUpBehavior: withFallback(() => store.general?.followUpBehavior, defaultSettings.general.followUpBehavior),
         setFollowUpBehavior(value: FollowUpBehavior) {

@@ -33,6 +33,7 @@ import { CommentCard } from "@opencode/session-ui/comment-card"
 import { typeLabel } from "@opencode/session-ui/message-file"
 import { getFilename } from "@opencode/util/path"
 import { Skill } from "@opencode/schema/skill"
+import { useSettings } from "@/settings/model"
 import type {
   ComposerAgentPart,
   ComposerAttachment,
@@ -93,6 +94,7 @@ export type ComposerEditorProps = {
 
 export function ComposerEditor(props: ComposerEditorProps) {
   const i18n = useI18n()
+  const settings = useSettings()
   const state = props.controller.state
   const view = props.controller.view
   let editor: HTMLDivElement | undefined
@@ -264,12 +266,25 @@ export function ComposerEditor(props: ComposerEditorProps) {
                 return
               }
 
-              if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
-                event.preventDefault()
+              if (event.key !== "Enter" || event.isComposing) return
 
-                if (event.repeat) return
-                props.controller.submit(mod ? { alternate: true } : undefined)
-              }
+              if (event.shiftKey && !mod) return
+
+              if (state.mode === "shell" && event.shiftKey) return
+
+              if (
+                state.mode === "normal" &&
+                !mod &&
+                settings.general.enterKeyBehavior() === "newline" &&
+                !view.submit.shouldSubmitOnEnter?.()
+              )
+                return
+
+              event.preventDefault()
+
+              if (event.repeat) return
+              const alternate = mod && (state.mode === "shell" || event.shiftKey || settings.general.enterKeyBehavior() === "submit")
+              props.controller.submit(alternate ? { alternate: true } : undefined)
             }}
             onKeyUp={updateCursor}
             onPointerUp={updateCursor}
@@ -374,7 +389,10 @@ export function ComposerEditor(props: ComposerEditorProps) {
             <Show when={state.mode === "normal"}>
               <ComposerEditorAlternateDelivery
                 controller={props.controller}
-                keybind={props.alternateKeybind ?? ["Mod", "Enter"]}
+                keybind={
+                  props.alternateKeybind ??
+                  (settings.general.enterKeyBehavior() === "newline" ? ["Mod", "Shift", "Enter"] : ["Mod", "Enter"])
+                }
               />
             </Show>
             <Show when={state.mode === "shell"}>
@@ -1074,10 +1092,8 @@ function composerSuggestionMaxHeight(boundaryHeight: number, search: boolean) {
   )
 }
 
-// "Steer ⌘⏎" / "Queue ⌘⏎" hint next to the submit button: submits with the
-// delivery opposite to what plain Enter does. Visible only while the queue
-// exposes an alternate (turn running and composer holding a value), so it
-// disappears on its own when the current turn ends.
+// Alternate delivery hint next to the submit button. Its shortcut matches the
+// current Enter behavior and is visible only while the queue exposes an alternate.
 function ComposerEditorAlternateDelivery(props: { controller: ComposerEditorModel; keybind: string[] }) {
   const i18n = useI18n()
   const view = props.controller.view

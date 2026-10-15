@@ -798,6 +798,11 @@ export const dict = {
   "settings.general.row.terminalPlacement.description": "Choose where the terminal opens in sessions",
   "settings.general.row.terminalPlacement.side": "Side",
   "settings.general.row.terminalPlacement.bottom": "Bottom",
+  "settings.general.row.enterKeyBehavior.title": "Enter key behavior",
+  "settings.general.row.enterKeyBehavior.description":
+    "Choose whether Enter submits a prompt or inserts a newline. Use {{keybind}} to submit when Enter inserts a newline.",
+  "settings.general.row.enterKeyBehavior.submit": "Submit prompt",
+  "settings.general.row.enterKeyBehavior.newline": "Insert newline",
   "settings.general.row.colorScheme.title": "Color scheme",
   "settings.general.row.colorScheme.description": "Choose whether OpenCode follows the system, light, or dark theme",
   "settings.general.row.theme.title": "Theme",

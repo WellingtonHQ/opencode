@@ -11,6 +11,7 @@ import { ModelSelectorPopover } from "@/providers/models/select-dialog"
 import { DialogSelectModelUnpaid } from "@/providers/models/unpaid"
 import { formatKeybind, useCommand } from "@/shell/commands/command"
 import { useLanguage } from "@/runtime/i18n/language"
+import { useSettings } from "@/settings/model"
 import type { ComposerModel } from "./model"
 
 export function Composer(props: {
@@ -23,6 +24,7 @@ export function Composer(props: {
   const dialog = useDialog()
   const command = useCommand()
   const language = useLanguage()
+  const settings = useSettings()
 
   return (
     <div class="flex flex-col gap-3">
@@ -34,7 +36,10 @@ export function Composer(props: {
         modelControlsVisible={!props.model.model.loading}
         attachKeybind={command.keybindParts("file.attach")}
         attachShortcut={command.keybind("file.attach")}
-        alternateKeybind={[formatKeybind("mod", language.t), "↵"]}
+        alternateKeybind={[
+          formatKeybind(settings.general.enterKeyBehavior() === "newline" ? "mod+shift" : "mod", language.t),
+          "↵",
+        ]}
         exitShellKeybind={[formatKeybind("esc", language.t)]}
         suggestionBoundary={props.suggestionBoundary}
         modelControl={

@@ -161,6 +161,7 @@ async function openQueue(
   followUpBehavior?: "queue" | "steer",
   revert?: string,
   status: "idle" | "running" = "running",
+  enterKeyBehavior: "submit" | "newline" = "submit",
 ) {
   const model = { id: "queue-model", name: "Queue Model" }
 
@@ -184,7 +185,11 @@ async function openQueue(
     events: mock.events,
   }
 
-  if (followUpBehavior) options.seed = { settings: { general: { followUpBehavior } } }
+  options.seed = {
+    settings: {
+      general: followUpBehavior ? { enterKeyBehavior, followUpBehavior } : { enterKeyBehavior },
+    },
+  }
   await openSession(page, options)
   const composer = page.locator('[data-component="composer"]')
 
@@ -222,6 +227,19 @@ test("follow-up preference controls Enter while Mod+Enter uses the alternate del
   await view.input.press("ControlOrMeta+Enter")
   await expect.poll(() => mock.prompts.map((prompt) => prompt.delivery)).toEqual(["queue", "steer"])
   await expect(view.input).toHaveText("")
+})
+
+test("Mod+Enter submits normally and Mod+Shift+Enter uses alternate delivery in newline mode", async ({ page }) => {
+  const mock = createQueueMock([])
+  const view = await openQueue(page, mock, "queue", undefined, "running", "newline")
+
+  await view.input.fill("queue this normally")
+  await view.input.press("ControlOrMeta+Enter")
+  await expect.poll(() => mock.prompts.map((prompt) => prompt.delivery)).toEqual(["queue"])
+
+  await view.input.fill("steer this alternate")
+  await view.input.press("ControlOrMeta+Shift+Enter")
+  await expect.poll(() => mock.prompts.map((prompt) => prompt.delivery)).toEqual(["queue", "steer"])
 })
 
 test("a steer shows in the timeline as the composer clears, before its selection commits", async ({ page }) => {
