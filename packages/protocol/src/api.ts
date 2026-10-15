@@ -33,6 +33,8 @@ import { WorktreeGroup } from "./groups/worktree.js"
 import { VcsGroup } from "./groups/vcs.js"
 import { MigrationGroup } from "./groups/migration.js"
 import { ConfigGroup } from "./groups/config.js"
+import { ScheduleGroup } from "./groups/schedule.js"
+import { GlobalGroup } from "./groups/global.js"
 
 type LocationGroups<LocationId extends HttpApiMiddleware.AnyId> =
   | HttpApiGroup.AddMiddleware<typeof AgentGroup, LocationId>
@@ -96,6 +98,8 @@ type ApiGroups<
   | typeof GenerateGroup
   | typeof PersistentPtyGroup
   | typeof CredentialGroup
+  | typeof ScheduleGroup
+  | typeof GlobalGroup
   | LocationGroups<LocationId>
   | LocationGroup<LocationId, LocationService>
   | PtyGroups<LocationId, LocationService>
@@ -131,7 +135,7 @@ export type Api<
     >,
     SchemaErrorMiddleware
   >
->
+  >
 
 // Protocol owns middleware placement, while Server injects concrete keys so Core service identities stay downstream.
 const makeApiFromGroup = <
@@ -171,6 +175,8 @@ const makeApiFromGroup = <
     .add(CredentialGroup)
     .add(ProjectGroup.middleware(locationMiddleware))
     .add(makeFormGroup(locationMiddleware))
+    .add(ScheduleGroup)
+    .add(GlobalGroup)
     .add(makePermissionGroup(locationMiddleware, sessionLocationMiddleware))
     .add(FileSystemGroup.middleware(locationMiddleware))
     .add(CommandGroup.middleware(locationMiddleware))

@@ -9,6 +9,7 @@ import { createHomeScrollController } from "./scroll"
 import { createHomeSessionSearchController } from "./sessions/search"
 import { createHomeSessionsController } from "./sessions/controller"
 import { HomeSessions } from "./sessions/region"
+import { SchedulePanel } from "./schedules/panel"
 
 export function Home() {
   const mobile = createMediaQuery("(max-width: 767px)")
@@ -48,7 +49,15 @@ export function Home() {
           <Show when={!mobile()}>
             <HomeProjects projects={projects} scroll={scroll} />
           </Show>
-          <HomeSessions sessions={sessions} search={search} scroll={scroll} />
+          <Show
+            when={projects.utility.schedules.open() ? home.server.focused() : undefined}
+            keyed
+            fallback={<HomeSessions sessions={sessions} search={search} scroll={scroll} />}
+          >
+            {(server) => (
+              <SchedulePanel server={server} defaultDirectory={home.selection.value().directory} />
+            )}
+          </Show>
         </div>
       </ScrollView>
       <div class="hidden shrink-0 px-3 py-2 md:block lg:hidden">
@@ -56,6 +65,8 @@ export function Home() {
           class="flex"
           onOpenSettings={projects.utility.settings}
           onOpenHelp={projects.utility.help}
+          onToggleSchedules={projects.utility.schedules.toggle}
+          schedulesActive={projects.utility.schedules.open}
           language={projects.copy.language}
         />
       </div>

@@ -31,6 +31,7 @@ import type { Form } from "@opencode/schema/form"
 import type { Integration } from "@opencode/schema/integration"
 import type { Mcp } from "@opencode/schema/mcp"
 import type { Credential } from "@opencode/schema/credential"
+import type { Schedule } from "@opencode/schema/schedule"
 import type { PermissionSaved } from "@opencode/schema/permission-saved"
 import type { FileSystem } from "@opencode/schema/filesystem"
 import type { Command } from "@opencode/schema/command"
@@ -1690,6 +1691,262 @@ export interface FormApi<E = never> {
   readonly list: FormListOperation<E>
 }
 
+export type ScheduleListOutput = ReadonlyArray<{
+  readonly id: Schedule.ID
+  readonly name?: string | undefined
+  readonly prompt: string
+  readonly spec:
+    | { readonly kind: "once"; readonly atMs: number }
+    | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
+    | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly hour: number; readonly minute: number }
+    | { readonly kind: "cron"; readonly expr: string }
+  readonly timezone: string
+  readonly agentId?: Agent.ID | undefined
+  readonly model?: Model.Ref | undefined
+  readonly directory: AbsolutePath
+  readonly enabled: boolean
+  readonly nextRunAtMs?: number | undefined
+  readonly lastRunAtMs?: number | undefined
+  readonly lastSessionId?: Session.ID | undefined
+  readonly lastError?: string | undefined
+  readonly runCount: number
+  readonly recentRuns?:
+    | ReadonlyArray<{
+        readonly taskID: Schedule.ID
+        readonly sessionID?: Session.ID | undefined
+        readonly status: "running" | "completed" | "failed"
+        readonly startedAtMs: number
+        readonly finishedAtMs?: number | undefined
+        readonly errorText?: string | undefined
+      }>
+    | undefined
+}>
+export type ScheduleListOperation<E = never> = () => Effect.Effect<ScheduleListOutput, E>
+
+export type ScheduleGetInput = { readonly scheduleID: Schedule.ID }
+export type ScheduleGetOutput = {
+  readonly id: Schedule.ID
+  readonly name?: string | undefined
+  readonly prompt: string
+  readonly spec:
+    | { readonly kind: "once"; readonly atMs: number }
+    | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
+    | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly hour: number; readonly minute: number }
+    | { readonly kind: "cron"; readonly expr: string }
+  readonly timezone: string
+  readonly agentId?: Agent.ID | undefined
+  readonly model?: Model.Ref | undefined
+  readonly directory: AbsolutePath
+  readonly enabled: boolean
+  readonly nextRunAtMs?: number | undefined
+  readonly lastRunAtMs?: number | undefined
+  readonly lastSessionId?: Session.ID | undefined
+  readonly lastError?: string | undefined
+  readonly runCount: number
+  readonly recentRuns?:
+    | ReadonlyArray<{
+        readonly taskID: Schedule.ID
+        readonly sessionID?: Session.ID | undefined
+        readonly status: "running" | "completed" | "failed"
+        readonly startedAtMs: number
+        readonly finishedAtMs?: number | undefined
+        readonly errorText?: string | undefined
+      }>
+    | undefined
+}
+export type ScheduleGetOperation<E = never> = (input: ScheduleGetInput) => Effect.Effect<ScheduleGetOutput, E>
+
+export type ScheduleCreateInput = {
+  readonly name?: string | undefined
+  readonly prompt: string
+  readonly spec:
+    | { readonly kind: "once"; readonly atMs: number }
+    | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
+    | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly hour: number; readonly minute: number }
+    | { readonly kind: "cron"; readonly expr: string }
+  readonly timezone?: string | undefined
+  readonly agentId?: Agent.ID | undefined
+  readonly model?: Model.Ref | undefined
+  readonly directory: AbsolutePath
+}
+export type ScheduleCreateOutput = {
+  readonly id: Schedule.ID
+  readonly name?: string | undefined
+  readonly prompt: string
+  readonly spec:
+    | { readonly kind: "once"; readonly atMs: number }
+    | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
+    | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly hour: number; readonly minute: number }
+    | { readonly kind: "cron"; readonly expr: string }
+  readonly timezone: string
+  readonly agentId?: Agent.ID | undefined
+  readonly model?: Model.Ref | undefined
+  readonly directory: AbsolutePath
+  readonly enabled: boolean
+  readonly nextRunAtMs?: number | undefined
+  readonly lastRunAtMs?: number | undefined
+  readonly lastSessionId?: Session.ID | undefined
+  readonly lastError?: string | undefined
+  readonly runCount: number
+  readonly recentRuns?:
+    | ReadonlyArray<{
+        readonly taskID: Schedule.ID
+        readonly sessionID?: Session.ID | undefined
+        readonly status: "running" | "completed" | "failed"
+        readonly startedAtMs: number
+        readonly finishedAtMs?: number | undefined
+        readonly errorText?: string | undefined
+      }>
+    | undefined
+}
+export type ScheduleCreateOperation<E = never> = (input: ScheduleCreateInput) => Effect.Effect<ScheduleCreateOutput, E>
+
+export type ScheduleUpdateInput = {
+  readonly scheduleID: Schedule.ID
+  readonly name?: string | undefined
+  readonly prompt?: string | undefined
+  readonly spec?:
+    | (
+        | { readonly kind: "once"; readonly atMs: number }
+        | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
+        | {
+            readonly kind: "weekly"
+            readonly days: ReadonlyArray<number>
+            readonly hour: number
+            readonly minute: number
+          }
+        | { readonly kind: "cron"; readonly expr: string }
+      )
+    | undefined
+  readonly timezone?: string | undefined
+  readonly agentId?: Agent.ID | undefined
+  readonly model?: Model.Ref | null | undefined
+  readonly directory?: AbsolutePath | undefined
+  readonly enabled?: boolean | undefined
+}
+export type ScheduleUpdateOutput = {
+  readonly id: Schedule.ID
+  readonly name?: string | undefined
+  readonly prompt: string
+  readonly spec:
+    | { readonly kind: "once"; readonly atMs: number }
+    | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
+    | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly hour: number; readonly minute: number }
+    | { readonly kind: "cron"; readonly expr: string }
+  readonly timezone: string
+  readonly agentId?: Agent.ID | undefined
+  readonly model?: Model.Ref | undefined
+  readonly directory: AbsolutePath
+  readonly enabled: boolean
+  readonly nextRunAtMs?: number | undefined
+  readonly lastRunAtMs?: number | undefined
+  readonly lastSessionId?: Session.ID | undefined
+  readonly lastError?: string | undefined
+  readonly runCount: number
+  readonly recentRuns?:
+    | ReadonlyArray<{
+        readonly taskID: Schedule.ID
+        readonly sessionID?: Session.ID | undefined
+        readonly status: "running" | "completed" | "failed"
+        readonly startedAtMs: number
+        readonly finishedAtMs?: number | undefined
+        readonly errorText?: string | undefined
+      }>
+    | undefined
+}
+export type ScheduleUpdateOperation<E = never> = (input: ScheduleUpdateInput) => Effect.Effect<ScheduleUpdateOutput, E>
+
+export type ScheduleRemoveInput = { readonly scheduleID: Schedule.ID }
+export type ScheduleRemoveOutput = {
+  readonly id: Schedule.ID
+  readonly name?: string | undefined
+  readonly prompt: string
+  readonly spec:
+    | { readonly kind: "once"; readonly atMs: number }
+    | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
+    | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly hour: number; readonly minute: number }
+    | { readonly kind: "cron"; readonly expr: string }
+  readonly timezone: string
+  readonly agentId?: Agent.ID | undefined
+  readonly model?: Model.Ref | undefined
+  readonly directory: AbsolutePath
+  readonly enabled: boolean
+  readonly nextRunAtMs?: number | undefined
+  readonly lastRunAtMs?: number | undefined
+  readonly lastSessionId?: Session.ID | undefined
+  readonly lastError?: string | undefined
+  readonly runCount: number
+  readonly recentRuns?:
+    | ReadonlyArray<{
+        readonly taskID: Schedule.ID
+        readonly sessionID?: Session.ID | undefined
+        readonly status: "running" | "completed" | "failed"
+        readonly startedAtMs: number
+        readonly finishedAtMs?: number | undefined
+        readonly errorText?: string | undefined
+      }>
+    | undefined
+}
+export type ScheduleRemoveOperation<E = never> = (input: ScheduleRemoveInput) => Effect.Effect<ScheduleRemoveOutput, E>
+
+export type ScheduleRunNowInput = { readonly scheduleID: Schedule.ID }
+export type ScheduleRunNowOutput = {
+  readonly id: Schedule.ID
+  readonly name?: string | undefined
+  readonly prompt: string
+  readonly spec:
+    | { readonly kind: "once"; readonly atMs: number }
+    | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
+    | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly hour: number; readonly minute: number }
+    | { readonly kind: "cron"; readonly expr: string }
+  readonly timezone: string
+  readonly agentId?: Agent.ID | undefined
+  readonly model?: Model.Ref | undefined
+  readonly directory: AbsolutePath
+  readonly enabled: boolean
+  readonly nextRunAtMs?: number | undefined
+  readonly lastRunAtMs?: number | undefined
+  readonly lastSessionId?: Session.ID | undefined
+  readonly lastError?: string | undefined
+  readonly runCount: number
+  readonly recentRuns?:
+    | ReadonlyArray<{
+        readonly taskID: Schedule.ID
+        readonly sessionID?: Session.ID | undefined
+        readonly status: "running" | "completed" | "failed"
+        readonly startedAtMs: number
+        readonly finishedAtMs?: number | undefined
+        readonly errorText?: string | undefined
+      }>
+    | undefined
+}
+export type ScheduleRunNowOperation<E = never> = (input: ScheduleRunNowInput) => Effect.Effect<ScheduleRunNowOutput, E>
+
+export interface ScheduleApi<E = never> {
+  readonly list: ScheduleListOperation<E>
+  readonly get: ScheduleGetOperation<E>
+  readonly create: ScheduleCreateOperation<E>
+  readonly update: ScheduleUpdateOperation<E>
+  readonly remove: ScheduleRemoveOperation<E>
+  readonly runNow: ScheduleRunNowOperation<E>
+}
+
+export type GlobalAutoApproveGetOutput = { readonly enabled: boolean }
+export type GlobalAutoApproveGetOperation<E = never> = () => Effect.Effect<GlobalAutoApproveGetOutput, E>
+
+export type GlobalAutoApproveSetInput = { readonly enabled: boolean }
+export type GlobalAutoApproveSetOutput = { readonly enabled: boolean }
+export type GlobalAutoApproveSetOperation<E = never> = (
+  input: GlobalAutoApproveSetInput,
+) => Effect.Effect<GlobalAutoApproveSetOutput, E>
+
+export interface GlobalApi<E = never> {
+  readonly "auto-approve": {
+    readonly get: GlobalAutoApproveGetOperation<E>
+    readonly set: GlobalAutoApproveSetOperation<E>
+  }
+}
+
 export type PermissionRequestListInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
 export type PermissionRequestListOutput = {
   readonly location: Location.PublicRef
@@ -2278,6 +2535,8 @@ export interface AppApi<E = never> {
   readonly credential: CredentialApi<E>
   readonly project: ProjectApi<E>
   readonly form: FormApi<E>
+  readonly schedule: ScheduleApi<E>
+  readonly global: GlobalApi<E>
   readonly permission: PermissionApi<E>
   readonly file: FileApi<E>
   readonly command: CommandApi<E>

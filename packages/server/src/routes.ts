@@ -1,6 +1,7 @@
 import { Database } from "@opencode/core/database/database"
 import { V1Migration } from "@opencode/core/database/v1-migration"
 import { App } from "@opencode/core/app"
+import { AppState } from "@opencode/core/app-state"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Node } from "@opencode/util/effect/app-node"
 import { httpClient } from "@opencode/util/effect/app-node-platform"
@@ -13,6 +14,7 @@ import { Config } from "@opencode/core/config"
 import { PermissionSaved } from "@opencode/core/permission/saved"
 import { PtyTicket } from "@opencode/core/pty/ticket"
 import { PersistentPty } from "@opencode/core/persistent-pty"
+import { ScheduleTask } from "@opencode/core/schedule"
 import { Project } from "@opencode/core/project"
 import { Worktree } from "@opencode/core/worktree"
 import { Session } from "@opencode/core/session"
@@ -71,6 +73,8 @@ const applicationServiceNodes = [
   PtyTicket.node,
   PersistentPty.node,
   Credential.node,
+  AppState.node,
+  ScheduleTask.node,
   WellKnown.node,
   PtyEnvironment.node,
   ServerPairing.node,
@@ -177,6 +181,7 @@ function makeRoutes<AuthError, AuthServices>(
             PermissionSaved.Service,
             PluginUpdate.Service,
             Project.Service,
+            ScheduleTask.Service,
             WellKnown.Service,
           )(context),
         ),

@@ -10,7 +10,8 @@ import { closeHomeProject, errorMessage, homeProjectDirectories } from "@/shell/
 import { Persist, persisted } from "@/runtime/persistence/storage"
 import { showToast } from "@/shell/notifications/toast"
 import { useDialog } from "@opencode/ui/context/dialog"
-import { createResource } from "solid-js"
+import { createEffect, createResource, on } from "solid-js"
+import { createStore } from "solid-js/store"
 import { Schema } from "effect"
 import { Persistence } from "@/runtime/persistence/schema"
 import type { HomeController } from "../model"
@@ -33,6 +34,17 @@ export function createHomeProjectsController(home: HomeController) {
   const global = useGlobal()
   const revealProject = useRevealProject()
   const [_state, setState, _, ready] = persisted(Persist.global("home.servers"), HomeServersSchema, { collapsed: {} })
+  const [schedules, setSchedules] = createStore({ open: false })
+
+  createEffect(
+    on(
+      home.selection.value,
+      () => {
+        if (schedules.open) setSchedules("open", false)
+      },
+      { defer: true },
+    ),
+  )
 
   const [state] = createResource(
     () => ready.promise ?? Promise.resolve(),
@@ -185,6 +197,10 @@ export function createHomeProjectsController(home: HomeController) {
     utility: {
       settings: openSettings,
       help: () => platform.openExternal("https://opencode.ai/desktop-feedback"),
+      schedules: {
+        open: () => schedules.open,
+        toggle: () => setSchedules("open", !schedules.open),
+      },
     },
   }
 }

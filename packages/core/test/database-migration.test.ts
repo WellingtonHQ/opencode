@@ -21,6 +21,7 @@ import executionClaimsMigration from "@opencode/core/database/migration/20260811
 import sessionInboxMigration from "@opencode/core/database/migration/20260812181746_session_inbox"
 import sessionViewedStateMigration from "@opencode/core/database/migration/20260819222447_session_viewed_state"
 import azureCliCredentialMigration from "@opencode/core/database/migration/20261007190000_azure_cli_external_credential"
+import scheduleTimezoneMigration from "@opencode/core/database/migration/20261013030935_add_scheduled_task_timezone"
 import { Global } from "@opencode/util/global"
 
 const run = <A, E>(
@@ -63,6 +64,22 @@ const parkedClient = (arrived: Deferred.Deferred<void>, gate: Deferred.Deferred<
   ).pipe(Layer.provide(SqliteClient.layer({ filename: ":memory:", disableWAL: true })), Layer.provide(Reactivity.layer))
 
 describe("DatabaseMigration", () => {
+  test("backfills existing scheduled tasks with the current local time zone", async () => {
+    await run(
+      Effect.gen(function* () {
+        const db = yield* makeDb
+        yield* db.run(sql`CREATE TABLE scheduled_task (id text PRIMARY KEY)`)
+        yield* db.run(sql`INSERT INTO scheduled_task (id) VALUES ('task_legacy')`)
+
+        yield* DatabaseMigration.applyOnly(db, [scheduleTimezoneMigration])
+
+        expect(yield* db.get(sql`SELECT timezone FROM scheduled_task WHERE id = 'task_legacy'`)).toEqual({
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        })
+      }),
+    )
+  })
+
   test("defaults missing workspace names while preserving legacy workspace data", async () => {
     await run(
       Effect.gen(function* () {

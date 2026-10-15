@@ -1,0 +1,73 @@
+---
+title: "Schedules"
+description: "Run prompts automatically on a schedule."
+---
+
+Scheduled tasks run prompts at specified times and are stored in OpenCode's global database. Each execution creates a new background session in the task's directory instead of continuing a previous session.
+
+## Create a task
+
+In the app, open **Schedules** in the sidebar and create a task with a prompt, directory, and schedule. You can also select an agent or model.
+
+Create a daily task from the CLI:
+
+```bash
+opencode schedule add "Summarize the latest news" --name daily-news --daily "09:30"
+```
+
+The CLI connects to a running OpenCode server. See the [CLI command reference](/cli/commands).
+
+## Schedule types
+
+Choose one-time, daily, weekly, or five-field cron scheduling:
+
+```bash
+opencode schedule add "Prepare a report" --at "2026-10-20 09:00"
+opencode schedule add "Prepare standup notes" --weekly "mon,wed 14:00"
+opencode schedule add "Review open issues" --cron "30 9 * * 1-5"
+```
+
+| Type     | Example                    | Runs                                                       |
+| -------- | -------------------------- | ---------------------------------------------------------- |
+| One-time | `--at "2026-10-20 09:00"` | Once at that local date and time                           |
+| Daily    | `--daily "09:30"`          | Every day at that local time                               |
+| Weekly   | `--weekly "mon,wed 14:00"` | On selected days (`sun`–`sat` or `0`–`6`) at that time     |
+| Cron     | `--cron "30 9 * * 1-5"`    | When the five-field cron expression matches                |
+
+Cron fields are minute, hour, day of month, month, and day of week. The `--at` value uses `yyyy-MM-dd HH:mm` and must be in the future.
+
+## Manage tasks
+
+List tasks to get their IDs, then use an ID to change or run a task:
+
+```bash
+opencode schedule list --format json
+opencode schedule enable <id>
+opencode schedule disable <id>
+opencode schedule run-now <id>
+opencode schedule remove <id>
+```
+
+## Time zones
+
+Each task stores an IANA timezone. The app and `opencode schedule` CLI use their local timezone when creating a task; the CLI uses the timezone of the machine running it. Existing tasks keep their saved timezone when edited. Legacy records are assigned the server-local timezone used by the migration.
+
+For example, a task created in Los Angeles stores this timezone:
+
+```json
+{ "timezone": "America/Los_Angeles" }
+```
+
+Recurring schedules use local wall-clock time across daylight-saving changes. A daily `09:30` stays at `09:30`; a time skipped during spring-forward moves to the next valid local time.
+
+## Runs and permissions
+
+The server checks for due tasks every 15 seconds. Tasks are stored in the global database, with a maximum of 50 tasks and ten recent runs retained per task.
+
+Run now starts an execution immediately, even if the task is disabled:
+
+```bash
+opencode schedule run-now <id>
+```
+
+Scheduled runs and Run now use the same **Auto-accept permissions for all sessions** setting in Settings → General. When enabled, permission requests are accepted automatically; when disabled, they wait for a decision in that run's session.

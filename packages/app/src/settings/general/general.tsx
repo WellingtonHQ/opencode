@@ -1,4 +1,4 @@
-import { Component, Show, createMemo, createResource } from "solid-js"
+import { Component, Show, createMemo, createResource, type Accessor } from "solid-js"
 import { createMediaQuery } from "@solid-primitives/media"
 import { Select } from "@opencode/ui/select"
 import { Switch } from "@opencode/ui/switch"
@@ -18,12 +18,15 @@ import { SettingsList } from "@/settings/list"
 import { SettingsRow } from "@/settings/row"
 import { createShellOptions, type ShellSettingsController } from "./controllers"
 import "@/settings/settings.css"
+import { useAutoApproveToggle } from "@/runtime/server/auto-approve"
+import { ServerConnection } from "@/runtime/server/registry"
 
 const tabLayoutOptions: ("horizontal" | "vertical")[] = ["horizontal", "vertical"]
 
-const AutoApprovePermissionsSetting: Component = () => {
+const AutoApprovePermissionsSetting: Component<{ server: Accessor<ServerConnection.Any | undefined> }> = (props) => {
   const language = useLanguage()
   const settings = useSettings()
+  const toggle = useAutoApproveToggle(props.server)
 
   return (
     <SettingsRow
@@ -34,7 +37,7 @@ const AutoApprovePermissionsSetting: Component = () => {
         <Switch
           hideLabel
           checked={settings.permissions.autoApprove()}
-          onChange={(checked) => settings.permissions.setAutoApprove(checked)}
+          onChange={toggle}
         >
           {language.t("settings.permissions.autoaccept.global.title")}
         </Switch>
@@ -254,7 +257,7 @@ const TabLayoutSetting = () => {
   )
 }
 
-export const SettingsGeneral: Component = () => {
+export const SettingsGeneral: Component<{ server: Accessor<ServerConnection.Any | undefined> }> = (props) => {
   const language = useLanguage()
   const platform = usePlatform()
   const settings = useSettings()
@@ -283,7 +286,7 @@ export const SettingsGeneral: Component = () => {
         <TabLayoutSetting />
 
         <WorkspaceDestinationSetting />
-        <AutoApprovePermissionsSetting />
+        <AutoApprovePermissionsSetting server={props.server} />
 
         <SettingsRow
           title={language.t("settings.general.row.showCustomAgents.title")}

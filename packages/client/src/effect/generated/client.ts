@@ -170,6 +170,20 @@ import type {
   ProjectUpdateOutput,
   FormListInput,
   FormListOutput,
+  ScheduleListOutput,
+  ScheduleGetInput,
+  ScheduleGetOutput,
+  ScheduleCreateInput,
+  ScheduleCreateOutput,
+  ScheduleUpdateInput,
+  ScheduleUpdateOutput,
+  ScheduleRemoveInput,
+  ScheduleRemoveOutput,
+  ScheduleRunNowInput,
+  ScheduleRunNowOutput,
+  GlobalAutoApproveGetOutput,
+  GlobalAutoApproveSetInput,
+  GlobalAutoApproveSetOutput,
   PermissionRequestListInput,
   PermissionRequestListOutput,
   PermissionSavedListInput,
@@ -1128,6 +1142,77 @@ const EndpointFormList = (raw: RawClient["server.form"]) => (input?: FormListInp
 
 const adaptGroupForm = (raw: RawClient["server.form"]) => ({ list: EndpointFormList(raw) })
 
+const EndpointScheduleList = (raw: RawClient["server.schedule"]) => () =>
+  preserveEffect<ScheduleListOutput>()(raw["schedule.list"]({}).pipe(Effect.mapError(mapClientError)))
+
+const EndpointScheduleGet = (raw: RawClient["server.schedule"]) => (input: ScheduleGetInput) =>
+  preserveEffect<ScheduleGetOutput>()(
+    raw["schedule.get"]({ params: { scheduleID: input["scheduleID"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointScheduleCreate = (raw: RawClient["server.schedule"]) => (input: ScheduleCreateInput) =>
+  preserveEffect<ScheduleCreateOutput>()(
+    raw["schedule.create"]({
+      payload: {
+        name: input["name"],
+        prompt: input["prompt"],
+        spec: input["spec"],
+        timezone: input["timezone"],
+        agentId: input["agentId"],
+        model: input["model"],
+        directory: input["directory"],
+      },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointScheduleUpdate = (raw: RawClient["server.schedule"]) => (input: ScheduleUpdateInput) =>
+  preserveEffect<ScheduleUpdateOutput>()(
+    raw["schedule.update"]({
+      params: { scheduleID: input["scheduleID"] },
+      payload: {
+        name: input["name"],
+        prompt: input["prompt"],
+        spec: input["spec"],
+        timezone: input["timezone"],
+        agentId: input["agentId"],
+        model: input["model"],
+        directory: input["directory"],
+        enabled: input["enabled"],
+      },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointScheduleRemove = (raw: RawClient["server.schedule"]) => (input: ScheduleRemoveInput) =>
+  preserveEffect<ScheduleRemoveOutput>()(
+    raw["schedule.remove"]({ params: { scheduleID: input["scheduleID"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointScheduleRunNow = (raw: RawClient["server.schedule"]) => (input: ScheduleRunNowInput) =>
+  preserveEffect<ScheduleRunNowOutput>()(
+    raw["schedule.runNow"]({ params: { scheduleID: input["scheduleID"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const adaptGroupSchedule = (raw: RawClient["server.schedule"]) => ({
+  list: EndpointScheduleList(raw),
+  get: EndpointScheduleGet(raw),
+  create: EndpointScheduleCreate(raw),
+  update: EndpointScheduleUpdate(raw),
+  remove: EndpointScheduleRemove(raw),
+  runNow: EndpointScheduleRunNow(raw),
+})
+
+const EndpointGlobalAutoApproveGet = (raw: RawClient["server.global"]) => () =>
+  preserveEffect<GlobalAutoApproveGetOutput>()(raw["global.autoApprove.get"]({}).pipe(Effect.mapError(mapClientError)))
+
+const EndpointGlobalAutoApproveSet = (raw: RawClient["server.global"]) => (input: GlobalAutoApproveSetInput) =>
+  preserveEffect<GlobalAutoApproveSetOutput>()(
+    raw["global.autoApprove.set"]({ payload: { enabled: input["enabled"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const adaptGroupGlobal = (raw: RawClient["server.global"]) => ({
+  "auto-approve": { get: EndpointGlobalAutoApproveGet(raw), set: EndpointGlobalAutoApproveSet(raw) },
+})
+
 const EndpointPermissionRequestList = (raw: RawClient["server.permission"]) => (input?: PermissionRequestListInput) =>
   preserveEffect<PermissionRequestListOutput>()(
     raw["permission.request.list"]({ query: { location: input?.["location"] } }).pipe(Effect.mapError(mapClientError)),
@@ -1622,6 +1707,8 @@ const adaptClient = (raw: RawClient) => ({
   credential: adaptGroupCredential(raw["server.credential"]),
   project: adaptGroupProject(raw["server.project"]),
   form: adaptGroupForm(raw["server.form"]),
+  schedule: adaptGroupSchedule(raw["server.schedule"]),
+  global: adaptGroupGlobal(raw["server.global"]),
   permission: adaptGroupPermission(raw["server.permission"]),
   file: adaptGroupFile(raw["server.fs"]),
   command: adaptGroupCommand(raw["server.command"]),

@@ -52,6 +52,13 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
         );
       `)
       yield* tx.run(`
+        CREATE TABLE \`app_setting\` (
+          \`key\` text PRIMARY KEY,
+          \`value\` text NOT NULL,
+          \`time_updated\` integer NOT NULL
+        );
+      `)
+      yield* tx.run(`
         CREATE TABLE \`credential\` (
           \`id\` text PRIMARY KEY,
           \`integration_id\` text,
@@ -128,6 +135,45 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
           \`time_archived\` integer,
           \`sandboxes\` text NOT NULL,
           \`commands\` text
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`schedule_run\` (
+          \`id\` text PRIMARY KEY,
+          \`task_id\` text NOT NULL,
+          \`session_id\` text,
+          \`status\` text NOT NULL,
+          \`started_at\` integer NOT NULL,
+          \`finished_at\` integer,
+          \`error_text\` text,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL,
+          CONSTRAINT \`fk_schedule_run_task_id_scheduled_task_id_fk\` FOREIGN KEY (\`task_id\`) REFERENCES \`scheduled_task\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`scheduled_task\` (
+          \`id\` text PRIMARY KEY,
+          \`name\` text,
+          \`prompt\` text NOT NULL,
+          \`kind\` text NOT NULL,
+          \`timezone\` text NOT NULL,
+          \`at_ms\` integer,
+          \`hour\` integer,
+          \`minute\` integer,
+          \`days\` text,
+          \`expr\` text,
+          \`agent_id\` text,
+          \`model\` text,
+          \`directory\` text NOT NULL,
+          \`enabled\` integer DEFAULT true NOT NULL,
+          \`next_run_at_ms\` integer,
+          \`last_run_at_ms\` integer,
+          \`last_session_id\` text,
+          \`last_error\` text,
+          \`run_count\` integer DEFAULT 0 NOT NULL,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL
         );
       `)
       yield* tx.run(`
@@ -260,6 +306,8 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
       yield* tx.run(
         `CREATE UNIQUE INDEX \`permission_project_action_resource_idx\` ON \`permission\` (\`project_id\`,\`action\`,\`resource\`);`,
       )
+      yield* tx.run(`CREATE INDEX \`schedule_run_task_id_idx\` ON \`schedule_run\` (\`task_id\`);`)
+      yield* tx.run(`CREATE INDEX \`scheduled_task_next_run_at_ms_idx\` ON \`scheduled_task\` (\`next_run_at_ms\`);`)
       yield* tx.run(
         `CREATE INDEX \`session_inbox_session_delivery_seq_idx\` ON \`session_inbox\` (\`session_id\`,\`delivery\`,\`enqueued_seq\`);`,
       )

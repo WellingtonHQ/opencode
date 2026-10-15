@@ -11,6 +11,8 @@ export type Args = {
   readonly standalone?: boolean
   readonly mismatch?: "replace" | "ignore" | "error"
   readonly onStart?: EnsureOptions["onStart"]
+  readonly username?: string
+  readonly password?: string
 }
 
 export type Resolved = {
@@ -22,11 +24,14 @@ export const resolve = Effect.fn("cli.server-connection.resolve")(function* (arg
   if (args.server !== undefined && args.standalone)
     return yield* Effect.fail(new Error("--server and --standalone cannot be combined"))
   if (args.server !== undefined) {
-    const password = yield* Env.password
-    const username = yield* Env.username
+    const environmentPassword = yield* Env.password
+    const environmentUsername = yield* Env.username
+    const password =
+      args.password ?? (environmentPassword === undefined ? undefined : Redacted.value(environmentPassword))
+    const username = args.username ?? environmentUsername
     const endpoint = {
       url: args.server,
-      auth: password ? { type: "basic" as const, username, password: Redacted.value(password) } : undefined,
+      auth: password ? { type: "basic" as const, username, password } : undefined,
     } satisfies Endpoint
     const client = OpenCode.make({ baseUrl: endpoint.url, headers: Service.headers(endpoint) })
     const health = yield* Effect.tryPromise({

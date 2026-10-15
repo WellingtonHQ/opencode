@@ -22,6 +22,10 @@ story.describe("touch timeline", () => {
     await expect(timeline.locator('[data-slot="user-message-meta-tail"]')).not.toBeEmpty()
     await expect(timeline.locator('[data-slot="text-part-meta"]')).toContainText("Build")
     await expect(timeline.locator('[data-slot="text-part-meta"]')).toContainText("Sonnet")
+    const timestamp = await page.evaluate(() =>
+      new Intl.DateTimeFormat("en", { dateStyle: "short", timeStyle: "medium" }).format(1_735_689_636_000),
+    )
+    await expect(timeline.locator('[data-slot="text-part-meta"]')).toContainText(timestamp)
   })
 
   story("keeps shell copy visible without hover", async ({ mount }) => {

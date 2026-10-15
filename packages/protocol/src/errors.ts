@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 import { Skill } from "@opencode/schema/skill"
 import { Location } from "@opencode/schema/location"
+import { Schedule } from "@opencode/schema/schedule"
 
 export class LocationNotFoundError extends Schema.TaggedError<LocationNotFoundError>()(
   "LocationNotFoundError",
@@ -257,6 +258,15 @@ export class PtyNotFoundError extends Schema.TaggedError<PtyNotFoundError>()(
   { httpApiStatus: 404 },
 ) {}
 
+export class ScheduleNotFoundError extends Schema.TaggedError<ScheduleNotFoundError>()(
+  "ScheduleNotFoundError",
+  {
+    scheduleID: Schedule.ID,
+    message: Schema.String,
+  },
+  { httpApiStatus: 404 },
+) {}
+
 export class ShellNotFoundError extends Schema.TaggedError<ShellNotFoundError>()(
   "ShellNotFoundError",
   {
@@ -264,4 +274,12 @@ export class ShellNotFoundError extends Schema.TaggedError<ShellNotFoundError>()
     message: Schema.String,
   },
   { httpApiStatus: 404 },
+) {}
+
+export class ScheduleLimitExceededError extends Schema.TaggedError<ScheduleLimitExceededError>()(
+  "ScheduleLimitExceededError",
+  {
+    message: Schema.String,
+  },
+  { httpApiStatus: 409 },
 ) {}
