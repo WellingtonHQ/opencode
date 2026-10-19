@@ -293,7 +293,7 @@ export const DialogSchedule: Component<{
           </Field>
 
           <SegmentedControl
-            class="flex flex-wrap gap-1"
+            class="segmented-control-v2--auto"
             value={form.kind}
             disabled={form.busy}
             onChange={(value) => {
