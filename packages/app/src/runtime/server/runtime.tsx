@@ -8,7 +8,6 @@ import { createServerSyncContext } from "./sync"
 import { createData } from "@opencode/client/solid"
 import type { ServerScope } from "@/runtime/server/scope"
 import { createPermissionAutoApprover } from "@/session/requests/auto-approve"
-import { createRequestPolicy } from "@/session/requests/policy"
 import { createServerNotificationState } from "@/shell/notifications/notification"
 import { createNotificationCoordinator } from "@/shell/notifications/coordinator"
 import { Persist, persisted } from "@/runtime/persistence/storage"
@@ -196,8 +195,7 @@ function createServerController(
   })
 
   const sync = createServerSyncContext(sdk, data)
-  const requestPolicy = createRequestPolicy({ sdk, data })
-  createPermissionAutoApprover({ sdk, data, policy: requestPolicy })
+  createPermissionAutoApprover({ sdk, data })
   const notification = createServerNotificationState({ sdk, data, key: connKey, coordinator: notificationCoordinator })
 
   function enrich(project: { worktree: string; expanded: boolean }) {
@@ -254,7 +252,6 @@ function createServerController(
     data,
     sdk,
     sync,
-    requestPolicy,
     isLocal,
     projects: {
       ...projects,

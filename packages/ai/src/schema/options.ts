@@ -52,8 +52,14 @@ export const mergeProviderOptions = (
 export const HttpTimeout = Schema.Union([Schema.Number.check(Schema.isGreaterThan(0)), Schema.Literal(false)])
 export type HttpTimeout = Schema.Schema.Type<typeof HttpTimeout>
 
-/** Applied to `headerTimeout` and `chunkTimeout` when a request leaves them unset. */
+/** Applied to `headerTimeout` when a request leaves it unset. */
 export const DEFAULT_HTTP_TIMEOUT_MS = 300_000
+
+/**
+ * Applied to `chunkTimeout` when a request leaves it unset. Some providers, such as DeepSeek, have specifically asked
+ * clients to allow at least 15 minutes, because their models can stream nothing for minutes while they reason.
+ */
+export const DEFAULT_CHUNK_TIMEOUT_MS = 900_000
 
 /** `Content-Encoding` for JSON request bodies; `none` sends plain JSON. */
 export const RequestEncoding = Schema.Literals(["zstd", "gzip", "none"])
@@ -215,7 +221,8 @@ export class LanguageModelCompatibility extends Schema.Class<LanguageModelCompat
   requireFinishReason: Schema.optional(Schema.Boolean),
   requireAssistantAfterTool: Schema.optional(Schema.Boolean),
   supportsStore: Schema.optional(Schema.Boolean),
-  supportsUsageInStreaming: Schema.optional(Schema.Boolean),
+  /** Request usage in the stream with `stream_options.include_usage`. Defaults to true. */
+  streamUsage: Schema.optional(Schema.Boolean),
   supportsStrictMode: Schema.optional(Schema.Boolean),
   // Accepts `prompt_cache_key` in the request body. Chat omits the key unless
   // this is true; other protocols omit it only when this is false.
