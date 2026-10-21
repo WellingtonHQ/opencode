@@ -153,6 +153,18 @@ export function HomeProjectsView(props: HomeProjectsViewProps) {
                 setState("open", false)
                 props.onOpenProjectNewSession(server, directory)
               }}
+              onOpenSettings={() => {
+                props.onOpenSettings()
+                setState("open", false)
+              }}
+              onOpenHelp={() => {
+                props.onOpenHelp()
+                setState("open", false)
+              }}
+              onToggleSchedules={() => {
+                props.onToggleSchedules()
+                setState("open", false)
+              }}
             />
           </Popover.Content>
         </Popover.Portal>
@@ -303,7 +315,7 @@ function HomeProjectsPanel(props: HomeProjectsViewProps) {
         </Show>
       </ScrollView>
       <HomeUtilityNav
-        class="mb-8 mt-4 hidden shrink-0 lg:flex"
+        class={props.dropdown ? "mt-4 shrink-0" : "mb-8 mt-4 hidden shrink-0 lg:flex"}
         onOpenSettings={props.onOpenSettings}
         onOpenHelp={props.onOpenHelp}
         onToggleSchedules={props.onToggleSchedules}
