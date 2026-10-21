@@ -2,7 +2,7 @@ import { createEffect, onCleanup } from "solid-js"
 import type { PermissionRequest } from "@opencode/client/promise"
 import type { Data } from "@opencode/client/solid"
 import type { ServerSDK } from "@/runtime/server/client"
-import type { RequestPolicy } from "./policy"
+import { projectSettingsKey, useSettings } from "@/settings/model"
 
 const respondedLimit = 1000
 
@@ -10,14 +10,19 @@ const retryLimit = 2
 
 const retryDelayMs = 1000
 
-// The app-level default applies across servers and sessions; the server's
-// request policy preserves explicit session and directory overrides.
-export function createPermissionAutoApprover(input: { sdk: ServerSDK; data: Data; policy: RequestPolicy }) {
-  const enabled = input.policy.enabled
+// Auto-approves permission requests on one server connection for the projects
+// the client-local settings cover: the app-wide default, unless a project overrides it.
+export function createPermissionAutoApprover(input: { sdk: ServerSDK; data: Data }) {
+  const permissions = useSettings().permissions
+  const enabled = () => permissions.autoApprovesOnServer(input.sdk.scope)
+
+  const covers = (projectID: string | undefined) =>
+    permissions.autoApproves(projectSettingsKey(input.sdk.scope, projectID))
+
   const state = { disposed: false, generation: 0, responded: new Set<string>() }
 
   const unsubscribe = input.sdk.event.on("permission.asked", (event) => {
-    void approve(event.data, event.location?.directory)
+    if (enabled()) consider(event.data)
   })
 
   onCleanup(() => {
@@ -42,10 +47,7 @@ export function createPermissionAutoApprover(input: { sdk: ServerSDK; data: Data
     if (!enabled()) return
 
     for (const session of input.data.session.list()) {
-      for (const request of input.data.session.permission.list(session.id) ?? []) {
-        if (!input.policy.autoApproves(request.sessionID, session.location.directory)) continue
-        void approve(request, session.location.directory)
-      }
+      for (const request of input.data.session.permission.list(session.id) ?? []) approve(request)
     }
   })
 
@@ -56,13 +58,10 @@ export function createPermissionAutoApprover(input: { sdk: ServerSDK; data: Data
     const complete = await sweep()
 
     if (complete || attempt >= retryLimit) return
-    setTimeout(
-      () => {
-        if (state.disposed || !enabled() || generation !== state.generation) return
-        void sweepWithRetry(generation, attempt + 1)
-      },
-      retryDelayMs * (attempt + 1),
-    )
+    setTimeout(() => {
+      if (state.disposed || !enabled() || generation !== state.generation) return
+      void sweepWithRetry(generation, attempt + 1)
+    }, retryDelayMs * (attempt + 1))
   }
 
   async function sweep() {
@@ -73,7 +72,7 @@ export function createPermissionAutoApprover(input: { sdk: ServerSDK; data: Data
         input.sdk.api.permission.request
           .list({ location: { directory: location.directory } })
           .then((pending) => {
-            if (!state.disposed) pending.data.forEach((request) => void approve(request, location.directory))
+            if (!state.disposed) pending.data.forEach((request) => consider(request))
 
             return true
           })
@@ -120,28 +119,32 @@ export function createPermissionAutoApprover(input: { sdk: ServerSDK; data: Data
     ]
 
     return {
-      locations: [...new Map(locations.map((item) => [item.directory, item])).values()],
+      locations: [
+        ...new Map(locations.map((item) => [item.directory, item])).values(),
+      ],
       complete: active !== undefined && synced.every(Boolean),
     }
   }
 
-  async function approve(permission: PermissionRequest, directory?: string, attempt = 0) {
-    // Recheck the policy after resolving lineage and on every scheduled retry:
-    // the user may disable auto-accept while either is pending.
-    if (state.disposed || state.responded.has(permission.id)) return
+  // A request from a session this client has not loaded needs that session's
+  // project before a per-project choice can apply to it.
+  function consider(permission: PermissionRequest) {
+    if (covers(undefined) || input.data.session.get(permission.sessionID)) return approve(permission)
+    void input.sdk.api.session
+      .get({ sessionID: permission.sessionID })
+      .then((session) => approve(permission, session.projectID))
+      .catch(() => undefined)
+  }
+
+  function approve(
+    permission: PermissionRequest,
+    projectID = input.data.session.get(permission.sessionID)?.projectID,
+    attempt = 0,
+  ) {
+    // covers() guards the retry timer path: the user may disable the setting
+    // between a failed reply and its scheduled retry.
+    if (state.disposed || !covers(projectID) || state.responded.has(permission.id)) return
     remember(permission.id)
-
-    if (!(await input.policy.resolve(permission.sessionID, directory))) {
-      state.responded.delete(permission.id)
-
-      return
-    }
-
-    if (state.disposed || !input.policy.autoApproves(permission.sessionID, directory)) {
-      state.responded.delete(permission.id)
-
-      return
-    }
     input.sdk.api.permission
       .reply({ sessionID: permission.sessionID, requestID: permission.id, decision: "once" })
       .catch(() => {
@@ -151,7 +154,7 @@ export function createPermissionAutoApprover(input: { sdk: ServerSDK; data: Data
         state.responded.delete(permission.id)
 
         if (state.disposed || attempt >= retryLimit) return
-        setTimeout(() => void approve(permission, directory, attempt + 1), retryDelayMs * (attempt + 1))
+        setTimeout(() => approve(permission, projectID, attempt + 1), retryDelayMs * (attempt + 1))
       })
   }
 

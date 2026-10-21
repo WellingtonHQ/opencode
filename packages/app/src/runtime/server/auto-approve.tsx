@@ -14,13 +14,13 @@ export function useAutoApproveToggle(server: Accessor<ServerConnection.Any | und
   return (checked: boolean) => {
     const conn = server()
     if (!conn) return
-    settings.permissions.setAutoApprove(checked)
+    settings.permissions.setAutoApproveDefault(checked)
     void global
       .ensureServerCtx(conn)
       .sdk.api.global["auto-approve"]
       .set({ enabled: checked })
       .catch((error: unknown) => {
-        settings.permissions.setAutoApprove(!checked)
+        settings.permissions.setAutoApproveDefault(!checked)
         showToast({
           variant: "error",
           title: language.t("settings.permissions.toast.updateFailed.title"),
@@ -45,7 +45,7 @@ export function AutoApproveSync(props: { server: Accessor<ServerConnection.Any |
       .get()
       .then((state) => {
         if (run !== sequence) return
-        settings.permissions.setAutoApprove(state.enabled)
+        settings.permissions.setAutoApproveDefault(state.enabled)
       })
       .catch(() => undefined)
   })

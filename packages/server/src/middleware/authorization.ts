@@ -2,9 +2,12 @@ import { Database } from "@opencode/core/database/database"
 import { UnauthorizedError } from "@opencode/protocol/errors"
 import { Authorization } from "@opencode/protocol/middleware/authorization"
 export { Authorization } from "@opencode/protocol/middleware/authorization"
-import { hasPtyConnectTicketURL } from "@opencode/protocol/groups/pty"
-import { hasPersistentPtyConnectTicketURL } from "@opencode/protocol/groups/persistent-pty"
-import { isPairingConnectURL } from "@opencode/protocol/groups/server"
+import { hasPtyConnectTicketURL, PTY_CONNECT_PATH, PTY_CONNECT_TICKET_QUERY } from "@opencode/protocol/groups/pty"
+import {
+  hasPersistentPtyConnectTicketURL,
+  PERSISTENT_PTY_CONNECT_PATH,
+} from "@opencode/protocol/groups/persistent-pty"
+import { isPairingConnectURL, PAIRING_CONNECT_PATH } from "@opencode/protocol/groups/server"
 import { Clock, Effect, Layer, Redacted } from "effect"
 import { Base64 } from "effect/encoding"
 import { HttpEffect, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http"
@@ -161,8 +164,16 @@ export const authorizationLayer = Layer.effect(
     return Authorization.of((effect) =>
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
-        // These handlers consume and validate their own single-use ticket or pairing code.
-        if (ticketed(request)) return yield* effect
+        const route = yield* HttpRouter.RouteContext
+        // These handlers consume and validate their own single-use ticket or pairing code. Use the
+        // route selected by Effect so authorization and dispatch cannot disagree about the request path.
+        const url = new URL(request.url, "http://localhost")
+        if (
+          ((route.route.path === PTY_CONNECT_PATH || route.route.path === PERSISTENT_PTY_CONNECT_PATH) &&
+            !!url.searchParams.get(PTY_CONNECT_TICKET_QUERY)) ||
+          route.route.path === PAIRING_CONNECT_PATH
+        )
+          return yield* effect
         const result = yield* authorizedRequest(request, config, rateLimit, database.db)
         if (result.authorized) return yield* effect
         yield* HttpEffect.appendPreResponseHandler((_request, response) =>

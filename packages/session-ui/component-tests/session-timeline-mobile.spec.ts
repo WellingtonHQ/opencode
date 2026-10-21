@@ -18,14 +18,13 @@ story.describe("touch timeline", () => {
       await expect(actions.getByRole("button", { name: action.name, exact: true })).toBeVisible()
     }
 
-    await expect(timeline.locator('[data-slot="user-message-meta"]')).toContainText("Build")
+    // Agent and model are omitted on mobile, leaving only the time and duration.
+    await expect(timeline.locator('[data-slot="user-message-meta"]')).toHaveCount(0)
     await expect(timeline.locator('[data-slot="user-message-meta-tail"]')).not.toBeEmpty()
-    await expect(timeline.locator('[data-slot="text-part-meta"]')).toContainText("Build")
-    await expect(timeline.locator('[data-slot="text-part-meta"]')).toContainText("Sonnet")
-    const timestamp = await page.evaluate(() =>
-      new Intl.DateTimeFormat("en", { dateStyle: "short", timeStyle: "medium" }).format(1_735_689_636_000),
-    )
-    await expect(timeline.locator('[data-slot="text-part-meta"]')).toContainText(timestamp)
+    const responseMeta = timeline.locator('[data-slot="text-part-meta"]')
+    await expect(responseMeta).not.toBeEmpty()
+    await expect(responseMeta).not.toContainText("Build")
+    await expect(responseMeta).not.toContainText("Sonnet")
   })
 
   story("keeps shell copy visible without hover", async ({ mount }) => {

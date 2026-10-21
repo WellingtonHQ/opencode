@@ -157,7 +157,7 @@ export function SchedulePanel(props: { server: ServerConnection.Any; defaultDire
   }
 
   const policyIndicator = () => {
-    const enabled = settings.permissions.autoApprove()
+    const enabled = settings.permissions.autoApproveDefault()
     return (
       <Tooltip
         placement="top"
