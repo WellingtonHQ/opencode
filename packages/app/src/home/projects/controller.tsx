@@ -2,7 +2,7 @@ import { useDirectoryPicker } from "@/workspaces/selection/picker"
 import { useServerActionsController } from "@/servers/registry/controller"
 import { useSettingsCommand } from "@/settings/command"
 import { useSettingsSurface } from "@/settings/surface"
-import { type LocalProject } from "@/shell/state/layout"
+import { useLayout, type LocalProject } from "@/shell/state/layout"
 import { useLanguage } from "@/runtime/i18n/language"
 import { usePlatform } from "@/runtime/platform/platform"
 import { ServerConnection } from "@/runtime/server/registry"
@@ -11,7 +11,6 @@ import { Persist, persisted } from "@/runtime/persistence/storage"
 import { showToast } from "@/shell/notifications/toast"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { createEffect, createResource, on } from "solid-js"
-import { createStore } from "solid-js/store"
 import { Schema } from "effect"
 import { Persistence } from "@/runtime/persistence/schema"
 import type { HomeController } from "../model"
@@ -32,14 +31,14 @@ export function createHomeProjectsController(home: HomeController) {
   const serverManagement = useServerActionsController()
   const global = useGlobal()
   const revealProject = useRevealProject()
+  const layout = useLayout()
   const [_state, setState, _, ready] = persisted(Persist.global("home.servers"), HomeServersSchema, { collapsed: {} })
-  const [schedules, setSchedules] = createStore({ open: false })
 
   createEffect(
     on(
       home.selection.value,
       () => {
-        if (schedules.open) setSchedules("open", false)
+        if (layout.home.schedules.open()) layout.home.schedules.setOpen(false)
       },
       { defer: true },
     ),
@@ -195,8 +194,8 @@ export function createHomeProjectsController(home: HomeController) {
       settings: openSettings,
       help: () => platform.openExternal("https://opencode.ai/desktop-feedback"),
       schedules: {
-        open: () => schedules.open,
-        toggle: () => setSchedules("open", !schedules.open),
+        open: layout.home.schedules.open,
+        toggle: layout.home.schedules.toggle,
       },
     },
   }

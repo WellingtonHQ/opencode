@@ -597,6 +597,19 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                             <Icon name="grid-plus" />
                             {language.t("home.title")}
                           </Menu.Item>
+                          <Menu.Item
+                            onSelect={() => {
+                              if (layout.route().type !== "home") {
+                                toggleHome()
+                                layout.home.schedules.setOpen(true)
+                                return
+                              }
+                              layout.home.schedules.toggle()
+                            }}
+                          >
+                            <Icon name="status" size="small" />
+                            {language.t("sidebar.schedules")}
+                          </Menu.Item>
                           <Menu.Item onSelect={openSettings}>
                             <Icon name="settings-gear" size="small" />
                             {language.t("sidebar.settings")}
