@@ -256,7 +256,9 @@ export type ScheduleSpecWeekly = { kind: "weekly"; days: Array<number>; hour: nu
 
 export type ScheduleSpecCron = { kind: "cron"; expr: string }
 
-export type ScheduleRunStatus = "running" | "completed" | "failed"
+export type ScheduleSessionMode = "new" | "reuse"
+
+export type ScheduleRunStatus = "running" | "completed" | "failed" | "skipped"
 
 export type GlobalAutoApprove = { enabled: boolean }
 
@@ -2022,6 +2024,7 @@ export type ScheduleChanged = {
       name?: string
       prompt: string
       spec: ScheduleSpec
+      session: ScheduleSessionMode
       timezone: string
       agentId?: AgentID
       model?: ModelRef
@@ -5444,6 +5447,7 @@ export type ScheduleListOutput = Array<{
   name?: string
   prompt: string
   spec: ScheduleSpec
+  session: ScheduleSessionMode
   timezone: string
   agentId?: AgentID
   model?: ModelRef
@@ -5471,6 +5475,7 @@ export type ScheduleGetOutput = {
   name?: string
   prompt: string
   spec: ScheduleSpec
+  session: ScheduleSessionMode
   timezone: string
   agentId?: AgentID
   model?: ModelRef
@@ -5505,6 +5510,7 @@ export type ScheduleCreateInput = {
           readonly minute: number
         }
       | { readonly kind: "cron"; readonly expr: string }
+    readonly session?: "new" | "reuse"
     readonly timezone?: string | null
     readonly agentId?: string
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
@@ -5523,6 +5529,7 @@ export type ScheduleCreateInput = {
           readonly minute: number
         }
       | { readonly kind: "cron"; readonly expr: string }
+    readonly session?: "new" | "reuse"
     readonly timezone?: string | null
     readonly agentId?: string
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
@@ -5541,11 +5548,31 @@ export type ScheduleCreateInput = {
           readonly minute: number
         }
       | { readonly kind: "cron"; readonly expr: string }
+    readonly session?: "new" | "reuse"
     readonly timezone?: string | null
     readonly agentId?: string
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
     readonly directory: string
   }["spec"]
+  readonly session?: {
+    readonly name?: string
+    readonly prompt: string
+    readonly spec:
+      | { readonly kind: "once"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
+      | {
+          readonly kind: "weekly"
+          readonly days: ReadonlyArray<number>
+          readonly hour: number
+          readonly minute: number
+        }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly session?: "new" | "reuse"
+    readonly timezone?: string | null
+    readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
+    readonly directory: string
+  }["session"]
   readonly timezone?: {
     readonly name?: string
     readonly prompt: string
@@ -5559,6 +5586,7 @@ export type ScheduleCreateInput = {
           readonly minute: number
         }
       | { readonly kind: "cron"; readonly expr: string }
+    readonly session?: "new" | "reuse"
     readonly timezone?: string | null
     readonly agentId?: string
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
@@ -5577,6 +5605,7 @@ export type ScheduleCreateInput = {
           readonly minute: number
         }
       | { readonly kind: "cron"; readonly expr: string }
+    readonly session?: "new" | "reuse"
     readonly timezone?: string | null
     readonly agentId?: string
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
@@ -5595,6 +5624,7 @@ export type ScheduleCreateInput = {
           readonly minute: number
         }
       | { readonly kind: "cron"; readonly expr: string }
+    readonly session?: "new" | "reuse"
     readonly timezone?: string | null
     readonly agentId?: string
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
@@ -5613,6 +5643,7 @@ export type ScheduleCreateInput = {
           readonly minute: number
         }
       | { readonly kind: "cron"; readonly expr: string }
+    readonly session?: "new" | "reuse"
     readonly timezone?: string | null
     readonly agentId?: string
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
@@ -5625,6 +5656,7 @@ export type ScheduleCreateOutput = {
   name?: string
   prompt: string
   spec: ScheduleSpec
+  session: ScheduleSessionMode
   timezone: string
   agentId?: AgentID
   model?: ModelRef
@@ -5660,6 +5692,7 @@ export type ScheduleUpdateInput = {
           readonly minute: number
         }
       | { readonly kind: "cron"; readonly expr: string }
+    readonly session?: "new" | "reuse"
     readonly timezone?: string | null
     readonly agentId?: string
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
@@ -5679,6 +5712,7 @@ export type ScheduleUpdateInput = {
           readonly minute: number
         }
       | { readonly kind: "cron"; readonly expr: string }
+    readonly session?: "new" | "reuse"
     readonly timezone?: string | null
     readonly agentId?: string
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
@@ -5698,12 +5732,33 @@ export type ScheduleUpdateInput = {
           readonly minute: number
         }
       | { readonly kind: "cron"; readonly expr: string }
+    readonly session?: "new" | "reuse"
     readonly timezone?: string | null
     readonly agentId?: string
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
     readonly directory?: string
     readonly enabled?: boolean
   }["spec"]
+  readonly session?: {
+    readonly name?: string
+    readonly prompt?: string
+    readonly spec?:
+      | { readonly kind: "once"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
+      | {
+          readonly kind: "weekly"
+          readonly days: ReadonlyArray<number>
+          readonly hour: number
+          readonly minute: number
+        }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly session?: "new" | "reuse"
+    readonly timezone?: string | null
+    readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
+    readonly directory?: string
+    readonly enabled?: boolean
+  }["session"]
   readonly timezone?: {
     readonly name?: string
     readonly prompt?: string
@@ -5717,6 +5772,7 @@ export type ScheduleUpdateInput = {
           readonly minute: number
         }
       | { readonly kind: "cron"; readonly expr: string }
+    readonly session?: "new" | "reuse"
     readonly timezone?: string | null
     readonly agentId?: string
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
@@ -5736,6 +5792,7 @@ export type ScheduleUpdateInput = {
           readonly minute: number
         }
       | { readonly kind: "cron"; readonly expr: string }
+    readonly session?: "new" | "reuse"
     readonly timezone?: string | null
     readonly agentId?: string
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
@@ -5755,6 +5812,7 @@ export type ScheduleUpdateInput = {
           readonly minute: number
         }
       | { readonly kind: "cron"; readonly expr: string }
+    readonly session?: "new" | "reuse"
     readonly timezone?: string | null
     readonly agentId?: string
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
@@ -5774,6 +5832,7 @@ export type ScheduleUpdateInput = {
           readonly minute: number
         }
       | { readonly kind: "cron"; readonly expr: string }
+    readonly session?: "new" | "reuse"
     readonly timezone?: string | null
     readonly agentId?: string
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
@@ -5793,6 +5852,7 @@ export type ScheduleUpdateInput = {
           readonly minute: number
         }
       | { readonly kind: "cron"; readonly expr: string }
+    readonly session?: "new" | "reuse"
     readonly timezone?: string | null
     readonly agentId?: string
     readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
@@ -5806,6 +5866,7 @@ export type ScheduleUpdateOutput = {
   name?: string
   prompt: string
   spec: ScheduleSpec
+  session: ScheduleSessionMode
   timezone: string
   agentId?: AgentID
   model?: ModelRef
@@ -5833,6 +5894,7 @@ export type ScheduleRemoveOutput = {
   name?: string
   prompt: string
   spec: ScheduleSpec
+  session: ScheduleSessionMode
   timezone: string
   agentId?: AgentID
   model?: ModelRef
@@ -5860,6 +5922,7 @@ export type ScheduleRunNowOutput = {
   name?: string
   prompt: string
   spec: ScheduleSpec
+  session: ScheduleSessionMode
   timezone: string
   agentId?: AgentID
   model?: ModelRef

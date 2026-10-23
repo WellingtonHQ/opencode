@@ -8193,6 +8193,9 @@
                       "spec": {
                         "$ref": "#/components/schemas/Schedule.Spec"
                       },
+                      "session": {
+                        "$ref": "#/components/schemas/Schedule.SessionMode"
+                      },
                       "timezone": {
                         "type": "string"
                       },
@@ -8264,7 +8267,7 @@
                         ]
                       }
                     },
-                    "required": ["id", "prompt", "spec", "timezone", "directory", "enabled", "runCount"],
+                    "required": ["id", "prompt", "spec", "session", "timezone", "directory", "enabled", "runCount"],
                     "additionalProperties": false
                   }
                 }
@@ -8319,6 +8322,9 @@
                     },
                     "spec": {
                       "$ref": "#/components/schemas/Schedule.Spec"
+                    },
+                    "session": {
+                      "$ref": "#/components/schemas/Schedule.SessionMode"
                     },
                     "timezone": {
                       "type": "string"
@@ -8391,7 +8397,7 @@
                       ]
                     }
                   },
-                  "required": ["id", "prompt", "spec", "timezone", "directory", "enabled", "runCount"],
+                  "required": ["id", "prompt", "spec", "session", "timezone", "directory", "enabled", "runCount"],
                   "additionalProperties": false
                 }
               }
@@ -8444,6 +8450,9 @@
                   },
                   "spec": {
                     "$ref": "#/components/schemas/Schedule.Spec"
+                  },
+                  "session": {
+                    "$ref": "#/components/schemas/Schedule.SessionMode"
                   },
                   "timezone": {
                     "anyOf": [
@@ -8509,6 +8518,9 @@
                     "spec": {
                       "$ref": "#/components/schemas/Schedule.Spec"
                     },
+                    "session": {
+                      "$ref": "#/components/schemas/Schedule.SessionMode"
+                    },
                     "timezone": {
                       "type": "string"
                     },
@@ -8580,7 +8592,7 @@
                       ]
                     }
                   },
-                  "required": ["id", "prompt", "spec", "timezone", "directory", "enabled", "runCount"],
+                  "required": ["id", "prompt", "spec", "session", "timezone", "directory", "enabled", "runCount"],
                   "additionalProperties": false
                 }
               }
@@ -8654,6 +8666,9 @@
                     "spec": {
                       "$ref": "#/components/schemas/Schedule.Spec"
                     },
+                    "session": {
+                      "$ref": "#/components/schemas/Schedule.SessionMode"
+                    },
                     "timezone": {
                       "type": "string"
                     },
@@ -8725,7 +8740,7 @@
                       ]
                     }
                   },
-                  "required": ["id", "prompt", "spec", "timezone", "directory", "enabled", "runCount"],
+                  "required": ["id", "prompt", "spec", "session", "timezone", "directory", "enabled", "runCount"],
                   "additionalProperties": false
                 }
               }
@@ -8778,6 +8793,9 @@
                   },
                   "spec": {
                     "$ref": "#/components/schemas/Schedule.Spec"
+                  },
+                  "session": {
+                    "$ref": "#/components/schemas/Schedule.SessionMode"
                   },
                   "timezone": {
                     "anyOf": [
@@ -8850,6 +8868,9 @@
                     "spec": {
                       "$ref": "#/components/schemas/Schedule.Spec"
                     },
+                    "session": {
+                      "$ref": "#/components/schemas/Schedule.SessionMode"
+                    },
                     "timezone": {
                       "type": "string"
                     },
@@ -8921,7 +8942,7 @@
                       ]
                     }
                   },
-                  "required": ["id", "prompt", "spec", "timezone", "directory", "enabled", "runCount"],
+                  "required": ["id", "prompt", "spec", "session", "timezone", "directory", "enabled", "runCount"],
                   "additionalProperties": false
                 }
               }
@@ -8997,6 +9018,9 @@
                     "spec": {
                       "$ref": "#/components/schemas/Schedule.Spec"
                     },
+                    "session": {
+                      "$ref": "#/components/schemas/Schedule.SessionMode"
+                    },
                     "timezone": {
                       "type": "string"
                     },
@@ -9068,7 +9092,7 @@
                       ]
                     }
                   },
-                  "required": ["id", "prompt", "spec", "timezone", "directory", "enabled", "runCount"],
+                  "required": ["id", "prompt", "spec", "session", "timezone", "directory", "enabled", "runCount"],
                   "additionalProperties": false
                 }
               }
@@ -19513,7 +19537,11 @@
       },
       "Schedule.Run.Status": {
         "type": "string",
-        "enum": ["running", "completed", "failed"]
+        "enum": ["running", "completed", "failed", "skipped"]
+      },
+      "Schedule.SessionMode": {
+        "type": "string",
+        "enum": ["new", "reuse"]
       },
       "Schedule.Spec": {
         "anyOf": [

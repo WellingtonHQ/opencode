@@ -18,6 +18,7 @@ describe("schedule command", () => {
     expect(results[1]?.stdout).toContain("run-now")
     expect(results[2]?.stdout).toContain('"yyyy-MM-dd HH:mm"')
     expect(results[2]?.stdout).toContain("Days and local time")
+    expect(results[2]?.stdout).toContain('"new" starts a fresh session each run')
     expect(results[2]?.stdout).toContain("--username")
     expect(results[2]?.stdout).toContain("--password")
   })
@@ -47,6 +48,7 @@ describe("schedule command", () => {
             id: "task_cli_create",
             prompt: "Summarize the open PRs",
             spec: { kind: "daily", hour: 9, minute: 30 },
+            session: "reuse",
             timezone,
             directory: process.cwd(),
             enabled: true,
@@ -87,6 +89,7 @@ describe("schedule command", () => {
       expect(requests[1]?.body).toMatchObject({
         prompt: "Summarize the open PRs",
         spec: { kind: "daily", hour: 9, minute: 30 },
+        session: "reuse",
         timezone: "UTC",
         directory: process.cwd(),
       })
@@ -112,6 +115,7 @@ describe("schedule command", () => {
               id: "task_cli_list",
               prompt: "Summarize the open PRs",
               spec: { kind: "daily", hour: 9, minute: 30 },
+              session: "reuse",
               timezone,
               directory: process.cwd(),
               enabled: true,
@@ -129,6 +133,7 @@ describe("schedule command", () => {
       })
       expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: "" })
       expect(result.stdout).toContain(`Daily at 09:30 (${timezone})`)
+      expect(result.stdout).toContain("Session")
       expect(result.stdout).toContain(
         new Intl.DateTimeFormat(undefined, {
           timeZone: timezone,
@@ -163,6 +168,7 @@ describe("schedule command", () => {
             id: taskID,
             prompt: "Summarize the open PRs",
             spec: { kind: "daily", hour: 9, minute: 30 },
+            session: "reuse",
             timezone: "UTC",
             directory: process.cwd(),
             enabled: true,
@@ -179,6 +185,40 @@ describe("schedule command", () => {
       expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: "" })
       expect(result.stdout).toContain(`Started run for ${taskID}`)
       expect(result.stdout).not.toContain(previousError)
+    } finally {
+      await server.stop(true)
+    }
+  })
+
+  test("run-now reports a skipped run when the shared session is busy", async () => {
+    await using root = await tmpdir("opencode-cli-schedule-")
+    const taskID = "task_cli_skip"
+    const server = Bun.serve({
+      port: 0,
+      fetch(request) {
+        const url = new URL(request.url)
+        if (url.pathname === "/api/info")
+          return Response.json({ version: OPENCODE_VERSION, pid: process.pid, urls: [], paths: { tmp: "/tmp" } })
+        if (url.pathname === `/api/schedule/${taskID}/run-now`)
+          return Response.json({
+            id: taskID,
+            prompt: "Summarize the open PRs",
+            spec: { kind: "daily", hour: 9, minute: 30 },
+            session: "reuse",
+            timezone: "UTC",
+            directory: process.cwd(),
+            enabled: true,
+            runCount: 2,
+            recentRuns: [{ taskID, status: "skipped", startedAtMs: Date.now() }],
+          } satisfies ScheduleListOutput[number])
+        return new Response("Not found", { status: 404 })
+      },
+    })
+
+    try {
+      const result = await cli(["schedule", "run-now", taskID, "--server", server.url.toString()], root.path)
+      expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: "" })
+      expect(result.stdout).toContain(`Skipped run for ${taskID}`)
     } finally {
       await server.stop(true)
     }

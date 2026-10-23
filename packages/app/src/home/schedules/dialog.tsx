@@ -64,6 +64,7 @@ export const DialogSchedule: Component<{
     prompt: props.task?.prompt ?? "",
     // Existing schedules keep the saved IANA zone; the sidebar's selected project only seeds new schedules.
     directory: props.task ? props.task.directory : props.defaultDirectory || "",
+    session: props.task?.session ?? "reuse",
     timezone,
     agentId: props.task?.agentId as string | undefined,
     modelKey: props.task?.model ? `${String(props.task.model.providerID)}:${props.task.model.id}` : DEFAULT_MODEL_KEY,
@@ -203,6 +204,7 @@ export const DialogSchedule: Component<{
       name: form.name.trim() || undefined,
       prompt,
       spec: built.spec,
+      session: form.session,
       timezone: form.timezone,
       agentId: form.agentId ? (form.agentId as Agent.ID) : undefined,
       directory: form.directory as AbsolutePath,
@@ -290,6 +292,23 @@ export const DialogSchedule: Component<{
               label={(option) => option.name}
               onSelect={(option) => setForm("modelKey", option?.key ?? DEFAULT_MODEL_KEY)}
             />
+          </Field>
+
+          <Field>
+            <Field.Label>{language.t("schedule.dialog.session.label")}</Field.Label>
+            <SegmentedControl
+              class="segmented-control-v2--auto"
+              value={form.session}
+              disabled={form.busy}
+              onChange={(value) => {
+                if (!value) return
+                setForm("session", value as Schedule.SessionMode)
+              }}
+            >
+              <SegmentedControlItem value="new">{language.t("schedule.dialog.session.new")}</SegmentedControlItem>
+              <SegmentedControlItem value="reuse">{language.t("schedule.dialog.session.reuse")}</SegmentedControlItem>
+            </SegmentedControl>
+            <span class="text-12-medium text-text-weak">{language.t("schedule.dialog.session.hint")}</span>
           </Field>
 
           <SegmentedControl

@@ -12,6 +12,7 @@ export const ScheduleTaskTable = sqliteTable(
     id: text().$type<Schedule.ID>().primaryKey(),
     name: text(),
     prompt: text().notNull(),
+    session: text().$type<Schedule.SessionMode>().notNull().default("new"),
     kind: text().$type<Schedule.Kind>().notNull(),
     timezone: text().$type<Schedule.TimeZone>().notNull(),
     at_ms: integer(),

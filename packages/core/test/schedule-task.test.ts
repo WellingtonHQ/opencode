@@ -62,6 +62,19 @@ const failedExecution = Layer.succeed(
   }),
 )
 const failing = testEffect(node(failedExecution))
+// Reports the session as actively executing, so a second run must skip.
+const pendingExecution = Layer.succeed(
+  SessionExecution.Service,
+  SessionExecution.Service.of({
+    active: Effect.succeed(new Set()),
+    isActive: () => Effect.succeed(true),
+    resume: () => Effect.void,
+    wake: () => Effect.void,
+    interrupt: () => Effect.succeed(false),
+    awaitIdle: () => Effect.void,
+  }),
+)
+const pending = testEffect(node(pendingExecution))
 
 const directory = AbsolutePath.make("/schedules")
 
@@ -284,6 +297,136 @@ describe("ScheduleTask", () => {
         location: { directory },
       })
       expect(yield* sessions.inbox(sessionID)).toMatchObject([{ type: "user", payload: { text: "standup" } }])
+    }),
+  )
+
+  it.effect("defaults new tasks to the reuse session mode and stores an explicit mode", () =>
+    Effect.gen(function* () {
+      const tasks = yield* ScheduleTask.Service
+      const created = yield* tasks.create({ prompt: "modes", spec: { kind: "daily", hour: 9, minute: 0 }, directory })
+      expect(created.session).toBe("reuse")
+
+      const updated = yield* tasks.update(created.id, { session: "new" })
+      if (updated === undefined) throw new Error("update returned no record for an existing task")
+      expect(updated.session).toBe("new")
+    }),
+  )
+
+  it.effect("reuses one session across runs in reuse mode", () =>
+    Effect.gen(function* () {
+      const tasks = yield* ScheduleTask.Service
+      const bus = yield* Bus.Service
+      const sessions = yield* Session.Service
+      const created = yield* tasks.create({ prompt: "standup", spec: { kind: "once", atMs: Date.now() + 60_000 }, directory })
+
+      const first = yield* fireAndAwait(tasks, bus, created.id)
+      const firstSession = first.lastSessionId
+      if (firstSession === undefined) throw new Error("the first run has no Session ID")
+
+      const second = yield* fireAndAwait(tasks, bus, created.id)
+      expect(second.lastSessionId).toBe(firstSession)
+      expect(yield* sessions.inbox(firstSession)).toMatchObject([
+        { type: "user", payload: { text: "standup" } },
+        { type: "user", payload: { text: "standup" } },
+      ])
+    }),
+  )
+
+  it.effect("creates a new session per run in new mode", () =>
+    Effect.gen(function* () {
+      const tasks = yield* ScheduleTask.Service
+      const bus = yield* Bus.Service
+      const created = yield* tasks.create({
+        prompt: "fresh",
+        session: "new",
+        spec: { kind: "once", atMs: Date.now() + 60_000 },
+        directory,
+      })
+
+      const first = yield* fireAndAwait(tasks, bus, created.id)
+      const firstSession = first.lastSessionId
+      if (firstSession === undefined) throw new Error("the first run has no Session ID")
+
+      const second = yield* fireAndAwait(tasks, bus, created.id)
+      expect(second.lastSessionId).toBeDefined()
+      expect(second.lastSessionId).not.toBe(firstSession)
+    }),
+  )
+
+  pending.effect("skips a run while the previous run's session is still busy", () =>
+    Effect.gen(function* () {
+      const tasks = yield* ScheduleTask.Service
+      const bus = yield* Bus.Service
+      const created = yield* tasks.create({ prompt: "busy", spec: { kind: "once", atMs: Date.now() + 60_000 }, directory })
+
+      const firstListener = yield* bus.subscribe(Schedule.Event.Changed).pipe(
+        Stream.filter(
+          (event) => event.data.info.id === created.id && event.data.info.recentRuns?.[0]?.status === "completed",
+        ),
+        Stream.take(1),
+        Stream.runCollect,
+        Effect.forkScoped,
+      )
+      yield* Effect.yieldNow
+      yield* tasks.runNow(created.id)
+      const [first] = Array.from(yield* Fiber.join(firstListener))
+      if (first === undefined) throw new Error("the first run never completed")
+      const firstSession = first.data.info.lastSessionId
+      if (firstSession === undefined) throw new Error("the first run has no Session ID")
+
+      const skipListener = yield* bus.subscribe(Schedule.Event.Changed).pipe(
+        Stream.filter(
+          (event) => event.data.info.id === created.id && event.data.info.recentRuns?.[0]?.status === "skipped",
+        ),
+        Stream.take(1),
+        Stream.runCollect,
+        Effect.forkScoped,
+      )
+      yield* Effect.yieldNow
+      yield* tasks.runNow(created.id)
+      const [skip] = Array.from(yield* Fiber.join(skipListener))
+      if (skip === undefined) throw new Error("the second run was never recorded as skipped")
+      expect(skip.data.info.recentRuns?.[0]).toMatchObject({ status: "skipped", sessionID: firstSession })
+      expect(skip.data.info.lastSessionId).toBe(firstSession)
+      expect(skip.data.info.lastError).toBeUndefined()
+    }),
+  )
+
+  it.effect("starts a new session when the reused session is removed", () =>
+    Effect.gen(function* () {
+      const tasks = yield* ScheduleTask.Service
+      const bus = yield* Bus.Service
+      const sessions = yield* Session.Service
+      const created = yield* tasks.create({ prompt: "standup", spec: { kind: "once", atMs: Date.now() + 60_000 }, directory })
+
+      const first = yield* fireAndAwait(tasks, bus, created.id)
+      const firstSession = first.lastSessionId
+      if (firstSession === undefined) throw new Error("the first run has no Session ID")
+
+      yield* sessions.remove(firstSession)
+
+      const second = yield* fireAndAwait(tasks, bus, created.id)
+      expect(second.lastSessionId).toBeDefined()
+      expect(second.lastSessionId).not.toBe(firstSession)
+    }),
+  )
+
+  it.effect("starts a new session when the reused session is archived", () =>
+    Effect.gen(function* () {
+      const tasks = yield* ScheduleTask.Service
+      const bus = yield* Bus.Service
+      const sessions = yield* Session.Service
+      const created = yield* tasks.create({ prompt: "standup", spec: { kind: "once", atMs: Date.now() + 60_000 }, directory })
+
+      const first = yield* fireAndAwait(tasks, bus, created.id)
+      const firstSession = first.lastSessionId
+      if (firstSession === undefined) throw new Error("the first run has no Session ID")
+
+      yield* sessions.archive(firstSession)
+
+      const second = yield* fireAndAwait(tasks, bus, created.id)
+      expect(second.lastSessionId).toBeDefined()
+      expect(second.lastSessionId).not.toBe(firstSession)
     }),
   )
 

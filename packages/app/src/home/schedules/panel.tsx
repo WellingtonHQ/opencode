@@ -130,6 +130,8 @@ export function SchedulePanel(props: { server: ServerConnection.Any; defaultDire
         return language.t("schedule.status.completed")
       case "failed":
         return language.t("schedule.status.failed")
+      case "skipped":
+        return language.t("schedule.status.skipped")
     }
   }
 
@@ -143,6 +145,8 @@ export function SchedulePanel(props: { server: ServerConnection.Any; defaultDire
         <Spinner class="size-2.5 text-icon-base" />
       ) : run.status === "completed" ? (
         <Icon name="circle-check" class="size-3 text-icon-success-base" />
+      ) : run.status === "skipped" ? (
+        <Icon name="circle-ban-sign" class="size-3 text-icon-base" />
       ) : (
         <Icon name="warning" class="size-3 text-icon-critical-base" />
       )

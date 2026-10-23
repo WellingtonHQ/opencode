@@ -24,3 +24,22 @@ describe("Schedule.Spec", () => {
     expect(() => decode({ kind: "weekly", days: [], hour: 9, minute: 0 })).toThrow()
   })
 })
+
+describe("Schedule.CreateInput", () => {
+  test("accepts an optional session mode and rejects unknown modes", () => {
+    const decode = Schema.decodeUnknownSync(Schedule.CreateInput)
+    const input = { prompt: "standup", spec: { kind: "daily", hour: 9, minute: 0 }, directory: "/project" }
+    expect(decode(input).session).toBeUndefined()
+    expect(decode({ ...input, session: "reuse" }).session).toBe("reuse")
+    expect(() => decode({ ...input, session: "fork" })).toThrow()
+  })
+})
+
+describe("Schedule.Run", () => {
+  test("accepts a skipped run status", () => {
+    const decode = Schema.decodeUnknownSync(Schedule.Run)
+    const run = { taskID: "task_test", status: "skipped", startedAtMs: 1 }
+    expect(decode(run).status).toBe("skipped")
+    expect(() => decode({ ...run, status: "cancelled" })).toThrow()
+  })
+})

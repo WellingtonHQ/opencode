@@ -1,6 +1,6 @@
 export * as ScheduleTask from "./schedule.js"
 
-import { asc, and, desc, eq, lte, notInArray, sql } from "drizzle-orm"
+import { asc, and, desc, eq, lte, ne, notInArray, sql } from "drizzle-orm"
 import { Cause, Context, Duration, Effect, Exit, Layer, Scope, Schema } from "effect"
 import { Schedule } from "@opencode/schema/schedule"
 import { Identifier } from "@opencode/schema/identifier"
@@ -12,6 +12,7 @@ import { ScheduleRunTable, ScheduleTaskTable } from "./schedule/sql.js"
 import { nextRunAt } from "./schedule/time.js"
 import { Session } from "./session.js"
 import { SessionEvent } from "./session/event.js"
+import { SessionExecution } from "./session/execution.js"
 import { SessionTable } from "./session/sql.js"
 
 export const ID = Schedule.ID
@@ -57,6 +58,7 @@ const layer = Layer.effect(
     const { db } = yield* Database.Service
     const bus = yield* Bus.Service
     const sessions = yield* Session.Service
+    const execution = yield* SessionExecution.Service
     const scope = yield* Scope.Scope
 
     const runFrom = (row: RunRow): Schedule.Run => ({
@@ -87,6 +89,7 @@ const layer = Layer.effect(
         ...(row.name ? { name: row.name } : {}),
         prompt: row.prompt,
         spec: specFrom(row),
+        session: row.session,
         timezone: row.timezone,
         ...(row.agent_id ? { agentId: row.agent_id } : {}),
         ...(row.model ? { model: row.model } : {}),
@@ -207,6 +210,38 @@ const layer = Layer.effect(
       return yield* computeNext(spec, anchorMs, timezone)
     })
 
+    // Resolves the session a reuse-mode run should prompt. A missing or archived stored
+    // session falls back to a fresh one. When the shared session is still executing —
+    // an open run from a previous fire or an active execution — this run is recorded
+    // as skipped.
+    const resolveReuse = Effect.fn("ScheduleTask.resolveReuse")(function* (row: Row, runID: string) {
+      if (row.session !== "reuse" || row.last_session_id === null) return undefined
+      const session = yield* db
+        .select({ id: SessionTable.id, archived: SessionTable.time_archived })
+        .from(SessionTable)
+        .where(eq(SessionTable.id, row.last_session_id))
+        .get()
+        .pipe(Effect.orDie)
+      if (session === undefined || session.archived !== null) return undefined
+      const open = yield* db
+        .select({ id: ScheduleRunTable.id })
+        .from(ScheduleRunTable)
+        .where(
+          and(
+            eq(ScheduleRunTable.task_id, row.id),
+            eq(ScheduleRunTable.status, "running"),
+            ne(ScheduleRunTable.id, runID),
+          ),
+        )
+        .get()
+        .pipe(Effect.orDie)
+      const busy = open !== undefined || (yield* execution.isActive(row.last_session_id))
+      if (!busy) return row.last_session_id
+      const taskID = yield* finishRun(runID, row.last_session_id, "skipped", undefined, Date.now())
+      if (taskID) yield* announceTask(taskID)
+      return "skipped"
+    })
+
     // Claims the row by conditionally bumping its next run time; a concurrent tick that moves the
     // timestamp first makes this update match no rows and the claim is lost.
     const fire = Effect.fn("ScheduleTask.fire")(function* (row: Row, claimNextMs?: number) {
@@ -270,15 +305,22 @@ const layer = Layer.effect(
       // Execution is forked into the service scope so tick never blocks and run-now responses
       // return before the prompt finishes.
       yield* Effect.gen(function* () {
-        const created = yield* Effect.exit(
-          sessions.create({
-            title,
-            location: Location.Ref.make({ directory: claimedRow.directory }),
-            ...(claimedRow.agent_id ? { agent: claimedRow.agent_id } : {}),
-            ...(claimedRow.model ? { model: claimedRow.model } : {}),
-          }),
-        )
-        const sessionID = Exit.isSuccess(created) ? created.value.id : undefined
+        const reuse = yield* resolveReuse(claimedRow, runID)
+        if (reuse === "skipped") return
+        const created =
+          reuse === undefined
+            ? yield* Effect.exit(
+                sessions
+                  .create({
+                    title,
+                    location: Location.Ref.make({ directory: claimedRow.directory }),
+                    ...(claimedRow.agent_id ? { agent: claimedRow.agent_id } : {}),
+                    ...(claimedRow.model ? { model: claimedRow.model } : {}),
+                  })
+                  .pipe(Effect.map((info) => info.id)),
+              )
+            : Exit.succeed(reuse)
+        const sessionID = Exit.isSuccess(created) ? created.value : undefined
         const exit = Exit.isFailure(created)
           ? created
           : yield* Effect.gen(function* () {
@@ -287,21 +329,21 @@ const layer = Layer.effect(
                   Effect.gen(function* () {
                     yield* db
                       .update(ScheduleRunTable)
-                      .set({ session_id: created.value.id })
+                      .set({ session_id: created.value })
                       .where(eq(ScheduleRunTable.id, runID))
                       .run()
                       .pipe(Effect.orDie)
                     yield* db
                       .update(ScheduleTaskTable)
-                      .set({ last_session_id: created.value.id })
+                      .set({ last_session_id: created.value })
                       .where(eq(ScheduleTaskTable.id, claimedRow.id))
                       .run()
                       .pipe(Effect.orDie)
                   }),
                 )
                 .pipe(Effect.orDie)
-              yield* sessions.prompt({ sessionID: created.value.id, text: claimedRow.prompt, resume: false })
-              yield* sessions.resume(created.value.id)
+              yield* sessions.prompt({ sessionID: created.value, text: claimedRow.prompt, resume: false })
+              yield* sessions.resume(created.value)
             }).pipe(Effect.exit)
         const interrupted = Exit.isFailure(exit) && Cause.hasInterrupts(exit.cause)
         if (interrupted) return
@@ -408,6 +450,7 @@ const layer = Layer.effect(
       create: Effect.fn("ScheduleTask.create")(function* (input) {
         const now = Date.now()
         const timezone = input.timezone ?? localTimeZone()
+        const session = input.session ?? "reuse"
         const next = yield* validateSpec(input.spec, now, timezone)
         const total = yield* db.select({ value: sql<number>`COUNT(*)` }).from(ScheduleTaskTable).get().pipe(Effect.orDie)
         if ((total?.value ?? 0) >= MAX_TASKS)
@@ -419,6 +462,7 @@ const layer = Layer.effect(
             id,
             name: input.name ?? null,
             prompt: input.prompt,
+            session,
             ...specColumns(input.spec),
             timezone,
             agent_id: input.agentId ?? null,
@@ -434,6 +478,7 @@ const layer = Layer.effect(
           ...(input.name !== undefined ? { name: input.name } : {}),
           prompt: input.prompt,
           spec: input.spec,
+          session,
           timezone,
           ...(input.agentId !== undefined ? { agentId: input.agentId } : {}),
           ...(input.model !== undefined ? { model: input.model } : {}),
@@ -462,6 +507,7 @@ const layer = Layer.effect(
             ...(updates.name !== undefined ? { name: updates.name } : {}),
             ...(updates.prompt !== undefined ? { prompt: updates.prompt } : {}),
             ...(updates.spec !== undefined ? specColumns(updates.spec) : {}),
+            ...(updates.session !== undefined ? { session: updates.session } : {}),
             ...(updates.timezone !== undefined ? { timezone: updates.timezone } : {}),
             ...(specNext !== undefined ? { next_run_at_ms: specNext } : {}),
             ...(updates.agentId !== undefined ? { agent_id: updates.agentId } : {}),
@@ -494,4 +540,8 @@ const layer = Layer.effect(
   }),
 )
 
-export const node = makeGlobalNode({ service: Service, layer, deps: [Database.node, Bus.node, Session.node] })
+export const node = makeGlobalNode({
+  service: Service,
+  layer,
+  deps: [Database.node, Bus.node, Session.node, SessionExecution.node],
+})

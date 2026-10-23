@@ -1729,6 +1729,7 @@ export type ScheduleListOutput = ReadonlyArray<{
     | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
     | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly hour: number; readonly minute: number }
     | { readonly kind: "cron"; readonly expr: string }
+  readonly session: "new" | "reuse"
   readonly timezone: string
   readonly agentId?: Agent.ID | undefined
   readonly model?: Model.Ref | undefined
@@ -1743,7 +1744,7 @@ export type ScheduleListOutput = ReadonlyArray<{
     | ReadonlyArray<{
         readonly taskID: Schedule.ID
         readonly sessionID?: Session.ID | undefined
-        readonly status: "running" | "completed" | "failed"
+        readonly status: "running" | "completed" | "failed" | "skipped"
         readonly startedAtMs: number
         readonly finishedAtMs?: number | undefined
         readonly errorText?: string | undefined
@@ -1762,6 +1763,7 @@ export type ScheduleGetOutput = {
     | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
     | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly hour: number; readonly minute: number }
     | { readonly kind: "cron"; readonly expr: string }
+  readonly session: "new" | "reuse"
   readonly timezone: string
   readonly agentId?: Agent.ID | undefined
   readonly model?: Model.Ref | undefined
@@ -1776,7 +1778,7 @@ export type ScheduleGetOutput = {
     | ReadonlyArray<{
         readonly taskID: Schedule.ID
         readonly sessionID?: Session.ID | undefined
-        readonly status: "running" | "completed" | "failed"
+        readonly status: "running" | "completed" | "failed" | "skipped"
         readonly startedAtMs: number
         readonly finishedAtMs?: number | undefined
         readonly errorText?: string | undefined
@@ -1793,6 +1795,7 @@ export type ScheduleCreateInput = {
     | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
     | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly hour: number; readonly minute: number }
     | { readonly kind: "cron"; readonly expr: string }
+  readonly session?: ("new" | "reuse") | undefined
   readonly timezone?: string | undefined
   readonly agentId?: Agent.ID | undefined
   readonly model?: Model.Ref | undefined
@@ -1807,6 +1810,7 @@ export type ScheduleCreateOutput = {
     | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
     | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly hour: number; readonly minute: number }
     | { readonly kind: "cron"; readonly expr: string }
+  readonly session: "new" | "reuse"
   readonly timezone: string
   readonly agentId?: Agent.ID | undefined
   readonly model?: Model.Ref | undefined
@@ -1821,7 +1825,7 @@ export type ScheduleCreateOutput = {
     | ReadonlyArray<{
         readonly taskID: Schedule.ID
         readonly sessionID?: Session.ID | undefined
-        readonly status: "running" | "completed" | "failed"
+        readonly status: "running" | "completed" | "failed" | "skipped"
         readonly startedAtMs: number
         readonly finishedAtMs?: number | undefined
         readonly errorText?: string | undefined
@@ -1847,6 +1851,7 @@ export type ScheduleUpdateInput = {
         | { readonly kind: "cron"; readonly expr: string }
       )
     | undefined
+  readonly session?: ("new" | "reuse") | undefined
   readonly timezone?: string | undefined
   readonly agentId?: Agent.ID | undefined
   readonly model?: Model.Ref | null | undefined
@@ -1862,6 +1867,7 @@ export type ScheduleUpdateOutput = {
     | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
     | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly hour: number; readonly minute: number }
     | { readonly kind: "cron"; readonly expr: string }
+  readonly session: "new" | "reuse"
   readonly timezone: string
   readonly agentId?: Agent.ID | undefined
   readonly model?: Model.Ref | undefined
@@ -1876,7 +1882,7 @@ export type ScheduleUpdateOutput = {
     | ReadonlyArray<{
         readonly taskID: Schedule.ID
         readonly sessionID?: Session.ID | undefined
-        readonly status: "running" | "completed" | "failed"
+        readonly status: "running" | "completed" | "failed" | "skipped"
         readonly startedAtMs: number
         readonly finishedAtMs?: number | undefined
         readonly errorText?: string | undefined
@@ -1895,6 +1901,7 @@ export type ScheduleRemoveOutput = {
     | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
     | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly hour: number; readonly minute: number }
     | { readonly kind: "cron"; readonly expr: string }
+  readonly session: "new" | "reuse"
   readonly timezone: string
   readonly agentId?: Agent.ID | undefined
   readonly model?: Model.Ref | undefined
@@ -1909,7 +1916,7 @@ export type ScheduleRemoveOutput = {
     | ReadonlyArray<{
         readonly taskID: Schedule.ID
         readonly sessionID?: Session.ID | undefined
-        readonly status: "running" | "completed" | "failed"
+        readonly status: "running" | "completed" | "failed" | "skipped"
         readonly startedAtMs: number
         readonly finishedAtMs?: number | undefined
         readonly errorText?: string | undefined
@@ -1928,6 +1935,7 @@ export type ScheduleRunNowOutput = {
     | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
     | { readonly kind: "weekly"; readonly days: ReadonlyArray<number>; readonly hour: number; readonly minute: number }
     | { readonly kind: "cron"; readonly expr: string }
+  readonly session: "new" | "reuse"
   readonly timezone: string
   readonly agentId?: Agent.ID | undefined
   readonly model?: Model.Ref | undefined
@@ -1942,7 +1950,7 @@ export type ScheduleRunNowOutput = {
     | ReadonlyArray<{
         readonly taskID: Schedule.ID
         readonly sessionID?: Session.ID | undefined
-        readonly status: "running" | "completed" | "failed"
+        readonly status: "running" | "completed" | "failed" | "skipped"
         readonly startedAtMs: number
         readonly finishedAtMs?: number | undefined
         readonly errorText?: string | undefined

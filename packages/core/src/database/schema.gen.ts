@@ -156,6 +156,7 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
           \`id\` text PRIMARY KEY,
           \`name\` text,
           \`prompt\` text NOT NULL,
+          \`session\` text DEFAULT 'new' NOT NULL,
           \`kind\` text NOT NULL,
           \`timezone\` text NOT NULL,
           \`at_ms\` integer,

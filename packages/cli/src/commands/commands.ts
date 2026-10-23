@@ -384,6 +384,10 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
               Flag.withDescription('5-field cron expression in the local timezone, e.g. "30 9 * * 1"'),
               Flag.optional,
             ),
+            session: Flag.Literals("session", ["new", "reuse"]).pipe(
+              Flag.withDescription('Session behavior: "new" starts a fresh session each run, "reuse" keeps one session'),
+              Flag.withDefault("reuse"),
+            ),
           },
         }),
         Spec.make("remove", {

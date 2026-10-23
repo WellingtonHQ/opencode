@@ -56,6 +56,7 @@ it.live("serves scheduled prompts with time zones and the global auto-approve se
     expect(createdResponse.status).toBe(200)
     const created = Schema.decodeUnknownSync(Schedule.Info)(yield* Effect.promise(() => createdResponse.json()))
     expect(created.timezone).toBe(input.timezone)
+    expect(created.session).toBe("reuse")
 
     const readResponse = yield* send(`${schedulePath}/${created.id}`)
     expect(readResponse.status).toBe(200)
@@ -68,6 +69,12 @@ it.live("serves scheduled prompts with time zones and the global auto-approve se
     expect(
       Schema.decodeUnknownSync(Schedule.Info)(yield* Effect.promise(() => updatedResponse.json())).timezone,
     ).toBe("Europe/London")
+
+    const sessionResponse = yield* send(`${schedulePath}/${created.id}`, "PATCH", { session: "new" })
+    expect(sessionResponse.status).toBe(200)
+    expect(Schema.decodeUnknownSync(Schedule.Info)(yield* Effect.promise(() => sessionResponse.json())).session).toBe(
+      "new",
+    )
 
     const listResponse = yield* send(schedulePath)
     expect(listResponse.status).toBe(200)

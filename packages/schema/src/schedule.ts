@@ -29,6 +29,10 @@ export type TimeZone = typeof TimeZone.Type
 export const Kind = Schema.Literals(["once", "daily", "weekly", "cron"]).annotate({ identifier: "Schedule.Kind" })
 export type Kind = typeof Kind.Type
 
+/** How a run chooses its Session: a fresh Session per run, or the task's one shared Session. */
+export const SessionMode = Schema.Literals(["new", "reuse"]).annotate({ identifier: "Schedule.SessionMode" })
+export type SessionMode = typeof SessionMode.Type
+
 const Hour = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(23))
 const Minute = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(59))
 const Weekday = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(6))
@@ -65,7 +69,9 @@ export const Spec = Schema.Union([OnceSpec, DailySpec, WeeklySpec, CronSpec])
   .annotate({ identifier: "Schedule.Spec" })
 export type Spec = typeof Spec.Type
 
-export const RunStatus = Schema.Literals(["running", "completed", "failed"]).annotate({ identifier: "Schedule.Run.Status" })
+export const RunStatus = Schema.Literals(["running", "completed", "failed", "skipped"]).annotate({
+  identifier: "Schedule.Run.Status",
+})
 export type RunStatus = typeof RunStatus.Type
 
 export interface Run extends Schema.Schema.Type<typeof Run> {}
@@ -84,6 +90,7 @@ export const Info = Schema.Struct({
   name: optional(Schema.String),
   prompt: Schema.String,
   spec: Spec,
+  session: SessionMode,
   timezone: TimeZone,
   agentId: Agent.ID.pipe(optional),
   model: Model.Ref.pipe(optional),
@@ -102,6 +109,7 @@ export const CreateInput = Schema.Struct({
   name: optional(Schema.String),
   prompt: Schema.String,
   spec: Spec,
+  session: SessionMode.pipe(optional),
   timezone: TimeZone.pipe(optional),
   agentId: Agent.ID.pipe(optional),
   model: Model.Ref.pipe(optional),
@@ -113,6 +121,7 @@ export const UpdateInput = Schema.Struct({
   name: optional(Schema.String),
   prompt: optional(Schema.String),
   spec: Spec.pipe(optional),
+  session: SessionMode.pipe(optional),
   timezone: TimeZone.pipe(optional),
   agentId: Agent.ID.pipe(optional),
   // Absent leaves the stored model untouched; null clears it back to the default.

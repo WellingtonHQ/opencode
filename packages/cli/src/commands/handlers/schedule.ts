@@ -64,6 +64,7 @@ export const add = Runtime.handler(Commands.commands.schedule.commands.add, (inp
           prompt,
           spec,
           timezone,
+          session: input.session,
           directory: process.cwd(),
           ...(name ? { name } : {}),
           ...(agent ? { agentId: agent } : {}),
@@ -110,6 +111,10 @@ export const runNow = Runtime.handler(Commands.commands.schedule.commands["run-n
     const run = task.recentRuns?.[0]
     if (run?.status === "failed") {
       process.stdout.write(`Run for ${task.id} failed:${EOL}${run.errorText ?? "Unknown error"}${EOL}`)
+      return
+    }
+    if (run?.status === "skipped") {
+      write(`Skipped run for ${task.id}: its session is still busy`)
       return
     }
     write(run?.status === "completed" ? `Completed run for ${task.id}` : `Started run for ${task.id}`)
@@ -165,6 +170,7 @@ function formatTaskTable(tasks: ReadonlyArray<Task>) {
     id: task.id,
     name: (task.name ?? task.prompt).replace(/\s+/g, " ").trim(),
     spec: summarize(task.spec, task.timezone),
+    session: task.session,
     next: task.nextRunAtMs === undefined ? "-" : formatNextRun(task.nextRunAtMs, task.timezone),
     status: task.enabled ? "enabled" : "disabled",
   }))
@@ -172,6 +178,7 @@ function formatTaskTable(tasks: ReadonlyArray<Task>) {
     id: Math.max("Task ID".length, ...rows.map((row) => row.id.length)),
     name: Math.min(40, Math.max("Name".length, ...rows.map((row) => row.name.length))),
     spec: Math.min(52, Math.max("Schedule".length, ...rows.map((row) => row.spec.length))),
+    session: Math.max("Session".length, ...rows.map((row) => row.session.length)),
     next: Math.min(32, Math.max("Next Run".length, ...rows.map((row) => row.next.length))),
   }
   const columns = (row: (typeof rows)[number]) =>
@@ -179,6 +186,7 @@ function formatTaskTable(tasks: ReadonlyArray<Task>) {
       [row.id, widths.id],
       [row.name, widths.name],
       [row.spec, widths.spec],
+      [row.session, widths.session],
       [row.next, widths.next],
       [row.status, "Status".length],
     ] as const
@@ -186,6 +194,7 @@ function formatTaskTable(tasks: ReadonlyArray<Task>) {
     ["Task ID", widths.id],
     ["Name", widths.name],
     ["Schedule", widths.spec],
+    ["Session", widths.session],
     ["Next Run", widths.next],
     ["Status", "Status".length],
   ] as const

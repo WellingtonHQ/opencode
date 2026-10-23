@@ -3,7 +3,7 @@ title: "Schedules"
 description: "Run prompts automatically on a schedule."
 ---
 
-Scheduled tasks run prompts at specified times and are stored in OpenCode's global database. Each execution creates a new background session in the task's directory instead of continuing a previous session.
+Scheduled tasks run prompts at specified times and are stored in OpenCode's global database. By default, every run prompts the task's one shared background session, so prompts build on earlier context; a task can also start a new session for every run.
 
 ## Create a task
 
@@ -35,6 +35,19 @@ opencode schedule add "Review open issues" --cron "30 9 * * 1-5"
 | Cron     | `--cron "30 9 * * 1-5"`    | When the five-field cron expression matches                |
 
 Cron fields are minute, hour, day of month, month, and day of week. The `--at` value uses `yyyy-MM-dd HH:mm` and must be in the future.
+
+## Session behavior
+
+Each task picks how its runs get their session:
+
+| Mode  | Behavior                                                                                          |
+| ----- | ------------------------------------------------------------------------------------------------- |
+| Reuse | Every run prompts the task's one shared session, so prompts build on earlier context (default)    |
+| New   | Every run creates a fresh session in the task's directory                                         |
+
+In the app, choose the mode in the schedule dialog. From the CLI, pass `--session reuse` or `--session new` to `opencode schedule add`; the mode is shown in `opencode schedule list`.
+
+If a reuse task's session is deleted or archived, the next run starts a new one. While the shared session is still running, the next due run is skipped and recorded in the run history; the scheduled time itself is unchanged.
 
 ## Manage tasks
 

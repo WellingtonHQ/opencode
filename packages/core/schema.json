@@ -1,8 +1,8 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "6b89aa30-6c28-4765-acca-950e7173986e",
-  "prevIds": ["b760e9ad-c98f-44c7-810a-55a955ec1e90"],
+  "id": "e245b77b-3371-4372-9178-533846d4d544",
+  "prevIds": ["6b89aa30-6c28-4765-acca-950e7173986e"],
   "ddl": [
     {
       "name": "auth_config",
@@ -967,6 +967,16 @@
       "default": null,
       "generated": null,
       "name": "prompt",
+      "entityType": "columns",
+      "table": "scheduled_task"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'new'",
+      "generated": null,
+      "name": "session",
       "entityType": "columns",
       "table": "scheduled_task"
     },

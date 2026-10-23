@@ -56,6 +56,7 @@ import m53 from "./migration/20261005063756_add_app_setting_and_schedule_run.js"
 import m54 from "./migration/20261007190000_azure_cli_external_credential.js"
 import m55 from "./migration/20261010180456_project_time_archived.js"
 import m56 from "./migration/20261013030935_add_scheduled_task_timezone.js"
+import m57 from "./migration/20261023060420_add_scheduled_task_session.js"
 
 export const migrations = [
   m00,
@@ -115,4 +116,5 @@ export const migrations = [
   m54,
   m55,
   m56,
+  m57,
 ] satisfies DatabaseMigration.Migration[]
