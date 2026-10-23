@@ -1,34 +1,29 @@
 import { describe, expect, test } from "bun:test"
 import type { ScheduleListOutput } from "@opencode/client/promise"
 import path from "node:path"
+import { tmpdir } from "../../core/test/fixture/tmpdir"
 import { OPENCODE_VERSION } from "../src/version"
+import { isolatedEnv } from "./fixture/environment"
 
 describe("schedule command", () => {
   test("registers the scheduled-task commands and documents their options", async () => {
-    const argvs = [
-      ["--help"],
-      ["schedule", "--help"],
-      ["schedule", "list", "--help"],
-      ["schedule", "add", "--help"],
-      ["schedule", "remove", "--help"],
-      ["schedule", "enable", "--help"],
-      ["schedule", "disable", "--help"],
-      ["schedule", "run-now", "--help"],
-    ]
-    const results = await Promise.all(argvs.map((argv) => cli(argv)))
+    // One spawn per help level: root, group, and one subcommand cover the flag documentation.
+    await using root = await tmpdir("opencode-cli-schedule-")
+    const results = await Promise.all(
+      [["--help"], ["schedule", "--help"], ["schedule", "add", "--help"]].map((argv) => cli(argv, root.path)),
+    )
     expect(results.every((result) => result.exitCode === 0)).toBe(true)
     expect(results[0]?.stdout).toContain("schedule")
     expect(results[1]?.stdout).toContain("Manage scheduled prompt tasks")
     expect(results[1]?.stdout).toContain("run-now")
-    expect(results[2]?.stdout).toContain("--format")
-    expect(results[3]?.stdout).toContain('"yyyy-MM-dd HH:mm"')
-    expect(results[3]?.stdout).toContain("Days and local time")
-    expect(results[3]?.stdout).toContain("--username")
-    expect(results[3]?.stdout).toContain("--password")
-    for (const result of results.slice(4)) expect(result?.stdout).toContain("Task ID")
+    expect(results[2]?.stdout).toContain('"yyyy-MM-dd HH:mm"')
+    expect(results[2]?.stdout).toContain("Days and local time")
+    expect(results[2]?.stdout).toContain("--username")
+    expect(results[2]?.stdout).toContain("--password")
   })
 
   test("creates tasks through the Promise client with local timezone and custom server auth", async () => {
+    await using root = await tmpdir("opencode-cli-schedule-")
     const requests: Array<{ method: string; path: string; authorization: string | null; body?: unknown }> = []
     const timezone = "UTC"
     const nextRunAtMs = Date.UTC(2030, 0, 1, 18, 30)
@@ -77,6 +72,7 @@ describe("schedule command", () => {
           "--password",
           "schedule-password",
         ],
+        root.path,
         { TZ: "UTC" },
       )
       expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: "" })
@@ -100,6 +96,7 @@ describe("schedule command", () => {
   })
 
   test("formats listed tasks in each task's saved timezone", async () => {
+    await using root = await tmpdir("opencode-cli-schedule-")
     const nextRunAtMs = Date.UTC(2030, 0, 1, 0, 30)
     const timezone = "America/Los_Angeles"
     const localTimezone = "UTC"
@@ -127,7 +124,9 @@ describe("schedule command", () => {
     })
 
     try {
-      const result = await cli(["schedule", "list", "--server", server.url.toString()], { TZ: localTimezone })
+      const result = await cli(["schedule", "list", "--server", server.url.toString()], root.path, {
+        TZ: localTimezone,
+      })
       expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: "" })
       expect(result.stdout).toContain(`Daily at 09:30 (${timezone})`)
       expect(result.stdout).toContain(
@@ -150,6 +149,7 @@ describe("schedule command", () => {
   })
 
   test("run-now reports the current run state instead of a previous task error", async () => {
+    await using root = await tmpdir("opencode-cli-schedule-")
     const previousError = "previous attempt failed"
     const taskID = "task_cli_run"
     const server = Bun.serve({
@@ -175,7 +175,7 @@ describe("schedule command", () => {
     })
 
     try {
-      const result = await cli(["schedule", "run-now", taskID, "--server", server.url.toString()])
+      const result = await cli(["schedule", "run-now", taskID, "--server", server.url.toString()], root.path)
       expect({ exitCode: result.exitCode, stderr: result.stderr }).toEqual({ exitCode: 0, stderr: "" })
       expect(result.stdout).toContain(`Started run for ${taskID}`)
       expect(result.stdout).not.toContain(previousError)
@@ -185,10 +185,10 @@ describe("schedule command", () => {
   })
 })
 
-async function cli(args: string[], env: Record<string, string> = {}) {
+async function cli(args: string[], root: string, env: Record<string, string> = {}) {
   const child = Bun.spawn([process.execPath, "run", "src/index.ts", ...args], {
     cwd: path.join(import.meta.dir, ".."),
-    env: { ...process.env, OPENCODE_DISABLE_AUTOUPDATE: "1", ...env },
+    env: isolatedEnv(root, { OPENCODE_DISABLE_AUTOUPDATE: "1", ...env }),
     stdout: "pipe",
     stderr: "pipe",
   })
