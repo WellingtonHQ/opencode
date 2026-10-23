@@ -49,7 +49,7 @@ export const DailySpec = Schema.Struct({
 export interface WeeklySpec extends Schema.Schema.Type<typeof WeeklySpec> {}
 export const WeeklySpec = Schema.Struct({
   kind: Schema.Literal("weekly"),
-  days: Schema.Array(Weekday),
+  days: Schema.Array(Weekday).check(Schema.isMinLength(1)),
   hour: Hour,
   minute: Minute,
 }).annotate({ identifier: "Schedule.Spec.Weekly" })

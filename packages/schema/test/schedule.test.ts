@@ -16,3 +16,11 @@ describe("Schedule.TimeZone", () => {
     expect(() => decode({ ...input, timezone: "Mars/Olympus_Mons" })).toThrow()
   })
 })
+
+describe("Schedule.Spec", () => {
+  test("requires a weekly spec to name at least one day", () => {
+    const decode = Schema.decodeUnknownSync(Schedule.WeeklySpec)
+    expect(decode({ kind: "weekly", days: [1, 3], hour: 9, minute: 0 }).days).toEqual([1, 3])
+    expect(() => decode({ kind: "weekly", days: [], hour: 9, minute: 0 })).toThrow()
+  })
+})
