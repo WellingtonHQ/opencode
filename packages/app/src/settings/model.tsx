@@ -118,6 +118,7 @@ const generalSchema = Persistence.struct({
     tools: placementOnlySchema,
   }),
   showCustomAgents: Schema.Boolean,
+  showMessageMetadata: Schema.Boolean,
   showTurnDiffs: Schema.Boolean,
   mobileTitlebarPosition: Schema.Literals(["top", "bottom"]),
   // Owned by the review extension, which copies it out once; kept so settings rewrites cannot drop it first.
@@ -282,6 +283,7 @@ export const defaultSettings: Settings = {
     showFileTree: false,
     timelineDetail: { ...timelinePresets[2].value },
     showCustomAgents: false,
+    showMessageMetadata: false,
     showTurnDiffs: false,
     mobileTitlebarPosition: "top",
     terminalPlacement: "side",
@@ -356,6 +358,13 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         showCustomAgents,
         setShowCustomAgents(value: boolean) {
           setStore("general", "showCustomAgents", value)
+        },
+        showMessageMetadata: withFallback(
+          () => store.general?.showMessageMetadata,
+          defaultSettings.general.showMessageMetadata,
+        ),
+        setShowMessageMetadata(value: boolean) {
+          setStore("general", "showMessageMetadata", value)
         },
         showTurnDiffs: withFallback(() => store.general?.showTurnDiffs, defaultSettings.general.showTurnDiffs),
         setShowTurnDiffs(value: boolean) {

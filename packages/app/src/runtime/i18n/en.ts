@@ -853,6 +853,8 @@ export const dict = {
   "settings.timeline.custom": "Custom",
   "settings.timeline.row.turnDiffs.title": "Changed files",
   "settings.timeline.row.turnDiffs.description": "List the files each turn changed when it finishes",
+  "settings.timeline.row.messageMetadata.title": "Message details",
+  "settings.timeline.row.messageMetadata.description": "Show each assistant message’s model and timestamp when hovered",
   "settings.timeline.advanced": "Advanced",
   "settings.timeline.advanced.description": "Set placement and details for each activity category.",
   "settings.timeline.group": "Group",

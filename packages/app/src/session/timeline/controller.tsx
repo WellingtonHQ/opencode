@@ -334,6 +334,7 @@ export function createTimelineController(input: { session: TimelineSessionSource
       reasoningMode,
       shellToolPartsExpanded,
       editToolPartsExpanded,
+      showMessageMetadata: settings.general.showMessageMetadata,
     },
     pending: {
       rename: () => pending.rename,

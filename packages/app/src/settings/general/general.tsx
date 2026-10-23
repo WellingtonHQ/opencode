@@ -366,6 +366,17 @@ export const SettingsGeneral: Component<{ server: Accessor<ServerConnection.Any 
                 />
               </div>
             </SettingsRow>
+            <SettingsRow
+              title={language.t("settings.timeline.row.messageMetadata.title")}
+              description={language.t("settings.timeline.row.messageMetadata.description")}
+            >
+              <div data-action="settings-show-message-metadata">
+                <Switch
+                  checked={settings.general.showMessageMetadata()}
+                  onChange={(checked) => settings.general.setShowMessageMetadata(checked)}
+                />
+              </div>
+            </SettingsRow>
           </SettingsList>
         </section>
 

@@ -674,6 +674,7 @@ export function AssistantTextContent(props: {
   message: SessionMessageAssistant
   showCopy: boolean
   turnDurationMs?: number | null
+  showMessageMetadata?: boolean
 }) {
   const data = useData()
   const i18n = useI18n()
@@ -732,6 +733,8 @@ export function AssistantTextContent(props: {
       .join(" \u00B7 ")
   })
 
+  const hoverMeta = () => [model(), timestamp()].filter(Boolean).join(" \u00B7 ")
+
   const [copied, setCopied] = createSignal(false)
 
   const copy = async () => {
@@ -746,18 +749,24 @@ export function AssistantTextContent(props: {
         <div data-slot="text-part-body">
           <PacedMarkdown text={props.text} cacheKey={props.id} streaming={props.message.time.completed === undefined} />
         </div>
-        <Show when={props.showCopy}>
-          <div data-slot="text-part-copy-wrapper" data-interrupted={interrupted() ? "" : undefined}>
-            <MessageActionButton
-              icon={copied() ? "check" : "copy"}
-              label={copied() ? i18n.t("ui.message.copied") : i18n.t("ui.message.copyResponse")}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={copy}
-              aria-label={copied() ? i18n.t("ui.message.copied") : i18n.t("ui.message.copyResponse")}
-            />
-            <Show when={meta()}>
+        <Show when={props.showCopy || props.showMessageMetadata}>
+          <div
+            data-slot="text-part-copy-wrapper"
+            data-interrupted={interrupted() ? "" : undefined}
+            data-message-metadata-only={!props.showCopy ? "" : undefined}
+          >
+            <Show when={props.showCopy}>
+              <MessageActionButton
+                icon={copied() ? "check" : "copy"}
+                label={copied() ? i18n.t("ui.message.copied") : i18n.t("ui.message.copyResponse")}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={copy}
+                aria-label={copied() ? i18n.t("ui.message.copied") : i18n.t("ui.message.copyResponse")}
+              />
+            </Show>
+            <Show when={props.showCopy ? meta() : hoverMeta()}>
               <span data-slot="text-part-meta" class="text-12-regular text-text-weak cursor-default">
-                {meta()}
+                {props.showCopy ? meta() : hoverMeta()}
               </span>
             </Show>
           </div>

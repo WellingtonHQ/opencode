@@ -534,6 +534,49 @@ const InterruptedTurn = {
   ),
 }
 
+const messageMetadataDocument = {
+  sessionID: CURRENT_SESSION_ID,
+  status: { type: "idle" },
+  diffs: [],
+  messages: [
+    {
+      id: "msg_user_agent_metadata",
+      type: "user",
+      text: "Explain this in two steps.",
+      time: { created: STORY_TIME },
+    },
+    {
+      id: "msg_agent_metadata_sonnet",
+      type: "assistant",
+      agent: "build",
+      model: STORY_MODEL,
+      content: [{ type: "text", text: "First response in this interaction." }],
+      time: { created: STORY_TIME + 1_000, completed: STORY_TIME + 2_000 },
+    },
+    {
+      id: "msg_agent_metadata_nano",
+      type: "assistant",
+      agent: "build",
+      model: { id: "fast-nano", providerID: "company-gateway" },
+      content: [{ type: "text", text: "A follow-up from a different model." }],
+      time: { created: STORY_TIME + 3_000, completed: STORY_TIME + 4_000 },
+    },
+  ],
+} satisfies SessionDocument
+
+export const AgentMessageMetadata = {
+  args: { showMessageMetadata: true },
+  render: (args: { showMessageMetadata: boolean }) => (
+    <CurrentSessionTimelineStory
+      title="Assistant message metadata"
+      description="Each assistant response exposes its own model and timestamp on hover."
+      document={messageMetadataDocument}
+      showMessageMetadata={args.showMessageMetadata}
+      width="560px"
+    />
+  ),
+}
+
 const AliasedModelNotices = {
   render: () => (
     <CurrentSessionTimelineStory

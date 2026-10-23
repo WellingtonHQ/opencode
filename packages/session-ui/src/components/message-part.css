@@ -299,6 +299,12 @@
     }
   }
 
+  [data-slot="text-part-copy-wrapper"][data-message-metadata-only] {
+    @media (hover: none) {
+      display: none;
+    }
+  }
+
   [data-slot="text-part-meta"] {
     user-select: none;
   }

@@ -37,6 +37,13 @@ describe("settings timeline detail migration", () => {
 })
 
 describe("settings schema", () => {
+  test("round trips the assistant message metadata preference", () => {
+    const settings = decode({ general: { showMessageMetadata: false } })
+
+    expect(settings.general.showMessageMetadata).toBe(false)
+    expect(decode(encode(settings)).general.showMessageMetadata).toBe(false)
+  })
+
   test("keeps the values extensions copy out once and discards retired preferences", () => {
     const settings = decode({
       general: {
@@ -93,6 +100,7 @@ describe("settings schema", () => {
         showFileTree: false,
         timelineDetail: timelinePresets[2].value,
         showCustomAgents: false,
+        showMessageMetadata: false,
         showTurnDiffs: false,
         mobileTitlebarPosition: "top",
         terminalPlacement: "side",

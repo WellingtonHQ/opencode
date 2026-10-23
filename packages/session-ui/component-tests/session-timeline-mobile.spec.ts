@@ -3,6 +3,18 @@ import { expect, story } from "../../storybook/playwright/story"
 story.describe("touch timeline", () => {
   story.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } })
 
+  story("does not show metadata-only footers without hover", async ({ mount, page }) => {
+    const timeline = await mount("current-session-timeline-rows--agent-message-metadata", {
+      args: { showMessageMetadata: true },
+    })
+
+    expect(await page.evaluate(() => matchMedia("(hover: none)").matches)).toBe(true)
+
+    await expect(
+      timeline.locator('[data-timeline-part-id="msg_agent_metadata_sonnet:text:0"] [data-slot="text-part-copy-wrapper"]'),
+    ).toBeHidden()
+  })
+
   story("keeps message actions and metadata visible without hover", async ({ mount, page }) => {
     const timeline = await mount("current-session-timeline-rows--conversation", { args: { scenario: "interruption" } })
     expect(await page.evaluate(() => matchMedia("(hover: none)").matches)).toBe(true)
@@ -75,4 +87,41 @@ story("desktop message actions still appear on hover and keyboard focus", async 
     await expect(actions).toHaveCSS("pointer-events", "auto")
     await page.getByRole("button", { name: "Reset", exact: true }).focus()
   }
+})
+
+story("assistant message hover metadata shows each model and timestamp", async ({ mount }) => {
+  const timeline = await mount("current-session-timeline-rows--agent-message-metadata", {
+    args: { showMessageMetadata: true },
+  })
+
+  const sonnet = timeline.locator('[data-timeline-part-id="msg_agent_metadata_sonnet:text:0"]')
+  const sonnetMeta = sonnet.locator('[data-slot="text-part-meta"]')
+  const sonnetFooter = sonnet.locator('[data-slot="text-part-copy-wrapper"]')
+
+  const nano = timeline.locator('[data-timeline-part-id="msg_agent_metadata_nano:text:0"]')
+  const nanoMeta = nano.locator('[data-slot="text-part-meta"]')
+  const nanoFooter = nano.locator('[data-slot="text-part-copy-wrapper"]')
+
+  await expect(sonnetMeta).toContainText("Claude Sonnet 4")
+  await expect(nanoMeta).toContainText("GPT-5.4 nano")
+  expect((await sonnetMeta.textContent())?.split(" · ").at(-1)).not.toEqual(
+    (await nanoMeta.textContent())?.split(" · ").at(-1),
+  )
+  await expect(sonnetFooter).toHaveCSS("opacity", "0")
+  await sonnet.hover()
+  await expect(sonnetFooter).toHaveCSS("opacity", "1")
+  await nano.hover()
+  await expect(nanoFooter).toHaveCSS("opacity", "1")
+  await expect(nanoFooter.getByRole("button", { name: "Copy response", exact: true })).toBeVisible()
+  await expect(nanoMeta).toContainText("Build")
+})
+
+story("assistant message metadata stays hidden when the preference is disabled", async ({ mount }) => {
+  const timeline = await mount("current-session-timeline-rows--agent-message-metadata", {
+    args: { showMessageMetadata: false },
+  })
+
+  const response = timeline.locator('[data-timeline-part-id="msg_agent_metadata_sonnet:text:0"]')
+
+  await expect(response.locator('[data-slot="text-part-copy-wrapper"]')).toHaveCount(0)
 })

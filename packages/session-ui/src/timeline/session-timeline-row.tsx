@@ -69,6 +69,7 @@ export function createSessionTimelineRowRenderer(input: {
   reasoningMode: Accessor<ReasoningMode>
   shellToolDefaultOpen: Accessor<boolean>
   editToolDefaultOpen: Accessor<boolean>
+  showMessageMetadata?: Accessor<boolean>
   timelineDetail?: Accessor<TimelineDetail>
   disclosure: {
     value: (key: string) => boolean | undefined
@@ -369,6 +370,7 @@ export function createSessionTimelineRowRenderer(input: {
                 contentID={ref()!.partID}
                 showAssistantCopyPartID={copyContentID(row().userMessageID)}
                 turnDurationMs={duration(row().userMessageID)}
+                showMessageMetadata={input.showMessageMetadata?.() ?? false}
                 defaultOpen={defaultOpen()}
                 toolOpen={input.disclosure.value(disclosureKey()) ?? defaultOpen()}
                 onToolOpenChange={(open) => input.disclosure.set(disclosureKey(), open)}

@@ -307,6 +307,7 @@ function MessageTimelineView(
     reasoningMode: props.data.reasoningMode,
     shellToolDefaultOpen: props.data.shellToolPartsExpanded,
     editToolDefaultOpen: props.data.editToolPartsExpanded,
+    showMessageMetadata: props.data.showMessageMetadata,
     timelineDetail: props.data.timelineDetail,
     disclosure: virtualized.disclosure,
     centered: () => props.centered,

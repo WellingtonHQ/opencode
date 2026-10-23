@@ -77,6 +77,7 @@ export function CurrentSessionTimelineStory(props: {
   width?: string
   shellToolDefaultOpen?: boolean
   editToolDefaultOpen?: boolean
+  showMessageMetadata?: boolean
   turnDiffs?: boolean
 }) {
   // Inline story documents rebuild their messages on every prop read, and the timeline projection keys text by identity.
@@ -120,6 +121,7 @@ export function CurrentSessionTimelineStory(props: {
                   actions={actions}
                   shellToolDefaultOpen={props.shellToolDefaultOpen}
                   editToolDefaultOpen={props.editToolDefaultOpen}
+                  showMessageMetadata={props.showMessageMetadata}
                   turnDiffs={props.turnDiffs}
                 />
               </CurrentSessionProviders>

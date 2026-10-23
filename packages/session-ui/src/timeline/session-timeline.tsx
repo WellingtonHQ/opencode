@@ -16,6 +16,7 @@ export type SessionTimelineProps = {
   shellToolDefaultOpen?: boolean
   editToolDefaultOpen?: boolean
   timelineDetail?: TimelineDetail
+  showMessageMetadata?: boolean
   turnDiffs?: boolean
   class?: string
 }
@@ -42,6 +43,7 @@ export function SessionTimeline(props: SessionTimelineProps) {
     reasoningMode: () => props.reasoningMode ?? "compact",
     shellToolDefaultOpen: () => props.shellToolDefaultOpen ?? false,
     editToolDefaultOpen: () => props.editToolDefaultOpen ?? false,
+    showMessageMetadata: () => props.showMessageMetadata ?? false,
     timelineDetail: props.timelineDetail && (() => props.timelineDetail!),
     disclosure: {
       value: (key) => toolOpen[key],

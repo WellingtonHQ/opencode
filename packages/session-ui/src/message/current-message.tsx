@@ -48,6 +48,7 @@ export function SessionAssistantContent(props: {
   contentID: string
   showAssistantCopyPartID?: string | null
   turnDurationMs?: number | null
+  showMessageMetadata?: boolean
   defaultOpen?: boolean
   reasoningDefaultOpen?: boolean
   toolOpen?: boolean
@@ -64,6 +65,7 @@ export function SessionAssistantContent(props: {
             message={props.message}
             showCopy={props.showAssistantCopyPartID === props.contentID}
             turnDurationMs={props.turnDurationMs}
+            showMessageMetadata={props.showMessageMetadata}
           />
         )}
       </Match>
