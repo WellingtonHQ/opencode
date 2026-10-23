@@ -47,6 +47,8 @@ export const groupNames = {
   "server.voice": "voice",
   "server.provider": "provider",
   "server.integration": "integration",
+  "server.schedule": "schedule",
+  "server.global": "global",
   "server.websearch": "websearch",
   "server.credential": "credential",
   "server.form": "form",

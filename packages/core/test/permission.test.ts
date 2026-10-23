@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { Cause, Deferred, Effect, Fiber, Layer, Schema } from "effect"
 import { Agent } from "@opencode/core/agent"
 import { Database } from "@opencode/core/database/database"
+import { AppState } from "@opencode/core/app-state"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Bus } from "@opencode/core/bus"
@@ -26,7 +27,7 @@ const current = Layer.succeed(
 )
 const it = testEffect(
   AppNodeBuilder.build(
-    LayerNode.group([Database.node, Bus.node, SessionStore.node, PermissionSaved.node, Agent.node, Permission.node]),
+    LayerNode.group([Database.node, Bus.node, SessionStore.node, PermissionSaved.node, Agent.node, AppState.node, Permission.node]),
     [Location.node.replace(current)],
   ),
 )
@@ -98,6 +99,21 @@ function waitForRequest(input: Partial<Permission.AssertInput> = {}) {
 }
 
 describe("Permission", () => {
+  it.effect("auto-approves ask effects when the persisted global switch is enabled", () =>
+    Effect.gen(function* () {
+      yield* setup()
+      const appState = yield* AppState.Service
+      yield* appState.setAutoApprove(true)
+      const service = yield* Permission.Service
+
+      expect(yield* service.ask(assertion())).toMatchObject({ effect: "allow" })
+      expect(yield* service.list()).toEqual([])
+
+      yield* setRules([{ action: "read", resource: "*", effect: "deny" }])
+      expect(yield* service.ask(assertion())).toMatchObject({ effect: "deny" })
+    }),
+  )
+
   it.effect("returns the evaluated effect and only queues prompts", () =>
     Effect.gen(function* () {
       yield* setup([{ action: "read", resource: "*", effect: "allow" }])

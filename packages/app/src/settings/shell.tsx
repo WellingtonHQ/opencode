@@ -356,7 +356,7 @@ function RootSettings() {
       mobileAction={multiple() ? <AddServerMenu compact onAddServer={addServer} /> : undefined}
     >
       <Tabs.Content value="general" class="settings-panel">
-        <SettingsGeneral />
+        <SettingsGeneral server={sourceServer} />
       </Tabs.Content>
       <Tabs.Content value="appearance" class="settings-panel">
         <SettingsAppearance />

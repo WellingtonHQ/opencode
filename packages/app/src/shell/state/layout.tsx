@@ -210,8 +210,12 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
       initialLayout(servers.list[0] ? ServerConnection.key(servers.list[0]) : undefined),
     )
 
-    const [ephemeral, setEphemeral] = createStore<{ sessionTabPreview: Record<string, string | undefined> }>({
+    const [ephemeral, setEphemeral] = createStore<{
+      sessionTabPreview: Record<string, string | undefined>
+      homeSchedulesOpen: boolean
+    }>({
       sessionTabPreview: {},
+      homeSchedulesOpen: false,
     })
 
     // Opening Home with its shortcut focuses session search, so typing filters immediately.
@@ -357,6 +361,15 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         selection: createMemo(() => store.home.selection),
         setSelection(selection: HomeProjectSelection) {
           setStore("home", "selection", reconcile(selection))
+        },
+        schedules: {
+          open: createMemo(() => ephemeral.homeSchedulesOpen),
+          setOpen(open: boolean) {
+            setEphemeral("homeSchedulesOpen", open)
+          },
+          toggle() {
+            setEphemeral("homeSchedulesOpen", (x) => !x)
+          },
         },
         searchFocus: {
           request() {

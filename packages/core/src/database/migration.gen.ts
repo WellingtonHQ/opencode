@@ -45,13 +45,17 @@ import m42 from "./migration/20260812181746_session_inbox.js"
 import m43 from "./migration/20260812213948_worktree.js"
 import m44 from "./migration/20260819222447_session_viewed_state.js"
 import m45 from "./migration/20260823191254_nullable_workspace_binding.js"
-import m46 from "./migration/20260910120000_clear_v1_session_permission.js"
-import m47 from "./migration/20260923013825_project_time_active.js"
-import m48 from "./migration/20260927235637_auth_session.js"
-import m49 from "./migration/20260930001258_auth_session_credentials.js"
-import m50 from "./migration/20260930001910_auth_config.js"
-import m51 from "./migration/20261007190000_azure_cli_external_credential.js"
-import m52 from "./migration/20261010180456_project_time_archived.js"
+import m46 from "./migration/20260910074445_medical_the_santerians.js"
+import m47 from "./migration/20260910120000_clear_v1_session_permission.js"
+import m48 from "./migration/20260911071846_add_schedule_task_model.js"
+import m49 from "./migration/20260923013825_project_time_active.js"
+import m50 from "./migration/20260927235637_auth_session.js"
+import m51 from "./migration/20260930001258_auth_session_credentials.js"
+import m52 from "./migration/20260930001910_auth_config.js"
+import m53 from "./migration/20261005063756_add_app_setting_and_schedule_run.js"
+import m54 from "./migration/20261007190000_azure_cli_external_credential.js"
+import m55 from "./migration/20261010180456_project_time_archived.js"
+import m56 from "./migration/20261013030935_add_scheduled_task_timezone.js"
 
 export const migrations = [
   m00,
@@ -107,4 +111,8 @@ export const migrations = [
   m50,
   m51,
   m52,
+  m53,
+  m54,
+  m55,
+  m56,
 ] satisfies DatabaseMigration.Migration[]

@@ -23,6 +23,22 @@ const ServerParams = {
   ),
 }
 
+const ScheduleServerParams = {
+  ...ServerParams,
+  username: Flag.String("username").pipe(
+    Flag.withAlias("u"),
+    Flag.withDescription("Basic auth username for --server (defaults to OPENCODE_SERVER_USERNAME or opencode)"),
+    Flag.optional,
+  ),
+  password: Flag.String("password").pipe(
+    Flag.withAlias("p"),
+    Flag.withDescription(
+      "Basic auth password for --server (defaults to OPENCODE_PASSWORD or OPENCODE_SERVER_PASSWORD)",
+    ),
+    Flag.optional,
+  ),
+}
+
 const PermissionParams = {
   auto: Flag.Boolean("auto").pipe(
     Flag.withDescription("Auto-approve permissions that are not explicitly denied"),
@@ -336,6 +352,69 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
         ),
         json: Flag.Boolean("json").pipe(Flag.withDescription("Output statistics as JSON"), Flag.withDefault(false)),
       },
+    }),
+    Spec.make("schedule", {
+      description: "Manage scheduled prompt tasks",
+      commands: [
+        Spec.make("list", {
+          description: "List scheduled tasks",
+          params: {
+            ...ScheduleServerParams,
+            format: Flag.Literals("format", ["table", "json"]).pipe(
+              Flag.withAlias("f"),
+              Flag.withDescription("Output format"),
+              Flag.withDefault("table"),
+            ),
+          },
+        }),
+        Spec.make("add", {
+          description: "Create a scheduled prompt task",
+          params: {
+            ...ScheduleServerParams,
+            prompt: Argument.String("prompt").pipe(Argument.withDescription("Prompt to run on schedule")),
+            name: Flag.String("name").pipe(Flag.withDescription("Human-readable task name"), Flag.optional),
+            agent: Flag.String("agent").pipe(Flag.withDescription("Agent to run the prompt with"), Flag.optional),
+            at: Flag.String("at").pipe(Flag.withDescription('One-shot local time: "yyyy-MM-dd HH:mm"'), Flag.optional),
+            daily: Flag.String("daily").pipe(Flag.withDescription('Every day at local time "HH:mm"'), Flag.optional),
+            weekly: Flag.String("weekly").pipe(
+              Flag.withDescription('Days and local time, e.g. "mon,wed 14:00" (days are sun..sat or 0-6)'),
+              Flag.optional,
+            ),
+            cron: Flag.String("cron").pipe(
+              Flag.withDescription('5-field cron expression in the local timezone, e.g. "30 9 * * 1"'),
+              Flag.optional,
+            ),
+          },
+        }),
+        Spec.make("remove", {
+          description: "Remove a scheduled task",
+          params: {
+            ...ScheduleServerParams,
+            id: Argument.String("id").pipe(Argument.withDescription("Task ID to remove")),
+          },
+        }),
+        Spec.make("enable", {
+          description: "Re-enable a paused scheduled task",
+          params: {
+            ...ScheduleServerParams,
+            id: Argument.String("id").pipe(Argument.withDescription("Task ID to enable")),
+          },
+        }),
+        Spec.make("disable", {
+          description: "Pause a scheduled task without removing it",
+          params: {
+            ...ScheduleServerParams,
+            id: Argument.String("id").pipe(Argument.withDescription("Task ID to disable")),
+          },
+        }),
+        Spec.make("run-now", {
+          description: "Run a scheduled task immediately, ignoring its schedule and enabled state",
+          params: {
+            ...ScheduleServerParams,
+            id: Argument.String("id").pipe(Argument.withDescription("Task ID to run now")),
+          },
+        }),
+      ],
     }),
     Spec.make("mini", {
       description: "Start the minimal interactive interface",

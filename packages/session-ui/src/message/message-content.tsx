@@ -687,6 +687,12 @@ export function AssistantTextContent(props: {
 
   const model = createMemo(() => modelLabel(data, i18n, props.message.model))
 
+  const timestamp = createMemo(() =>
+    new Intl.DateTimeFormat(i18n.locale(), { dateStyle: "short", timeStyle: "medium" }).format(
+      props.message.time.completed ?? props.message.time.created,
+    ),
+  )
+
   const duration = createMemo(() => {
     const completed = props.message.time.completed
 
@@ -720,6 +726,7 @@ export function AssistantTextContent(props: {
       ...(mobile() ? [] : [agent ? agent[0]?.toUpperCase() + agent.slice(1) : "", model()]),
       duration(),
       interrupted() ? i18n.t("ui.message.interrupted") : "",
+      timestamp(),
     ]
       .filter(Boolean)
       .join(" \u00B7 ")

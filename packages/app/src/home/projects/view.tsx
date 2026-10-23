@@ -1,4 +1,4 @@
-import { createMemo, For, type JSX, onCleanup, Show, splitProps } from "solid-js"
+import { createMemo, For, type Accessor, type JSX, onCleanup, Show, splitProps } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Popover } from "@kobalte/core/popover"
 import { DragDropProvider, PointerSensor } from "@dnd-kit/solid"
@@ -76,6 +76,8 @@ export type HomeProjectsViewProps = {
   onCloseProject: (server: ServerConnection.Any, directory: string) => void
   onOpenSettings: () => void
   onOpenHelp: () => void
+  onToggleSchedules: () => void
+  schedulesActive: Accessor<boolean>
 }
 
 export function HomeProjectsView(props: HomeProjectsViewProps) {
@@ -150,6 +152,18 @@ export function HomeProjectsView(props: HomeProjectsViewProps) {
               onOpenProjectNewSession={(server, directory) => {
                 setState("open", false)
                 props.onOpenProjectNewSession(server, directory)
+              }}
+              onOpenSettings={() => {
+                props.onOpenSettings()
+                setState("open", false)
+              }}
+              onOpenHelp={() => {
+                props.onOpenHelp()
+                setState("open", false)
+              }}
+              onToggleSchedules={() => {
+                props.onToggleSchedules()
+                setState("open", false)
               }}
             />
           </Popover.Content>
@@ -301,9 +315,11 @@ function HomeProjectsPanel(props: HomeProjectsViewProps) {
         </Show>
       </ScrollView>
       <HomeUtilityNav
-        class="mb-8 mt-4 hidden shrink-0 lg:flex"
+        class={props.dropdown ? "mt-4 shrink-0" : "mb-8 mt-4 hidden shrink-0 lg:flex"}
         onOpenSettings={props.onOpenSettings}
         onOpenHelp={props.onOpenHelp}
+        onToggleSchedules={props.onToggleSchedules}
+        schedulesActive={props.schedulesActive}
         language={props.language}
       />
     </aside>
@@ -314,12 +330,24 @@ export function HomeUtilityNav(props: {
   class?: string
   onOpenSettings: () => void
   onOpenHelp: () => void
+  onToggleSchedules: () => void
+  schedulesActive: Accessor<boolean>
   language: ReturnType<typeof useLanguage>
 }) {
   return (
     <div
       class={`${props.class ?? ""} min-w-0 flex-row justify-between gap-1 lg:flex-col lg:justify-start lg:pr-3 [&>button]:w-auto lg:[&>button]:w-full`}
     >
+      <HomeProjectNavButton
+        type="button"
+        data-selected={props.schedulesActive() ? "" : undefined}
+        aria-pressed={props.schedulesActive()}
+        classList={{ "text-v2-text-text-faint [&>[data-slot=icon-svg]]:text-v2-icon-icon-muted": !props.schedulesActive() }}
+        onClick={props.onToggleSchedules}
+      >
+        <Icon name="status" size="small" />
+        <span class={HOME_PROJECT_NAV_LABEL}>{props.language.t("sidebar.schedules")}</span>
+      </HomeProjectNavButton>
       <HomeProjectNavButton
         type="button"
         class="text-v2-text-text-faint [&>[data-slot=icon-svg]]:text-v2-icon-icon-muted"

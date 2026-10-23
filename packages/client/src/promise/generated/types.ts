@@ -246,6 +246,20 @@ export type ProjectCommands = { start?: string }
 
 export type ProjectTime = { created: number; updated: number; active: number; archived?: number }
 
+export type ScheduleID = string
+
+export type ScheduleSpecOnce = { kind: "once"; atMs: number }
+
+export type ScheduleSpecDaily = { kind: "daily"; hour: number; minute: number }
+
+export type ScheduleSpecWeekly = { kind: "weekly"; days: Array<number>; hour: number; minute: number }
+
+export type ScheduleSpecCron = { kind: "cron"; expr: string }
+
+export type ScheduleRunStatus = "running" | "completed" | "failed"
+
+export type GlobalAutoApprove = { enabled: boolean }
+
 export type PermissionID = string
 
 export type PermissionSource = { type: "tool"; messageID: string; id: string }
@@ -717,6 +731,17 @@ export type Project = {
   commands?: ProjectCommands
   time: ProjectTime
   sandboxes: Array<string>
+}
+
+export type ScheduleSpec = ScheduleSpecOnce | ScheduleSpecDaily | ScheduleSpecWeekly | ScheduleSpecCron
+
+export type ScheduleRun = {
+  taskID: string
+  sessionID?: SessionID
+  status: ScheduleRunStatus
+  startedAtMs: number
+  finishedAtMs?: number
+  errorText?: string
 }
 
 export type PermissionRequest = {
@@ -1985,6 +2010,33 @@ export type CredentialValue = CredentialOAuth | CredentialKey | CredentialExtern
 
 export type ConnectionInfo = ConnectionCredentialInfo | ConnectionEnvInfo
 
+export type ScheduleChanged = {
+  id: EventID
+  created: number
+  metadata?: { [x: string]: any }
+  type: "schedule.changed"
+  location?: LocationRef
+  data: {
+    info: {
+      id: string
+      name?: string
+      prompt: string
+      spec: ScheduleSpec
+      timezone: string
+      agentId?: AgentID
+      model?: ModelRef
+      directory: AbsolutePath
+      enabled: boolean
+      nextRunAtMs?: number
+      lastRunAtMs?: number
+      lastSessionId?: SessionID
+      lastError?: string
+      runCount: number
+      recentRuns?: Array<ScheduleRun>
+    }
+  }
+}
+
 export type PtyCreated = {
   id: EventID
   created: number
@@ -2565,6 +2617,7 @@ export type V2Event =
   | CredentialUpdated
   | CredentialSwitched
   | IntegrationUpdated
+  | ScheduleChanged
   | ProviderUpdated
   | ModelUpdated
   | AgentUpdated
@@ -2846,6 +2899,18 @@ export type ProjectNotFoundError = {
 }
 export const isProjectNotFoundError = (value: unknown): value is ProjectNotFoundError =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "ProjectNotFoundError"
+
+export type ScheduleNotFoundError = {
+  readonly _tag: "ScheduleNotFoundError"
+  readonly scheduleID: string
+  readonly message: string
+}
+export const isScheduleNotFoundError = (value: unknown): value is ScheduleNotFoundError =>
+  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "ScheduleNotFoundError"
+
+export type ScheduleLimitExceededError = { readonly _tag: "ScheduleLimitExceededError"; readonly message: string }
+export const isScheduleLimitExceededError = (value: unknown): value is ScheduleLimitExceededError =>
+  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "ScheduleLimitExceededError"
 
 export type PermissionSavedNotFoundError = {
   readonly _tag: "PermissionSavedNotFoundError"
@@ -5373,6 +5438,453 @@ export type FormListInput = {
 }
 
 export type FormListOutput = { location: LocationPublicRef; data: Array<FormInfo> }
+
+export type ScheduleListOutput = Array<{
+  id: ScheduleID
+  name?: string
+  prompt: string
+  spec: ScheduleSpec
+  timezone: string
+  agentId?: AgentID
+  model?: ModelRef
+  directory: AbsolutePath
+  enabled: boolean
+  nextRunAtMs?: number
+  lastRunAtMs?: number
+  lastSessionId?: SessionID
+  lastError?: string
+  runCount: number
+  recentRuns?: Array<{
+    taskID: ScheduleID
+    sessionID?: SessionID
+    status: ScheduleRunStatus
+    startedAtMs: number
+    finishedAtMs?: number
+    errorText?: string
+  }> | null
+}>
+
+export type ScheduleGetInput = { readonly scheduleID: { readonly scheduleID: string }["scheduleID"] }
+
+export type ScheduleGetOutput = {
+  id: ScheduleID
+  name?: string
+  prompt: string
+  spec: ScheduleSpec
+  timezone: string
+  agentId?: AgentID
+  model?: ModelRef
+  directory: AbsolutePath
+  enabled: boolean
+  nextRunAtMs?: number
+  lastRunAtMs?: number
+  lastSessionId?: SessionID
+  lastError?: string
+  runCount: number
+  recentRuns?: Array<{
+    taskID: ScheduleID
+    sessionID?: SessionID
+    status: ScheduleRunStatus
+    startedAtMs: number
+    finishedAtMs?: number
+    errorText?: string
+  }> | null
+}
+
+export type ScheduleCreateInput = {
+  readonly name?: {
+    readonly name?: string
+    readonly prompt: string
+    readonly spec:
+      | { readonly kind: "once"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
+      | {
+          readonly kind: "weekly"
+          readonly days: ReadonlyArray<number>
+          readonly hour: number
+          readonly minute: number
+        }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly timezone?: string | null
+    readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
+    readonly directory: string
+  }["name"]
+  readonly prompt: {
+    readonly name?: string
+    readonly prompt: string
+    readonly spec:
+      | { readonly kind: "once"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
+      | {
+          readonly kind: "weekly"
+          readonly days: ReadonlyArray<number>
+          readonly hour: number
+          readonly minute: number
+        }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly timezone?: string | null
+    readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
+    readonly directory: string
+  }["prompt"]
+  readonly spec: {
+    readonly name?: string
+    readonly prompt: string
+    readonly spec:
+      | { readonly kind: "once"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
+      | {
+          readonly kind: "weekly"
+          readonly days: ReadonlyArray<number>
+          readonly hour: number
+          readonly minute: number
+        }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly timezone?: string | null
+    readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
+    readonly directory: string
+  }["spec"]
+  readonly timezone?: {
+    readonly name?: string
+    readonly prompt: string
+    readonly spec:
+      | { readonly kind: "once"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
+      | {
+          readonly kind: "weekly"
+          readonly days: ReadonlyArray<number>
+          readonly hour: number
+          readonly minute: number
+        }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly timezone?: string | null
+    readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
+    readonly directory: string
+  }["timezone"]
+  readonly agentId?: {
+    readonly name?: string
+    readonly prompt: string
+    readonly spec:
+      | { readonly kind: "once"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
+      | {
+          readonly kind: "weekly"
+          readonly days: ReadonlyArray<number>
+          readonly hour: number
+          readonly minute: number
+        }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly timezone?: string | null
+    readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
+    readonly directory: string
+  }["agentId"]
+  readonly model?: {
+    readonly name?: string
+    readonly prompt: string
+    readonly spec:
+      | { readonly kind: "once"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
+      | {
+          readonly kind: "weekly"
+          readonly days: ReadonlyArray<number>
+          readonly hour: number
+          readonly minute: number
+        }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly timezone?: string | null
+    readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
+    readonly directory: string
+  }["model"]
+  readonly directory: {
+    readonly name?: string
+    readonly prompt: string
+    readonly spec:
+      | { readonly kind: "once"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
+      | {
+          readonly kind: "weekly"
+          readonly days: ReadonlyArray<number>
+          readonly hour: number
+          readonly minute: number
+        }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly timezone?: string | null
+    readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string }
+    readonly directory: string
+  }["directory"]
+}
+
+export type ScheduleCreateOutput = {
+  id: ScheduleID
+  name?: string
+  prompt: string
+  spec: ScheduleSpec
+  timezone: string
+  agentId?: AgentID
+  model?: ModelRef
+  directory: AbsolutePath
+  enabled: boolean
+  nextRunAtMs?: number
+  lastRunAtMs?: number
+  lastSessionId?: SessionID
+  lastError?: string
+  runCount: number
+  recentRuns?: Array<{
+    taskID: ScheduleID
+    sessionID?: SessionID
+    status: ScheduleRunStatus
+    startedAtMs: number
+    finishedAtMs?: number
+    errorText?: string
+  }> | null
+}
+
+export type ScheduleUpdateInput = {
+  readonly scheduleID: { readonly scheduleID: string }["scheduleID"]
+  readonly name?: {
+    readonly name?: string
+    readonly prompt?: string
+    readonly spec?:
+      | { readonly kind: "once"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
+      | {
+          readonly kind: "weekly"
+          readonly days: ReadonlyArray<number>
+          readonly hour: number
+          readonly minute: number
+        }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly timezone?: string | null
+    readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
+    readonly directory?: string
+    readonly enabled?: boolean
+  }["name"]
+  readonly prompt?: {
+    readonly name?: string
+    readonly prompt?: string
+    readonly spec?:
+      | { readonly kind: "once"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
+      | {
+          readonly kind: "weekly"
+          readonly days: ReadonlyArray<number>
+          readonly hour: number
+          readonly minute: number
+        }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly timezone?: string | null
+    readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
+    readonly directory?: string
+    readonly enabled?: boolean
+  }["prompt"]
+  readonly spec?: {
+    readonly name?: string
+    readonly prompt?: string
+    readonly spec?:
+      | { readonly kind: "once"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
+      | {
+          readonly kind: "weekly"
+          readonly days: ReadonlyArray<number>
+          readonly hour: number
+          readonly minute: number
+        }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly timezone?: string | null
+    readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
+    readonly directory?: string
+    readonly enabled?: boolean
+  }["spec"]
+  readonly timezone?: {
+    readonly name?: string
+    readonly prompt?: string
+    readonly spec?:
+      | { readonly kind: "once"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
+      | {
+          readonly kind: "weekly"
+          readonly days: ReadonlyArray<number>
+          readonly hour: number
+          readonly minute: number
+        }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly timezone?: string | null
+    readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
+    readonly directory?: string
+    readonly enabled?: boolean
+  }["timezone"]
+  readonly agentId?: {
+    readonly name?: string
+    readonly prompt?: string
+    readonly spec?:
+      | { readonly kind: "once"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
+      | {
+          readonly kind: "weekly"
+          readonly days: ReadonlyArray<number>
+          readonly hour: number
+          readonly minute: number
+        }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly timezone?: string | null
+    readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
+    readonly directory?: string
+    readonly enabled?: boolean
+  }["agentId"]
+  readonly model?: {
+    readonly name?: string
+    readonly prompt?: string
+    readonly spec?:
+      | { readonly kind: "once"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
+      | {
+          readonly kind: "weekly"
+          readonly days: ReadonlyArray<number>
+          readonly hour: number
+          readonly minute: number
+        }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly timezone?: string | null
+    readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
+    readonly directory?: string
+    readonly enabled?: boolean
+  }["model"]
+  readonly directory?: {
+    readonly name?: string
+    readonly prompt?: string
+    readonly spec?:
+      | { readonly kind: "once"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
+      | {
+          readonly kind: "weekly"
+          readonly days: ReadonlyArray<number>
+          readonly hour: number
+          readonly minute: number
+        }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly timezone?: string | null
+    readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
+    readonly directory?: string
+    readonly enabled?: boolean
+  }["directory"]
+  readonly enabled?: {
+    readonly name?: string
+    readonly prompt?: string
+    readonly spec?:
+      | { readonly kind: "once"; readonly atMs: number }
+      | { readonly kind: "daily"; readonly hour: number; readonly minute: number }
+      | {
+          readonly kind: "weekly"
+          readonly days: ReadonlyArray<number>
+          readonly hour: number
+          readonly minute: number
+        }
+      | { readonly kind: "cron"; readonly expr: string }
+    readonly timezone?: string | null
+    readonly agentId?: string
+    readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | null
+    readonly directory?: string
+    readonly enabled?: boolean
+  }["enabled"]
+}
+
+export type ScheduleUpdateOutput = {
+  id: ScheduleID
+  name?: string
+  prompt: string
+  spec: ScheduleSpec
+  timezone: string
+  agentId?: AgentID
+  model?: ModelRef
+  directory: AbsolutePath
+  enabled: boolean
+  nextRunAtMs?: number
+  lastRunAtMs?: number
+  lastSessionId?: SessionID
+  lastError?: string
+  runCount: number
+  recentRuns?: Array<{
+    taskID: ScheduleID
+    sessionID?: SessionID
+    status: ScheduleRunStatus
+    startedAtMs: number
+    finishedAtMs?: number
+    errorText?: string
+  }> | null
+}
+
+export type ScheduleRemoveInput = { readonly scheduleID: { readonly scheduleID: string }["scheduleID"] }
+
+export type ScheduleRemoveOutput = {
+  id: ScheduleID
+  name?: string
+  prompt: string
+  spec: ScheduleSpec
+  timezone: string
+  agentId?: AgentID
+  model?: ModelRef
+  directory: AbsolutePath
+  enabled: boolean
+  nextRunAtMs?: number
+  lastRunAtMs?: number
+  lastSessionId?: SessionID
+  lastError?: string
+  runCount: number
+  recentRuns?: Array<{
+    taskID: ScheduleID
+    sessionID?: SessionID
+    status: ScheduleRunStatus
+    startedAtMs: number
+    finishedAtMs?: number
+    errorText?: string
+  }> | null
+}
+
+export type ScheduleRunNowInput = { readonly scheduleID: { readonly scheduleID: string }["scheduleID"] }
+
+export type ScheduleRunNowOutput = {
+  id: ScheduleID
+  name?: string
+  prompt: string
+  spec: ScheduleSpec
+  timezone: string
+  agentId?: AgentID
+  model?: ModelRef
+  directory: AbsolutePath
+  enabled: boolean
+  nextRunAtMs?: number
+  lastRunAtMs?: number
+  lastSessionId?: SessionID
+  lastError?: string
+  runCount: number
+  recentRuns?: Array<{
+    taskID: ScheduleID
+    sessionID?: SessionID
+    status: ScheduleRunStatus
+    startedAtMs: number
+    finishedAtMs?: number
+    errorText?: string
+  }> | null
+}
+
+export type GlobalAutoApproveGetOutput = GlobalAutoApprove
+
+export type GlobalAutoApproveSetInput = { readonly enabled: { readonly enabled: boolean }["enabled"] }
+
+export type GlobalAutoApproveSetOutput = GlobalAutoApprove
 
 export type PermissionRequestListInput = {
   readonly location?: { readonly location?: { readonly directory?: string | undefined } | undefined }["location"]

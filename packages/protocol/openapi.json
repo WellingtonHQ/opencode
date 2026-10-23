@@ -137,7 +137,7 @@
             }
           }
         },
-        "description": "Redeem a pairing code. Browsers receive a session cookie and a redirect to the web app; requests that accept JSON receive a session token to use as the password.",
+        "description": "Redeem a pairing code. Browsers receive a session cookie and a redirect to the web app; requests that accept JSON receive a session token to use as the password and its Basic authentication username (default opencode when omitted).",
         "summary": "Redeem pairing code"
       }
     },
@@ -8165,6 +8165,1042 @@
         "summary": "List pending forms"
       }
     },
+    "/api/schedule": {
+      "get": {
+        "tags": ["schedule"],
+        "operationId": "v2.schedule.list",
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "$ref": "#/components/schemas/Schedule.ID"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "prompt": {
+                        "type": "string"
+                      },
+                      "spec": {
+                        "$ref": "#/components/schemas/Schedule.Spec"
+                      },
+                      "timezone": {
+                        "type": "string"
+                      },
+                      "agentId": {
+                        "$ref": "#/components/schemas/Agent.ID"
+                      },
+                      "model": {
+                        "$ref": "#/components/schemas/Model.Ref"
+                      },
+                      "directory": {
+                        "$ref": "#/components/schemas/AbsolutePath"
+                      },
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "nextRunAtMs": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "lastRunAtMs": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "lastSessionId": {
+                        "$ref": "#/components/schemas/Session.ID"
+                      },
+                      "lastError": {
+                        "type": "string"
+                      },
+                      "runCount": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "recentRuns": {
+                        "anyOf": [
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "taskID": {
+                                  "$ref": "#/components/schemas/Schedule.ID"
+                                },
+                                "sessionID": {
+                                  "$ref": "#/components/schemas/Session.ID"
+                                },
+                                "status": {
+                                  "$ref": "#/components/schemas/Schedule.Run.Status"
+                                },
+                                "startedAtMs": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "finishedAtMs": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "errorText": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["taskID", "status", "startedAtMs"],
+                              "additionalProperties": false
+                            }
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": ["id", "prompt", "spec", "timezone", "directory", "enabled", "runCount"],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Retrieve all scheduled tasks.",
+        "summary": "List scheduled tasks"
+      },
+      "post": {
+        "tags": ["schedule"],
+        "operationId": "v2.schedule.create",
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "$ref": "#/components/schemas/Schedule.ID"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "spec": {
+                      "$ref": "#/components/schemas/Schedule.Spec"
+                    },
+                    "timezone": {
+                      "type": "string"
+                    },
+                    "agentId": {
+                      "$ref": "#/components/schemas/Agent.ID"
+                    },
+                    "model": {
+                      "$ref": "#/components/schemas/Model.Ref"
+                    },
+                    "directory": {
+                      "$ref": "#/components/schemas/AbsolutePath"
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "nextRunAtMs": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "lastRunAtMs": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "lastSessionId": {
+                      "$ref": "#/components/schemas/Session.ID"
+                    },
+                    "lastError": {
+                      "type": "string"
+                    },
+                    "runCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "recentRuns": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "taskID": {
+                                "$ref": "#/components/schemas/Schedule.ID"
+                              },
+                              "sessionID": {
+                                "$ref": "#/components/schemas/Session.ID"
+                              },
+                              "status": {
+                                "$ref": "#/components/schemas/Schedule.Run.Status"
+                              },
+                              "startedAtMs": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "finishedAtMs": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "errorText": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["taskID", "status", "startedAtMs"],
+                            "additionalProperties": false
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["id", "prompt", "spec", "timezone", "directory", "enabled", "runCount"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "ScheduleLimitExceededError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleLimitExceededErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Create a scheduled task and compute its first next run time.",
+        "summary": "Create scheduled task",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "prompt": {
+                    "type": "string"
+                  },
+                  "spec": {
+                    "$ref": "#/components/schemas/Schedule.Spec"
+                  },
+                  "timezone": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "agentId": {
+                    "$ref": "#/components/schemas/Agent.ID"
+                  },
+                  "model": {
+                    "$ref": "#/components/schemas/Model.Ref"
+                  },
+                  "directory": {
+                    "$ref": "#/components/schemas/AbsolutePath"
+                  }
+                },
+                "required": ["prompt", "spec", "directory"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/api/schedule/{scheduleID}": {
+      "get": {
+        "tags": ["schedule"],
+        "operationId": "v2.schedule.get",
+        "parameters": [
+          {
+            "name": "scheduleID",
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/Schedule.ID"
+            },
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "$ref": "#/components/schemas/Schedule.ID"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "spec": {
+                      "$ref": "#/components/schemas/Schedule.Spec"
+                    },
+                    "timezone": {
+                      "type": "string"
+                    },
+                    "agentId": {
+                      "$ref": "#/components/schemas/Agent.ID"
+                    },
+                    "model": {
+                      "$ref": "#/components/schemas/Model.Ref"
+                    },
+                    "directory": {
+                      "$ref": "#/components/schemas/AbsolutePath"
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "nextRunAtMs": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "lastRunAtMs": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "lastSessionId": {
+                      "$ref": "#/components/schemas/Session.ID"
+                    },
+                    "lastError": {
+                      "type": "string"
+                    },
+                    "runCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "recentRuns": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "taskID": {
+                                "$ref": "#/components/schemas/Schedule.ID"
+                              },
+                              "sessionID": {
+                                "$ref": "#/components/schemas/Session.ID"
+                              },
+                              "status": {
+                                "$ref": "#/components/schemas/Schedule.Run.Status"
+                              },
+                              "startedAtMs": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "finishedAtMs": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "errorText": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["taskID", "status", "startedAtMs"],
+                            "additionalProperties": false
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["id", "prompt", "spec", "timezone", "directory", "enabled", "runCount"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ScheduleNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleNotFoundErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Retrieve one scheduled task by ID.",
+        "summary": "Get scheduled task"
+      },
+      "patch": {
+        "tags": ["schedule"],
+        "operationId": "v2.schedule.update",
+        "parameters": [
+          {
+            "name": "scheduleID",
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/Schedule.ID"
+            },
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "$ref": "#/components/schemas/Schedule.ID"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "spec": {
+                      "$ref": "#/components/schemas/Schedule.Spec"
+                    },
+                    "timezone": {
+                      "type": "string"
+                    },
+                    "agentId": {
+                      "$ref": "#/components/schemas/Agent.ID"
+                    },
+                    "model": {
+                      "$ref": "#/components/schemas/Model.Ref"
+                    },
+                    "directory": {
+                      "$ref": "#/components/schemas/AbsolutePath"
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "nextRunAtMs": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "lastRunAtMs": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "lastSessionId": {
+                      "$ref": "#/components/schemas/Session.ID"
+                    },
+                    "lastError": {
+                      "type": "string"
+                    },
+                    "runCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "recentRuns": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "taskID": {
+                                "$ref": "#/components/schemas/Schedule.ID"
+                              },
+                              "sessionID": {
+                                "$ref": "#/components/schemas/Session.ID"
+                              },
+                              "status": {
+                                "$ref": "#/components/schemas/Schedule.Run.Status"
+                              },
+                              "startedAtMs": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "finishedAtMs": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "errorText": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["taskID", "status", "startedAtMs"],
+                            "additionalProperties": false
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["id", "prompt", "spec", "timezone", "directory", "enabled", "runCount"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ScheduleNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleNotFoundErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Update one or more fields of a scheduled task; recomputes the next run when the spec changes.",
+        "summary": "Update scheduled task",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "prompt": {
+                    "type": "string"
+                  },
+                  "spec": {
+                    "$ref": "#/components/schemas/Schedule.Spec"
+                  },
+                  "timezone": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "agentId": {
+                    "$ref": "#/components/schemas/Agent.ID"
+                  },
+                  "model": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/Model.Ref"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "directory": {
+                    "$ref": "#/components/schemas/AbsolutePath"
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        }
+      },
+      "delete": {
+        "tags": ["schedule"],
+        "operationId": "v2.schedule.remove",
+        "parameters": [
+          {
+            "name": "scheduleID",
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/Schedule.ID"
+            },
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "$ref": "#/components/schemas/Schedule.ID"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "spec": {
+                      "$ref": "#/components/schemas/Schedule.Spec"
+                    },
+                    "timezone": {
+                      "type": "string"
+                    },
+                    "agentId": {
+                      "$ref": "#/components/schemas/Agent.ID"
+                    },
+                    "model": {
+                      "$ref": "#/components/schemas/Model.Ref"
+                    },
+                    "directory": {
+                      "$ref": "#/components/schemas/AbsolutePath"
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "nextRunAtMs": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "lastRunAtMs": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "lastSessionId": {
+                      "$ref": "#/components/schemas/Session.ID"
+                    },
+                    "lastError": {
+                      "type": "string"
+                    },
+                    "runCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "recentRuns": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "taskID": {
+                                "$ref": "#/components/schemas/Schedule.ID"
+                              },
+                              "sessionID": {
+                                "$ref": "#/components/schemas/Session.ID"
+                              },
+                              "status": {
+                                "$ref": "#/components/schemas/Schedule.Run.Status"
+                              },
+                              "startedAtMs": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "finishedAtMs": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "errorText": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["taskID", "status", "startedAtMs"],
+                            "additionalProperties": false
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["id", "prompt", "spec", "timezone", "directory", "enabled", "runCount"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ScheduleNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleNotFoundErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Remove a scheduled task and return the removed record.",
+        "summary": "Remove scheduled task"
+      }
+    },
+    "/api/schedule/{scheduleID}/run-now": {
+      "post": {
+        "tags": ["schedule"],
+        "operationId": "v2.schedule.runNow",
+        "parameters": [
+          {
+            "name": "scheduleID",
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/Schedule.ID"
+            },
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "$ref": "#/components/schemas/Schedule.ID"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "spec": {
+                      "$ref": "#/components/schemas/Schedule.Spec"
+                    },
+                    "timezone": {
+                      "type": "string"
+                    },
+                    "agentId": {
+                      "$ref": "#/components/schemas/Agent.ID"
+                    },
+                    "model": {
+                      "$ref": "#/components/schemas/Model.Ref"
+                    },
+                    "directory": {
+                      "$ref": "#/components/schemas/AbsolutePath"
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "nextRunAtMs": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "lastRunAtMs": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "lastSessionId": {
+                      "$ref": "#/components/schemas/Session.ID"
+                    },
+                    "lastError": {
+                      "type": "string"
+                    },
+                    "runCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "recentRuns": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "taskID": {
+                                "$ref": "#/components/schemas/Schedule.ID"
+                              },
+                              "sessionID": {
+                                "$ref": "#/components/schemas/Session.ID"
+                              },
+                              "status": {
+                                "$ref": "#/components/schemas/Schedule.Run.Status"
+                              },
+                              "startedAtMs": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "finishedAtMs": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "errorText": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["taskID", "status", "startedAtMs"],
+                            "additionalProperties": false
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["id", "prompt", "spec", "timezone", "directory", "enabled", "runCount"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ScheduleNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleNotFoundErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Run one scheduled task immediately regardless of its enabled state or next run time.",
+        "summary": "Run scheduled task now"
+      }
+    },
+    "/global/permissions/auto-approve": {
+      "get": {
+        "tags": ["global"],
+        "operationId": "global.auto-approve.get",
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "GlobalAutoApprove",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlobalAutoApprove"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Read whether this server automatically accepts permission requests for all sessions.",
+        "summary": "Get global permission auto-accept"
+      },
+      "put": {
+        "tags": ["global"],
+        "operationId": "global.auto-approve.set",
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "GlobalAutoApprove",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlobalAutoApprove"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Enable or disable automatic permission acceptance for interactive and scheduled sessions on this server.",
+        "summary": "Set global permission auto-accept",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GlobalAutoApprove"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
     "/api/permission/request": {
       "get": {
         "tags": ["permission"],
@@ -15814,6 +16850,16 @@
         "required": ["data"],
         "additionalProperties": false
       },
+      "GlobalAutoApprove": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": ["enabled"],
+        "additionalProperties": false
+      },
       "InstructionEntry.Info": {
         "type": "object",
         "properties": {
@@ -17225,6 +18271,16 @@
         "properties": {
           "token": {
             "type": "string"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": ["token"],
@@ -18449,6 +19505,142 @@
           }
         },
         "required": ["_tag", "type", "message"],
+        "additionalProperties": false
+      },
+      "Schedule.ID": {
+        "type": "string",
+        "pattern": "^task_"
+      },
+      "Schedule.Run.Status": {
+        "type": "string",
+        "enum": ["running", "completed", "failed"]
+      },
+      "Schedule.Spec": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/Schedule.Spec.Once"
+          },
+          {
+            "$ref": "#/components/schemas/Schedule.Spec.Daily"
+          },
+          {
+            "$ref": "#/components/schemas/Schedule.Spec.Weekly"
+          },
+          {
+            "$ref": "#/components/schemas/Schedule.Spec.Cron"
+          }
+        ]
+      },
+      "Schedule.Spec.Cron": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["cron"]
+          },
+          "expr": {
+            "type": "string"
+          }
+        },
+        "required": ["kind", "expr"],
+        "additionalProperties": false
+      },
+      "Schedule.Spec.Daily": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["daily"]
+          },
+          "hour": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 23
+          },
+          "minute": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 59
+          }
+        },
+        "required": ["kind", "hour", "minute"],
+        "additionalProperties": false
+      },
+      "Schedule.Spec.Once": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["once"]
+          },
+          "atMs": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": ["kind", "atMs"],
+        "additionalProperties": false
+      },
+      "Schedule.Spec.Weekly": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["weekly"]
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 6
+            },
+            "minItems": 1
+          },
+          "hour": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 23
+          },
+          "minute": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 59
+          }
+        },
+        "required": ["kind", "days", "hour", "minute"],
+        "additionalProperties": false
+      },
+      "ScheduleLimitExceededErrorEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": ["ScheduleLimitExceededError"]
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": ["_tag", "message"],
+        "additionalProperties": false
+      },
+      "ScheduleNotFoundErrorEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": ["ScheduleNotFoundError"]
+          },
+          "scheduleID": {
+            "type": "string",
+            "pattern": "^task_"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": ["_tag", "scheduleID", "message"],
         "additionalProperties": false
       },
       "ServerInfo": {
@@ -20877,6 +22069,14 @@
     {
       "name": "form",
       "description": "Location form routes."
+    },
+    {
+      "name": "schedule",
+      "description": "Scheduled prompt execution routes."
+    },
+    {
+      "name": "global",
+      "description": "Global server settings."
     },
     {
       "name": "permission",

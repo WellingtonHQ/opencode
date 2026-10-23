@@ -1,7 +1,9 @@
 import { Event } from "@opencode/schema/event"
 import { EventManifest } from "@opencode/schema/event-manifest"
 import { Location } from "@opencode/schema/location"
+import { Schedule } from "@opencode/schema/schedule"
 import type { Definition } from "@opencode/schema/event"
+import { statics } from "@opencode/schema/schema"
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/http-api"
 
@@ -10,6 +12,29 @@ const fields = {
   metadata: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
   location: Schema.optional(Location.PublicRef),
 }
+
+// The event stream uses the encoded timezone shape; Core validates IANA zones before publishing.
+const scheduleInfo = Schema.Struct({ ...Schedule.Info.fields, timezone: Schema.String })
+const scheduleChangedData = Schema.Struct({ info: scheduleInfo })
+const scheduleChanged = Schema.Struct({
+  ...Schedule.Event.Changed.fields,
+  data: scheduleChangedData,
+})
+  .annotate({ identifier: "schedule.changed" })
+  .pipe(
+    statics(() => ({
+      type: Schedule.Event.Changed.type,
+      durability: "ephemeral" as const,
+      durable: undefined,
+      data: scheduleChangedData,
+    })),
+  )
+
+const serverDefinitions = Event.inventory(
+  ...EventManifest.ServerDefinitions.map((definition) =>
+    definition.type === Schedule.Event.Changed.type ? scheduleChanged : definition,
+  ),
+)
 
 const rpcEvent = Schema.Struct({
   id: Event.ID,
@@ -59,7 +84,7 @@ const make = <const Definitions extends ReadonlyArray<Definition>>(definitions: 
 export const makeEventGroup = <const Definitions extends ReadonlyArray<Definition>>(definitions: Definitions) =>
   make(definitions).group
 
-const event = make(EventManifest.ServerDefinitions)
+const event = make(serverDefinitions)
 export const EventGroup = event.group
 export const OpenCodeEvent = event.schema
 export type OpenCodeEvent = typeof OpenCodeEvent.Type

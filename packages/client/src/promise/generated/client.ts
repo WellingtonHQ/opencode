@@ -166,6 +166,20 @@ import type {
   ProjectUpdateOutput,
   FormListInput,
   FormListOutput,
+  ScheduleListOutput,
+  ScheduleGetInput,
+  ScheduleGetOutput,
+  ScheduleCreateInput,
+  ScheduleCreateOutput,
+  ScheduleUpdateInput,
+  ScheduleUpdateOutput,
+  ScheduleRemoveInput,
+  ScheduleRemoveOutput,
+  ScheduleRunNowInput,
+  ScheduleRunNowOutput,
+  GlobalAutoApproveGetOutput,
+  GlobalAutoApproveSetInput,
+  GlobalAutoApproveSetOutput,
   PermissionRequestListInput,
   PermissionRequestListOutput,
   PermissionSavedListInput,
@@ -1541,6 +1555,114 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
+    },
+    schedule: {
+      list: (requestOptions?: RequestOptions) =>
+        request<ScheduleListOutput>(
+          { method: "GET", path: `/api/schedule`, successStatus: 200, declaredStatuses: [400, 401], empty: false },
+          requestOptions,
+        ),
+      get: (input: ScheduleGetInput, requestOptions?: RequestOptions) =>
+        request<ScheduleGetOutput>(
+          {
+            method: "GET",
+            path: `/api/schedule/${encodeURIComponent(input.scheduleID)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      create: (input: ScheduleCreateInput, requestOptions?: RequestOptions) =>
+        request<ScheduleCreateOutput>(
+          {
+            method: "POST",
+            path: `/api/schedule`,
+            body: {
+              name: input["name"],
+              prompt: input["prompt"],
+              spec: input["spec"],
+              timezone: input["timezone"],
+              agentId: input["agentId"],
+              model: input["model"],
+              directory: input["directory"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 409],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      update: (input: ScheduleUpdateInput, requestOptions?: RequestOptions) =>
+        request<ScheduleUpdateOutput>(
+          {
+            method: "PATCH",
+            path: `/api/schedule/${encodeURIComponent(input.scheduleID)}`,
+            body: {
+              name: input["name"],
+              prompt: input["prompt"],
+              spec: input["spec"],
+              timezone: input["timezone"],
+              agentId: input["agentId"],
+              model: input["model"],
+              directory: input["directory"],
+              enabled: input["enabled"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      remove: (input: ScheduleRemoveInput, requestOptions?: RequestOptions) =>
+        request<ScheduleRemoveOutput>(
+          {
+            method: "DELETE",
+            path: `/api/schedule/${encodeURIComponent(input.scheduleID)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      runNow: (input: ScheduleRunNowInput, requestOptions?: RequestOptions) =>
+        request<ScheduleRunNowOutput>(
+          {
+            method: "POST",
+            path: `/api/schedule/${encodeURIComponent(input.scheduleID)}/run-now`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404],
+            empty: false,
+          },
+          requestOptions,
+        ),
+    },
+    global: {
+      "auto-approve": {
+        get: (requestOptions?: RequestOptions) =>
+          request<GlobalAutoApproveGetOutput>(
+            {
+              method: "GET",
+              path: `/global/permissions/auto-approve`,
+              successStatus: 200,
+              declaredStatuses: [400, 401],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        set: (input: GlobalAutoApproveSetInput, requestOptions?: RequestOptions) =>
+          request<GlobalAutoApproveSetOutput>(
+            {
+              method: "PUT",
+              path: `/global/permissions/auto-approve`,
+              body: { enabled: input["enabled"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401],
+              empty: false,
+            },
+            requestOptions,
+          ),
+      },
     },
     permission: {
       request: {
