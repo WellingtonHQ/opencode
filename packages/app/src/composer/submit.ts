@@ -449,7 +449,10 @@ async function sendCommand(
   await session.api.command({
     sessionID: session.id,
     name: command.command,
-    text: command.arguments,
+    text:
+      command.command === "schedule"
+        ? `[Schedule request context]\nTimezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"}\nRequested at: ${new Date().toISOString()}\n[/Schedule request context]\n\n${command.arguments}`
+        : command.arguments,
     files: request.files.map((file) => ({
       uri: file.uri,
       name: file.name,

@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, setSystemTime, test } from "bun:test"
 import type { ModelSelection } from "@/providers/models/selection"
 import type { SessionMessageHandoff } from "@/session/handoff"
 import { Skill } from "@opencode/schema/skill"
@@ -171,6 +171,8 @@ function session(input: {
 }
 
 describe("Composer submission", () => {
+  afterEach(() => setSystemTime())
+
   test("applies the selection and runs a client argument command without admitting it to the session", async () => {
     const state = createMemoryComposerState().capture()
 
@@ -340,6 +342,46 @@ describe("Composer submission", () => {
     await completed.promise
     expect(calls).toEqual(["track", "agent", "model", "command"])
   })
+
+  test.each(["steer", "queue"] as const)(
+    "forwards schedule context and natural language through a %s command",
+    async (delivery) => {
+      setSystemTime(new Date("2026-10-23T16:45:00.000Z"))
+      const text = "tomorrow at 9am, remind me to review  the PR\nand check CI"
+      const state = createMemoryComposerState({ prompt: `/schedule ${text}` }).capture()
+      const calls: string[] = []
+      const history: string[] = []
+      const sent = Promise.withResolvers<Parameters<ComposerSession["api"]["command"]>[0]>()
+
+      const target = session({
+        calls,
+        command: async (request) => {
+          calls.push("command")
+          sent.resolve(request)
+        },
+      })
+
+      await submitInput(
+        active(state, target),
+        undefined,
+        "normal",
+        () => [{ name: "schedule" }],
+        history,
+        undefined,
+        delivery,
+      ).submit(new Event("submit"))
+
+      expect(await sent.promise).toMatchObject({
+        sessionID: target.id,
+        name: "schedule",
+        text: `[Schedule request context]\nTimezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"}\nRequested at: 2026-10-23T16:45:00.000Z\n[/Schedule request context]\n\n${text}`,
+        delivery,
+      })
+      expect(calls).toEqual(delivery === "steer" ? ["switch-agent", "switch-model", "command"] : ["command"])
+      expect(history).toEqual([`add:/schedule ${text}`])
+      expect(state.current()).toEqual([{ type: "text", content: "", start: 0, end: 0 }])
+    },
+  )
 
   test("cancels selection tracking and does not execute a command when selection fails", async () => {
     const state = createMemoryComposerState({ prompt: "/review changes" }).capture()

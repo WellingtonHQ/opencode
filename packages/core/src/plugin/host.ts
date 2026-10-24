@@ -34,6 +34,7 @@ import { WorktreeStrategies } from "../worktree/strategies.js"
 import { Generate } from "../generate.js"
 import { Permission } from "../permission.js"
 import { PluginHooks } from "./hooks.js"
+import { awaitActivation } from "./service.js"
 import type { Interface } from "../plugin.js"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 
@@ -98,6 +99,7 @@ export const make = Effect.fn("PluginHost.make")(function* (
 
   const listAgents = Effect.fn("PluginHost.listAgents")((ref: Location.Ref) =>
     Effect.gen(function* () {
+      yield* awaitActivation
       const location = yield* Location.Service
       const agents = yield* Agent.Service
       return {
@@ -225,7 +227,16 @@ export const make = Effect.fn("PluginHost.make")(function* (
         }),
     },
     model: {
-      list: () => response(models.available()),
+      list: (input) => {
+        const ref = locationRef(input)
+        if (!ref || isCurrentLocation(ref)) return response(models.available())
+        return Effect.gen(function* () {
+          yield* awaitActivation
+          const models = yield* Model.Service
+          const location = yield* Location.Service
+          return { location: new Location.Info(location), data: yield* models.available() }
+        }).pipe(Effect.provide(locations.get(ref)), Effect.orDie)
+      },
       default: () => response(models.default()),
       reload: models.reload,
       transform: (callback) =>

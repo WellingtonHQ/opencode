@@ -59,6 +59,7 @@ import { Reference } from "../reference.js"
 import { WebSearch } from "../websearch.js"
 import { Ripgrep } from "../ripgrep.js"
 import { Session } from "../session.js"
+import { ScheduleTask } from "../schedule.js"
 import { SessionCompaction } from "../session/compaction.js"
 import { SessionInstructions } from "../session/instructions.js"
 import { SubagentJob } from "../session/subagent-job.js"
@@ -77,6 +78,7 @@ import { OpenCodeTools } from "../tool/plugin/opencode.js"
 import { QuestionTool } from "../tool/plugin/question.js"
 import { ReadToolFileSystem } from "../tool/read-filesystem.js"
 import { ReadTool } from "../tool/plugin/read.js"
+import { ScheduleTools } from "../tool/plugin/schedule.js"
 import { ShellTool } from "../tool/plugin/shell.js"
 import { SkillTool } from "../tool/plugin/skill.js"
 import { SubagentTool } from "../tool/plugin/subagent.js"
@@ -142,6 +144,7 @@ const services = [
   WebSearch.Service,
   Ripgrep.Service,
   Session.Service,
+  ScheduleTask.Service,
   SessionCompaction.Service,
   SessionInstructions.Service,
   SubagentJob.Service,
@@ -196,6 +199,7 @@ export const requirements = LayerNode.group([
   WebSearch.node,
   Ripgrep.node,
   Session.node,
+  ScheduleTask.node,
   SessionCompaction.node,
   SessionInstructions.node,
   SubagentJob.node,
@@ -238,6 +242,7 @@ const pre = [
   GlobTool.Plugin,
   GrepTool.Plugin,
   OpenCodeTools.Plugin,
+  ScheduleTools.Plugin,
   McpResourceTools.Plugin,
   QuestionTool.Plugin,
   ReadTool.Plugin,

@@ -1,0 +1,21 @@
+Create a scheduled prompt from the user's natural-language request. Do not execute the future task now.
+
+Use the native opencode.schedule_create tool to save it directly. Do not open a review dialog, ask for an extra confirmation, use shell commands, or edit configuration files to create it. Normal tool permissions still apply. Only claim success after the tool returns the saved task.
+
+Ask follow-up questions with the question tool only when essential information is missing or ambiguous: what to do, when to run, an unclear timezone, an ambiguous requested model/agent/project, or a recurrence the scheduler cannot represent exactly. A bare /schedule should ask what to schedule and when. Use the conversation to resolve references such as "schedule this". Never quietly substitute a different recurrence or unavailable model.
+
+The desktop supplies a [Schedule request context] block with its IANA timezone and the request timestamp. Prefer that timezone over the server's fallback unless the user explicitly chooses another. Resolve "tomorrow", "in two hours", and other relative times from the request timestamp in that timezone; check against the current time before creating a one-time task. An explicit timezone overrides the desktop timezone. Use saved local wall-clock time for recurring schedules so they stay at the requested hour across daylight-saving changes.
+
+Supported settings match the Scheduled Prompts UI: optional name, future prompt text, project directory, agentId, model (providerID, id, optional variant), session mode, timezone, and schedule spec. Defaults: current project, omit agentId/model to use the scheduler defaults, session="reuse". Reuse means the scheduled task's own shared background session, NOT this conversation. session="new" starts fresh on every run. Do not change the current conversation's agent or model just because the future task requests another one. The global auto-accept-permissions setting is not a per-task option; do not change it.
+
+Use opencode.schedule_options for the target project to resolve requested model names, variants, and agent names to real IDs. Ask if more than one plausible match remains. Do not silently use the current conversation's model or agent when the user omitted them.
+
+Choose the simplest exact spec:
+- once: {kind:"once", atMs:<future Unix milliseconds>}.
+- daily: {kind:"daily", hour:0..23, minute:0..59}.
+- weekly: {kind:"weekly", days:[0..6], hour:0..23, minute:0..59}, where Sunday=0. Weekdays are [1,2,3,4,5].
+- cron: {kind:"cron", expr:"<five fields: minute hour day-of-month month day-of-week>"}, for other exactly representable recurrences such as hourly or monthly. Cron is calendar-based, not an arbitrary elapsed-time interval; ask rather than approximate unsupported patterns such as every two weeks.
+
+Separate the future prompt from the scheduling instructions. Preserve the requested work and all context it will need: the task will not inherit this conversation. If attached files or skills matter, put their references in the saved prompt. Do not include this scheduling guidance or the desktop context block in the saved future prompt.
+
+After creation, briefly confirm the saved name or ID, recurrence, timezone, exact next run date/time, project, agent/model overrides or defaults, and new/reused session behavior. Tell the user they can inspect or edit the task in Scheduled Prompts. The server must be running for scheduled tasks to execute.

@@ -4,7 +4,8 @@ import { asc, and, desc, eq, lte, ne, notInArray, sql } from "drizzle-orm"
 import { Cause, Context, Duration, Effect, Exit, Layer, Scope, Schema } from "effect"
 import { Schedule } from "@opencode/schema/schedule"
 import { Identifier } from "@opencode/schema/identifier"
-import { makeGlobalNode } from "@opencode/util/effect/app-node"
+import { Node } from "@opencode/util/effect/app-node"
+import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Bus } from "./bus.js"
 import { Database } from "./database/database.js"
 import { Location } from "./location.js"
@@ -540,7 +541,8 @@ const layer = Layer.effect(
   }),
 )
 
-export const node = makeGlobalNode({
+// Location plugins consume this global service; keep its graph type independent of the Location graph.
+export const node: LayerNode.Provider<Service, never, typeof Node.tags.values.global> = Node.makeGlobalNode({
   service: Service,
   layer,
   deps: [Database.node, Bus.node, Session.node, SessionExecution.node],

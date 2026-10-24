@@ -9,6 +9,29 @@ Scheduled tasks run prompts at specified times and are stored in OpenCode's glob
 
 In the app, open **Schedules** in the sidebar and create a task with a prompt, directory, and schedule. You can also select an agent or model.
 
+### Use natural language
+
+Type `/schedule` in the desktop composer and describe what should run and when:
+
+```text
+/schedule Every weekday at 8am Eastern, review open issues and summarize
+anything needing attention. Use the Build agent, start a fresh session
+each time, and name it Morning review.
+```
+
+The agent creates the task directly and asks follow-up questions only when essential details are missing or ambiguous. You can specify any schedule-dialog option, including the project, model, agent, and session mode; the future prompt does not run during creation.
+
+| Omitted setting | Default |
+| --- | --- |
+| Project | The current project directory. |
+| Timezone | The desktop's local timezone, unless you specify another. |
+| Agent and model | The scheduler's configured defaults, not necessarily this conversation's selections. |
+| Session mode | The task's own shared session, not the conversation creating it. |
+
+The confirmation includes the saved settings and next run time. Inspect or edit the task in **Schedules**; the server must be running for it to execute.
+
+### Use the CLI
+
 Create a daily task from the CLI:
 
 ```bash
