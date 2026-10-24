@@ -11,6 +11,7 @@ import { Capabilities, ID, Info, Model, Ref, VariantID } from "./model.js"
 import type { RuntimeInfo } from "./model.js"
 import { Npm } from "@opencode/util/npm"
 import { Provider } from "./provider.js"
+import { Config } from "./config.js"
 
 export class VariantUnavailableError extends Schema.TaggedError<VariantUnavailableError>()(
   "SessionRunnerModel.VariantUnavailableError",
@@ -369,6 +370,7 @@ export const layer = Layer.effect(
     const integrations = yield* Integration.Service
     const npm = yield* Npm.Service
     const aisdk = yield* AISDK.Service
+    const config = yield* Config.Service
     const load = Effect.fn("ModelResolver.resolveModel")(function* (selected: Info, variant?: VariantID) {
       const provider = yield* providers.get(selected.providerID)
       const connection = yield* integrations.connection.active(
@@ -380,6 +382,25 @@ export const layer = Layer.effect(
         ...selectedVariant,
         settings: Provider.mergeOverlay(provider?.settings, Provider.modelSettings(selectedVariant.settings)),
       }
+      const ignored = credential
+        ? ["settings.apiKey", "settings.authToken", "settings.accessToken", "env"]
+        : hasConfiguredAuth(runtimeInfo)
+          ? ["env"]
+          : []
+      const variables =
+        config.missingEnvironment?.(
+          selected.providerID,
+          selected.id,
+          variant === "default" ? undefined : variant,
+          ignored,
+        ) ?? []
+      if (variables.length)
+        return yield* new ModelConfigurationError({
+          providerID: selected.providerID,
+          modelID: selected.id,
+          package: runtimeInfo.package ?? "unknown",
+          detail: `Missing environment variable${variables.length === 1 ? "" : "s"}: ${variables.join(", ")}`,
+        })
       const model = yield* fromCatalogModel(runtimeInfo, credential, {
         loadPackage: (specifier) => Provider.loadPackage(specifier, npm),
         loadAISDK: (model) => aisdk.model(model),
@@ -478,5 +499,5 @@ function usesAPIKeyAuth(packageName: string | undefined) {
 export const node = makeLocationNode({
   service: Service,
   layer,
-  deps: [Provider.node, Model.node, Integration.node, Npm.node, AISDK.node],
+  deps: [Provider.node, Model.node, Integration.node, Npm.node, AISDK.node, Config.node],
 })

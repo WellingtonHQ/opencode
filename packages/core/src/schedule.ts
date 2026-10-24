@@ -15,6 +15,13 @@ import { Session } from "./session.js"
 import { SessionEvent } from "./session/event.js"
 import { SessionExecution } from "./session/execution.js"
 import { SessionTable } from "./session/sql.js"
+import { Config } from "./config.js"
+import { EnvironmentVariables } from "./environment-variables.js"
+import { Instance } from "./instance/service.js"
+import { Plugin } from "./plugin/service.js"
+import { Integration } from "./integration.js"
+import { Provider } from "./provider.js"
+import { Model } from "./model.js"
 
 export const ID = Schedule.ID
 export type ID = Schedule.ID
@@ -60,6 +67,8 @@ const layer = Layer.effect(
     const bus = yield* Bus.Service
     const sessions = yield* Session.Service
     const execution = yield* SessionExecution.Service
+    const environment = yield* EnvironmentVariables.Service
+    const instances = yield* Instance.Service
     const scope = yield* Scope.Scope
 
     const runFrom = (row: RunRow): Schedule.Run => ({
@@ -308,44 +317,57 @@ const layer = Layer.effect(
       yield* Effect.gen(function* () {
         const reuse = yield* resolveReuse(claimedRow, runID)
         if (reuse === "skipped") return
-        const created =
-          reuse === undefined
-            ? yield* Effect.exit(
-                sessions
-                  .create({
-                    title,
-                    location: Location.Ref.make({ directory: claimedRow.directory }),
-                    ...(claimedRow.agent_id ? { agent: claimedRow.agent_id } : {}),
-                    ...(claimedRow.model ? { model: claimedRow.model } : {}),
-                  })
-                  .pipe(Effect.map((info) => info.id)),
-              )
-            : Exit.succeed(reuse)
-        const sessionID = Exit.isSuccess(created) ? created.value : undefined
-        const exit = Exit.isFailure(created)
-          ? created
-          : yield* Effect.gen(function* () {
-              yield* db
-                .transaction(() =>
-                  Effect.gen(function* () {
-                    yield* db
-                      .update(ScheduleRunTable)
-                      .set({ session_id: created.value })
-                      .where(eq(ScheduleRunTable.id, runID))
-                      .run()
-                      .pipe(Effect.orDie)
-                    yield* db
-                      .update(ScheduleTaskTable)
-                      .set({ last_session_id: created.value })
-                      .where(eq(ScheduleTaskTable.id, claimedRow.id))
-                      .run()
-                      .pipe(Effect.orDie)
-                  }),
-                )
-                .pipe(Effect.orDie)
-              yield* sessions.prompt({ sessionID: created.value, text: claimedRow.prompt, resume: false })
-              yield* sessions.resume(created.value)
-            }).pipe(Effect.exit)
+        const created = yield* Effect.gen(function* () {
+          yield* environment.refresh
+          if (reuse !== undefined) return reuse
+          return yield* sessions
+            .create({
+              title,
+              location: Location.Ref.make({ directory: claimedRow.directory }),
+              ...(claimedRow.agent_id ? { agent: claimedRow.agent_id } : {}),
+              ...(claimedRow.model ? { model: claimedRow.model } : {}),
+            })
+            .pipe(Effect.map((info) => info.id))
+        }).pipe(Effect.exit)
+        const sessionID = Exit.isSuccess(created) ? created.value : reuse
+        const exit = yield* Effect.gen(function* () {
+          const id = yield* created
+          const session = yield* sessions.get(id)
+          yield* Effect.gen(function* () {
+            yield* Plugin.awaitActivation
+            const config = yield* Config.Service
+            if (config.refreshEnvironment) {
+              yield* config.refreshEnvironment()
+              // An env-based integration can change without changing any interpolated config document.
+              const integrations = yield* Integration.Service
+              const providers = yield* Provider.Service
+              const models = yield* Model.Service
+              yield* integrations.reload()
+              yield* providers.reload()
+              yield* models.reload()
+            }
+          }).pipe(instances.provide(session))
+          yield* db
+            .transaction(() =>
+              Effect.gen(function* () {
+                yield* db
+                  .update(ScheduleRunTable)
+                  .set({ session_id: id })
+                  .where(eq(ScheduleRunTable.id, runID))
+                  .run()
+                  .pipe(Effect.orDie)
+                yield* db
+                  .update(ScheduleTaskTable)
+                  .set({ last_session_id: id })
+                  .where(eq(ScheduleTaskTable.id, claimedRow.id))
+                  .run()
+                  .pipe(Effect.orDie)
+              }),
+            )
+            .pipe(Effect.orDie)
+          yield* sessions.prompt({ sessionID: id, text: claimedRow.prompt, resume: false })
+          yield* sessions.resume(id)
+        }).pipe(Effect.exit)
         const interrupted = Exit.isFailure(exit) && Cause.hasInterrupts(exit.cause)
         if (interrupted) return
         const failure = Exit.isFailure(exit) ? Cause.squash(exit.cause) : undefined
@@ -545,5 +567,5 @@ const layer = Layer.effect(
 export const node: LayerNode.Provider<Service, never, typeof Node.tags.values.global> = Node.makeGlobalNode({
   service: Service,
   layer,
-  deps: [Database.node, Bus.node, Session.node, SessionExecution.node],
+  deps: [Database.node, Bus.node, Session.node, SessionExecution.node, EnvironmentVariables.node, Instance.node],
 })

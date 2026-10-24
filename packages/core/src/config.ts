@@ -4,7 +4,7 @@ import { makeLocationNode } from "@opencode/util/effect/app-node"
 import path from "path"
 import { isDeepStrictEqual } from "node:util"
 import { applyEdits, modify, type ParseError, parse } from "jsonc-parser"
-import { Context, Effect, FiberMap, Layer, Option, PubSub, Ref, Schema, Semaphore, Stream } from "effect"
+import { Context, Effect, FiberMap, Layer, Option, PubSub, Ref, Schema, Semaphore, Stream, type Scope } from "effect"
 import { Directory, Document, Info, type Patch, type Entry, Event } from "@opencode/schema/config"
 import { Credential } from "./credential.js"
 import { Bus } from "./bus.js"
@@ -20,6 +20,7 @@ import { ConfigWatch } from "./config/watch.js"
 import { WellKnown } from "./wellknown.js"
 import { AppProcess } from "@opencode/util/process"
 import { ChildProcess } from "effect/process"
+import { EnvironmentVariables } from "./environment-variables.js"
 
 export function latest<K extends keyof Info>(entries: readonly Entry[], key: K): Info[K] | undefined {
   return entries.findLast((entry): entry is Document => entry.type === "document" && entry.info[key] !== undefined)
@@ -29,6 +30,17 @@ export function latest<K extends keyof Info>(entries: readonly Entry[], key: K):
 export interface Interface {
   /** Returns location config documents and discovery sources from lowest to highest priority. */
   readonly entries: () => Effect.Effect<Entry[]>
+  /** Re-resolves environment references and waits for subscribed config consumers to finish rebuilding. */
+  readonly refreshEnvironment?: () => Effect.Effect<void>
+  /** Internal synchronous reload barrier for consumers whose state is needed immediately after a refresh. */
+  readonly onReload?: (listener: (entries: Entry[]) => Effect.Effect<void>) => Effect.Effect<void, never, Scope.Scope>
+  /** Missing references for one selected provider/model, without credential values. */
+  readonly missingEnvironment?: (
+    providerID: string,
+    modelID: string,
+    variant?: string,
+    ignored?: readonly string[],
+  ) => readonly string[]
   /** Compatibility roots consumed by internal compatibility plugins. */
   readonly compatibility?: () => Effect.Effect<{
     readonly claude: readonly AbsolutePath[]
@@ -103,6 +115,22 @@ export const layer = (options?: Options) =>
       const globalService = yield* Global.Service
       const wellknown = yield* WellKnown.Service
       const processes = yield* AppProcess.Service
+      const environment = yield* EnvironmentVariables.Service
+      const context = Context.make(FSUtil.Service, fs).pipe(
+        Context.add(Global.Service, globalService),
+        Context.add(Location.Service, location),
+      )
+      const listeners = new Set<(entries: Entry[]) => Effect.Effect<void>>()
+      const references = new WeakMap<Document, readonly ConfigVariable.CredentialReference[]>()
+      const substitute = (input: Parameters<typeof ConfigVariable.substitute>[0]) => {
+        const get = (name: string) => input.env?.[name] ?? environment.get(name)
+        return ConfigVariable.substitute({
+          ...input,
+          env: Object.fromEntries(
+            Array.from(input.text.matchAll(/\{env:([^}]+)\}/g), (match) => [match[1], get(match[1]) ?? ""]),
+          ),
+        }).pipe(Effect.map((text) => ({ text, references: ConfigVariable.credentialReferences(input.text, get) })))
+      }
       const reloadLock = Semaphore.makeUnsafe(1)
       const updateLock = Semaphore.makeUnsafe(1)
       const decodeOptions = { errors: "all", onExcessProperty: "ignore" } as const
@@ -142,10 +170,19 @@ export const layer = (options?: Options) =>
       const loadFile = Effect.fnUntraced(function* (filepath: string) {
         const text = yield* fs.readFileStringSafe(filepath)
         if (text === undefined) return
-        const substituted = yield* ConfigVariable.substitute({ type: "path", path: filepath, text })
-        const info = yield* parseInfo(substituted, filepath)
+        return yield* loadDocument({ type: "path", path: filepath, text }, AbsolutePath.make(filepath))
+      })
+
+      const loadDocument = Effect.fnUntraced(function* (
+        input: Parameters<typeof ConfigVariable.substitute>[0],
+        path?: AbsolutePath,
+      ) {
+        const substituted = yield* substitute(input)
+        const info = yield* parseInfo(substituted.text, input.type === "path" ? input.path : input.source)
         if (!info) return
-        return new Document({ type: "document", path: AbsolutePath.make(filepath), info })
+        const document = new Document({ type: "document", path, info })
+        references.set(document, substituted.references)
+        return document
       })
 
       const loadWellknownEntry = Effect.fnUntraced(function* (entry: WellKnown.Entry) {
@@ -164,16 +201,13 @@ export const layer = (options?: Options) =>
           ),
         )
         return yield* Effect.forEach(configs, (config) =>
-          ConfigVariable.substitute({
+          loadDocument({
             type: "virtual",
             source: entry.origin,
             dir: entry.origin,
             text: JSON.stringify(config),
             env: variables,
-          }).pipe(
-            Effect.flatMap((text) => parseInfo(text, entry.origin)),
-            Effect.map((info) => (info ? new Document({ type: "document", info }) : undefined)),
-          ),
+          }),
         ).pipe(Effect.map((documents) => documents.filter((document) => document !== undefined)))
       })
 
@@ -198,14 +232,16 @@ export const layer = (options?: Options) =>
           yield* Effect.logWarning("failed to convert managed preferences", { source: plist })
           return []
         }
-        const text = yield* ConfigVariable.substitute({
-          type: "virtual",
-          source: plist,
-          dir: path.dirname(plist),
-          text: ConfigDiscovery.stripPreferenceMetadata(result.value.stdout.toString()),
-        })
-        const info = yield* parseInfo(text, plist)
-        return info ? [new Document({ type: "document", path: plist, info })] : []
+        const document = yield* loadDocument(
+          {
+            type: "virtual",
+            source: plist,
+            dir: path.dirname(plist),
+            text: ConfigDiscovery.stripPreferenceMetadata(result.value.stdout.toString()),
+          },
+          plist,
+        )
+        return document ? [document] : []
       })
 
       const loadDirectory = Effect.fnUntraced(function* (directory: AbsolutePath) {
@@ -231,14 +267,13 @@ export const layer = (options?: Options) =>
           : []
         const content =
           options?.content !== undefined
-            ? yield* ConfigVariable.substitute({
+            ? yield* loadDocument({
                 type: "virtual",
                 source: "OPENCODE_CONFIG_CONTENT",
                 dir: location.directory,
                 text: options.content,
               }).pipe(
-                Effect.flatMap((text) => parseInfo(text, "OPENCODE_CONFIG_CONTENT")),
-                Effect.map((info) => (info ? [new Document({ type: "document", info })] : [])),
+                Effect.map((document) => (document ? [document] : [])),
                 Effect.orDie,
               )
             : []
@@ -264,11 +299,12 @@ export const layer = (options?: Options) =>
               : [],
           )
           .toReversed()
-        const managedSettings = managed.map((entry) =>
-          entry.type === "document" && entry.info.policies
-            ? new Document({ ...entry, info: new Info({ ...entry.info, policies: undefined }) })
-            : entry,
-        )
+        const managedSettings = managed.map((entry) => {
+          if (entry.type !== "document" || !entry.info.policies) return entry
+          const document = new Document({ ...entry, info: new Info({ ...entry.info, policies: undefined }) })
+          references.set(document, references.get(entry) ?? [])
+          return document
+        })
         // Global entries sit below explicit and direct files; project directories rank above them.
         const globalSupplementary = sources.global ? yield* loadDirectory(sources.global).pipe(Effect.orDie) : []
         const projectSupplementary = yield* Effect.forEach(
@@ -323,9 +359,12 @@ export const layer = (options?: Options) =>
           const compatibilityChanged =
             !isDeepStrictEqual(sources.claude, discovered.claude) ||
             !isDeepStrictEqual(sources.agents, discovered.agents)
-          if (isDeepStrictEqual(configs, next) && !compatibilityChanged) return
+          const changed = !isDeepStrictEqual(configs, next) || compatibilityChanged
           sources = discovered
           configs = next
+          // Equal decoded values can still have different missing-variable metadata (for example, empty -> deleted).
+          if (!changed) return
+          yield* Effect.forEach(listeners, (listener) => listener(next), { discard: true })
           yield* bus.publish(Event.Updated, {})
         },
         (effect) => reloadLock.withPermit(effect),
@@ -403,6 +442,40 @@ export const layer = (options?: Options) =>
       )
 
       return Service.of({
+        refreshEnvironment: () => reload().pipe(Effect.provide(context)),
+        onReload: (listener) =>
+          Effect.acquireRelease(
+            Effect.sync(() => {
+              listeners.add(listener)
+            }),
+            () =>
+              Effect.sync(() => {
+                listeners.delete(listener)
+              }),
+          ),
+        missingEnvironment: (providerID, modelID, variant, ignored = []) => {
+          const selected = configs
+            .flatMap((entry) => (entry.type === "document" ? (references.get(entry) ?? []) : []))
+            .filter((reference) => reference.providerID === providerID)
+          // Config documents fold in priority order; model/variant fields then override provider defaults.
+          const effective = [
+            ...selected.filter((reference) => reference.modelID === undefined),
+            ...selected.filter((reference) => reference.modelID === modelID && reference.variant === undefined),
+            ...selected.filter(
+              (reference) => reference.modelID === modelID && reference.variant === variant && variant !== undefined,
+            ),
+          ].reduce(
+            (fields, reference) => fields.set(reference.field, reference),
+            new Map<string, ConfigVariable.CredentialReference>(),
+          )
+          return [
+            ...new Set(
+              Array.from(effective.values())
+                .filter((reference) => !ignored.includes(reference.field))
+                .flatMap((reference) => reference.variables),
+            ),
+          ]
+        },
         entries: Effect.fnUntraced(function* () {
           return configs
         }),
@@ -426,6 +499,7 @@ export function configured(options?: Options) {
       Bus.node,
       FSUtil.node,
       Global.node,
+      EnvironmentVariables.node,
       Location.node,
       Credential.node,
       WellKnown.node,

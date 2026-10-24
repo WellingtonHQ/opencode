@@ -14,6 +14,15 @@ export const observe = Effect.fnUntraced(function* (
     Effect.tap((entries) => Effect.sync(() => (loaded.entries = entries))),
     Effect.andThen(reload),
   )
+  if (config.onReload) {
+    yield* config.onReload((entries) =>
+      Effect.sync(() => {
+        loaded.entries = entries
+      }).pipe(Effect.andThen(reload)),
+    )
+    loaded.entries = yield* config.entries()
+    return loaded
+  }
   yield* event.subscribe().pipe(
     Stream.filter((event) => event.type === "config.updated"),
     Stream.runForEach(() => refresh),

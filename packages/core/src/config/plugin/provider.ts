@@ -18,7 +18,7 @@ export const Plugin = define({
     const loaded = yield* ConfigEntryObserver.observe(
       config,
       ctx.event,
-      ctx.integration.reload().pipe(Effect.andThen(ctx.provider.reload())),
+      ctx.integration.reload().pipe(Effect.andThen(ctx.provider.reload()), Effect.andThen(ctx.model.reload())),
     )
     yield* ctx.integration.transform((integrations) => {
       for (const [id, provider] of configuredProviders(loaded.entries)) {

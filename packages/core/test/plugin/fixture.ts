@@ -25,6 +25,7 @@ import { PluginHooks } from "@opencode/core/plugin/hooks"
 import { Provider } from "@opencode/core/provider"
 import { Session } from "@opencode/core/session"
 import { ScheduleTask } from "@opencode/core/schedule"
+import { EnvironmentVariables } from "@opencode/core/environment-variables"
 import { PersistentPty } from "@opencode/core/persistent-pty"
 import { LocationServiceMap } from "@opencode/core/location-service-map"
 import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
@@ -121,6 +122,9 @@ export const makePluginTestLayer = (permission = permissionLayer) =>
       Mcp.node.replace(emptyMcpLayer),
       Generate.node.replace(generateLayer),
       Permission.node.replace(permission),
+      EnvironmentVariables.node.replace(
+        Layer.succeed(EnvironmentVariables.Service, EnvironmentVariables.make({ inherited: () => process.env })),
+      ),
     ],
   ).pipe(Layer.provideMerge(configLayer))
 

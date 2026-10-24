@@ -107,3 +107,32 @@ opencode schedule run-now <id>
 ```
 
 Scheduled runs and Run now use the same **Auto-accept permissions for all sessions** setting in Settings → General. When enabled, permission requests are accepted automatically; when disabled, they wait for a decision in that run's session.
+
+## Credentials and environment variables
+
+Keep credentials in environment variables and reference them from provider configuration:
+
+```jsonc
+{
+  "providers": {
+    "my-provider": {
+      "package": "@opencode/ai/providers/openai-compatible",
+      "settings": {
+        "baseURL": "https://provider.example/v1",
+        "apiKey": "{env:MY_PROVIDER_API_KEY}",
+      },
+    },
+  },
+}
+```
+
+Before each scheduled run or **Run now**, the server refreshes environment-backed project configuration and waits for provider and model settings to rebuild. Tasks store the prompt and model selection, not copies of API keys.
+
+| Environment source       | Scheduled-run behavior                                                          |
+| ------------------------ | ------------------------------------------------------------------------------- |
+| Windows User variables   | Fresh saved values take highest priority.                                       |
+| Windows System variables | Fresh saved values apply when no User value exists.                             |
+| Process-only variables   | Inherited server values remain available when no saved variable owns that name. |
+| Other platforms          | Values come from the server process environment.                                |
+
+Changing a saved Windows key does not require restarting Desktop or the background server. If a previously saved variable is deleted, its stale inherited value is not reused. A missing referenced provider credential stops the run with the variable name; failure to read saved environment settings also stops the run without sending a model request.

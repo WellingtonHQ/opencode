@@ -15,6 +15,7 @@ import { LocationServiceMap } from "@opencode/core/location-service-map"
 import { Project } from "@opencode/core/project"
 import { ProjectTable } from "@opencode/core/project/sql"
 import { ScheduleTask } from "@opencode/core/schedule"
+import { EnvironmentVariables } from "@opencode/core/environment-variables"
 import { ScheduleRunTable, ScheduleTaskTable } from "@opencode/core/schedule/sql"
 import { Session } from "@opencode/core/session"
 import { SessionExecution } from "@opencode/core/session/execution"
@@ -46,6 +47,9 @@ const node = (execution = SessionExecution.noopLayer) =>
       Project.node.replace(globalProjectNode),
       LocationServiceMap.node.replace(promptLocationNode),
       SessionExecution.node.replace(execution),
+      EnvironmentVariables.node.replace(
+        Layer.succeed(EnvironmentVariables.Service, EnvironmentVariables.make({ inherited: () => process.env })),
+      ),
     ],
   )
 
@@ -130,6 +134,9 @@ const restartNode = (
       Project.node.replace(globalProjectNode),
       LocationServiceMap.node.replace(promptLocationNode),
       execution,
+      EnvironmentVariables.node.replace(
+        Layer.succeed(EnvironmentVariables.Service, EnvironmentVariables.make({ inherited: () => process.env })),
+      ),
       Database.node.replace(Database.configured({ path: file })),
     ],
   )

@@ -3,8 +3,10 @@ export * as ConfigVariable from "./variable.js"
 import os from "os"
 import path from "path"
 import { Effect } from "effect"
-import { type ParseError, parse } from "jsonc-parser"
+import { createScanner, type ParseError, parse } from "jsonc-parser"
+import { isRecord } from "@opencode/ai/utils/record"
 import { FSUtil } from "@opencode/util/fs-util"
+import { ConfigNormalize } from "./normalize.js"
 
 type ParseSource =
   | {
@@ -20,6 +22,63 @@ type ParseSource =
 type SubstituteInput = ParseSource & {
   text: string
   env?: Record<string, string>
+}
+
+export type CredentialReference = {
+  readonly providerID: string
+  readonly modelID?: string
+  readonly variant?: string
+  readonly field: string
+  readonly variables: readonly string[]
+}
+
+/** Inspect only credential fields in provider templates, never their resolved secret values. */
+export function credentialReferences(text: string, get: (name: string) => string | undefined): CredentialReference[] {
+  const visit = (value: unknown, path: readonly string[]): CredentialReference[] => {
+    if (Array.isArray(value)) {
+      if (path[0] === "providers" && path[1] && path[2] === "env" && path.length === 3) {
+        const variables = value.filter((name): name is string => typeof name === "string")
+        return [{ providerID: path[1], field: "env", variables: variables.some(get) ? [] : variables }]
+      }
+      return value.flatMap((item, index) =>
+        visit(item, [...path, isRecord(item) && typeof item.id === "string" ? item.id : String(index)]),
+      )
+    }
+    if (isRecord(value)) return Object.entries(value).flatMap(([key, item]) => visit(item, [...path, key]))
+    if (
+      typeof value !== "string" ||
+      !/^(api[_-]?key|authToken|accessToken|authorization|x-api-key)$/i.test(path.at(-1) ?? "")
+    )
+      return []
+    if (path[0] !== "providers" || !path[1]) return []
+    const field = path.slice(path[4] === "variants" ? 6 : path[2] === "models" ? 4 : 2)
+    if (field.length !== 2 || !["settings", "headers"].includes(field[0] ?? "")) return []
+    const variables = Array.from(value.matchAll(/\{env:([^}]+)\}/g), (match) => match[1]).filter((name) => !get(name))
+    return [
+      {
+        providerID: path[1],
+        ...(path[2] === "models" ? { modelID: path[3] } : {}),
+        ...(path[4] === "variants" ? { variant: path[5] } : {}),
+        field: field[0] === "headers" ? `headers.${field[1]?.toLowerCase()}` : `settings.${field[1]}`,
+        variables,
+      },
+    ]
+  }
+  // Resolve unquoted JSON fragments before validation, but preserve string templates for credential tracking.
+  const scanner = createScanner(text)
+  const strings: { start: number; end: number }[] = []
+  while (true) {
+    scanner.scan()
+    if (scanner.getTokenLength() === 0) break
+    if (text[scanner.getTokenOffset()] !== '"') continue
+    strings.push({ start: scanner.getTokenOffset(), end: scanner.getTokenOffset() + scanner.getTokenLength() })
+  }
+  const template = text.replace(/\{env:([^}]+)\}/g, (token, name: string, offset: number) =>
+    strings.some((range) => range.start <= offset && offset < range.end) ? token : get(name) || "null",
+  )
+  // Track the same canonical fields as the loaded document, including V1 migration and native precedence.
+  const normalized = ConfigNormalize.normalize(parse(template, [], { allowTrailingComma: true }))
+  return normalized.type === "normalized" ? visit(normalized.encoded, []) : []
 }
 
 /** Apply {env:VAR} and {file:path} substitutions to config text. */

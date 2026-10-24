@@ -1,5 +1,6 @@
 import type { FileSystem } from "@opencode/core/filesystem"
 import { Bus } from "@opencode/core/bus"
+import { Config } from "@opencode/core/config"
 import { Image } from "@opencode/core/image"
 import { LocationServiceMap } from "@opencode/core/location-service-map"
 import type { LocationServices } from "@opencode/core/location-services"
@@ -20,10 +21,11 @@ export const promptLocationNode = makeGlobalNode({
       const bus = yield* Bus.Service
       return yield* LayerMap.make(
         (_ref: Location.Ref) =>
-          LayerNode.compile(LayerNode.group([PluginHooks.node, Image.node, Skill.node, Plugin.node]), {
+          LayerNode.compile(LayerNode.group([PluginHooks.node, Image.node, Skill.node, Plugin.node, Config.node]), {
             replacements: [
               Bus.node.replace(Layer.succeed(Bus.Service, bus)),
               Plugin.node.replace(Layer.mock(Plugin.Service, { awaitActivation: Effect.void })),
+              Config.node.replace(Config.testLayer()),
             ],
           }) as unknown as Layer.Layer<LocationServices, FileSystem.DirectoryNotFoundError>,
       )

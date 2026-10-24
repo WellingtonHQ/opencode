@@ -18,6 +18,7 @@ import { AISDK } from "@opencode/core/aisdk"
 import { Generate } from "@opencode/core/generate"
 import { Integration } from "@opencode/core/integration"
 import { ModelResolver } from "@opencode/core/model-resolver"
+import { Config } from "@opencode/core/config"
 import { ID, Info, Model, Ref } from "@opencode/core/model"
 import { Provider } from "@opencode/core/provider"
 import { Npm } from "@opencode/util/npm"
@@ -76,7 +77,9 @@ const aisdk = Layer.mock(AISDK.Service, {
 })
 const client = TestLLM.testLayer({ fallback: TestLLM.text("OK", "generate") })
 
-const resolver = ModelResolver.layer.pipe(Layer.provide(Layer.mergeAll(providers, models, integrations, npm, aisdk)))
+const resolver = ModelResolver.layer.pipe(
+  Layer.provide(Layer.mergeAll(providers, models, integrations, npm, aisdk, Config.testLayer())),
+)
 const it = testEffect(Generate.layer.pipe(Layer.provide(Layer.merge(resolver, client))))
 const resolverIt = testEffect(resolver)
 const retryIt = testEffect(Generate.layer.pipe(Layer.provideMerge(Layer.merge(resolver, TestLLM.testLayer()))))
