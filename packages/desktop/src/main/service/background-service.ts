@@ -58,7 +58,9 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
         ...cli.command,
         "serve",
         "--service",
-        ...(isolated && process.env.OPENCODE_SERVER_HOST === undefined ? ["--hostname", "0.0.0.0"] : []),
+        // Bind the private (isolated) server to loopback so only this machine can reach it; the
+        // overall server stays reachable over tailscale, never 0.0.0.0.
+        ...(isolated && process.env.OPENCODE_SERVER_HOST === undefined ? ["--hostname", "127.0.0.1"] : []),
         ...(isolated && process.env.OPENCODE_SERVER_PORT === undefined ? ["--port", String(0x0c0c)] : []),
       ],
       onStart: (reason, previousVersion) =>
