@@ -93,6 +93,11 @@ const fixture = test.extend<{ site: Site }, { builds: Record<string, Record<stri
           .writeHead(200, { "content-type": "application/json" })
           .end(`{"version":"test","pid":1,"urls":["${url.origin}"],"paths":{"tmp":"/tmp/opencode"}}`)
 
+      if (path === "/sign-in" || path === "/sign-out")
+        return void response
+          .writeHead(200, { "content-type": "text/html" })
+          .end(`<title>${path === "/sign-in" ? "Sign in" : "Sign out"} · fixture</title>`)
+
       if (path === "/sw.js" && state.legacy && state.version === "old") {
         // Model the shipped worker's shared precache name and cache-first navigation behavior.
         const urls = Object.keys(builds.old).filter(
@@ -365,7 +370,7 @@ fixture("upgrades the legacy shared precache only after old tabs close", async (
   await expect(observer.getByRole("status")).toHaveText("new nested lazy loaded")
 })
 
-fixture("does not substitute cached HTML for API or missing asset navigations", async ({ page, site }) => {
+fixture("does not substitute cached HTML for API, missing asset, or sign-in navigations", async ({ page, site }) => {
   await install(page, site.url)
   const api = await page.goto(`${site.url}/api/info`)
   expect(await api?.json()).toEqual({
@@ -378,6 +383,12 @@ fixture("does not substitute cached HTML for API or missing asset navigations", 
   const asset = await page.goto(`${site.url}/_assets/missing.js`)
   expect(asset?.status()).toBe(404)
   expect(await asset?.text()).toBe("Not found")
+
+  for (const path of ["/sign-in", "/sign-out"]) {
+    const form = await page.goto(`${site.url}${path}`)
+    expect(form?.fromServiceWorker()).toBe(false)
+    expect(await form?.text()).toContain(`<title>${path === "/sign-in" ? "Sign in" : "Sign out"}`)
+  }
 })
 
 test("the production build precaches every deployable file except on-demand Office assets", async ({
