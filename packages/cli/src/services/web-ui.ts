@@ -16,12 +16,15 @@ export const handler = Effect.fn("cli.web-ui.handler")(function* (options?: {
     Effect.gen(function* () {
       const request = yield* HttpServerRequest.HttpServerRequest
       const url = new URL(request.url, "http://localhost")
-      // Serve the web shell before API authentication so a signed-out browser gets the app's sign-in screen.
+      // The server owns its API, pairing links, and browser sign-in/sign-out pages; everything else is the
+      // bundled web shell, served before API authentication so a signed-out browser reaches the sign-in page.
       if (
         url.pathname === "/api" ||
         url.pathname.startsWith("/api/") ||
         url.pathname.startsWith("/auth/") ||
-        url.pathname === "/openapi.json"
+        url.pathname === "/openapi.json" ||
+        url.pathname === "/sign-in" ||
+        url.pathname === "/sign-out"
       )
         return yield* api.pipe(
           Effect.catchIf(isRouteNotFound, () => Effect.succeed(HttpServerResponse.empty({ status: 404 }))),

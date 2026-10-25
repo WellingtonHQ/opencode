@@ -61,6 +61,11 @@ describe("web UI", () => {
           expect(response.headers.get("location")).toStartWith("/sign-in")
         }),
       )
+      const form = yield* Effect.promise(() =>
+        fetch(new URL("/sign-in?next=%2F", origin), { redirect: "manual", headers: { accept: "text/html" } }),
+      )
+      expect(form.status).toBe(200)
+      expect(yield* Effect.promise(() => form.text())).toContain('<form method="post" action="/sign-in">')
       yield* Effect.forEach(["/api", "/api/info", "/api/event", "/api/missing", "/openapi.json"], (pathname) =>
         Effect.gen(function* () {
           const response = yield* Effect.promise(() => fetch(new URL(pathname, origin)))
@@ -97,6 +102,44 @@ describe("web UI", () => {
       expect(yield* Effect.promise(() => shell.text())).toContain("connect")
     }).pipe(Effect.provide(NodeFileSystem.layer)),
   )
+
+  test("reserves the server's browser sign-in and sign-out pages for the API", async () => {
+    const assets = { "index.html": "<html><body>shell</body></html>" }
+
+    await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const transform = yield* WebUi.handler({ assets })
+          const http = yield* NodeHttpServer.make(createServer, { host: "127.0.0.1", port: 0 })
+          yield* http.serve(
+            transform(
+              Effect.gen(function* () {
+                const request = yield* HttpServerRequest.HttpServerRequest
+                const pathname = new URL(request.url, "http://localhost").pathname
+                if (pathname === "/sign-in" || pathname === "/sign-out")
+                  return HttpServerResponse.text(`auth page ${pathname}`, { contentType: "text/html" })
+                return yield* Effect.fail(
+                  new HttpServerError.HttpServerError({ reason: new HttpServerError.RouteNotFound({ request }) }),
+                )
+              }),
+            ),
+          )
+          const origin = HttpServer.formatAddress(http.address)
+
+          for (const pathname of ["/sign-in", "/sign-in?next=%2F", "/sign-out"]) {
+            const response = yield* Effect.promise(() =>
+              fetch(new URL(pathname, origin), { headers: { accept: "text/html" } }),
+            )
+            expect(response.status).toBe(200)
+            expect(yield* Effect.promise(() => response.text())).toContain("auth page")
+          }
+
+          const shell = yield* Effect.promise(() => fetch(new URL("/some/page", origin)))
+          expect(yield* Effect.promise(() => shell.text())).toContain("shell")
+        }),
+      ).pipe(Effect.provide(NodeFileSystem.layer)),
+    )
+  })
 
   test("sends embedded brotli bytes as they are to browsers that accept them", async () => {
     const script = "console.log('compressed')".repeat(50)
