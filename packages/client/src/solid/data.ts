@@ -51,6 +51,7 @@ import {
 import { createStore, produce, reconcile } from "solid-js/store"
 import type { SessionInbox } from "@opencode/schema/session-inbox"
 import { batch, createEffect, createMemo, createSignal, onCleanup } from "solid-js"
+import { createCatalog } from "./catalog"
 
 export type DataSessionStatus = "idle" | "running"
 /**
@@ -1227,7 +1228,7 @@ export function createData(config: CreateDataInput) {
         const location = { directory: ref[0], workspaceID: ref[1] ?? undefined }
         if (event.type === "credential.updated") {
           result.location.integration.invalidate(location)
-          refresh(() => result.location.integration.sync(location))
+          refresh(() => catalog.refresh(location) ?? result.location.integration.sync(location))
           return
         }
         setStore("location", key, (data) => ({
@@ -1245,7 +1246,11 @@ export function createData(config: CreateDataInput) {
         }))
         result.location.model.invalidate(location)
         result.location.provider.invalidate(location)
-        refresh(() => Promise.all([result.location.model.sync(location), result.location.provider.sync(location)]))
+        refresh(
+          () =>
+            catalog.refresh(location) ??
+            Promise.all([result.location.model.sync(location), result.location.provider.sync(location)]),
+        )
       })
       return
     }
@@ -1255,11 +1260,11 @@ export function createData(config: CreateDataInput) {
     switch (event.type) {
       case "provider.updated":
         result.location.provider.invalidate(location)
-        refresh(() => result.location.provider.sync(location))
+        refresh(() => catalog.refresh(location) ?? result.location.provider.sync(location))
         break
       case "model.updated":
         result.location.model.invalidate(location)
-        refresh(() => result.location.model.sync(location))
+        refresh(() => catalog.refresh(location) ?? result.location.model.sync(location))
         break
       case "agent.updated":
         result.location.agent.invalidate(location)
@@ -1312,12 +1317,14 @@ export function createData(config: CreateDataInput) {
         result.location.integration.invalidate(location)
         result.location.model.invalidate(location)
         result.location.provider.invalidate(location)
-        refresh(() =>
-          Promise.all([
-            result.location.integration.sync(location),
-            result.location.model.sync(location),
-            result.location.provider.sync(location),
-          ]),
+        refresh(
+          () =>
+            catalog.refresh(location) ??
+            Promise.all([
+              result.location.integration.sync(location),
+              result.location.model.sync(location),
+              result.location.provider.sync(location),
+            ]),
         )
         break
       case "config.updated":
@@ -1359,6 +1366,7 @@ export function createData(config: CreateDataInput) {
         const id = locationKey(location)
         return sync.run(`location.${field}:${id}`, async () => {
           const response = await load(locationQuery(location))
+          if (disposed) return
           const key = locationKey(response.location)
           publish(key, response.data)
           if (options?.alias && key !== id) publish(id, response.data)
@@ -1376,6 +1384,23 @@ export function createData(config: CreateDataInput) {
       location: response.location,
       data: Object.fromEntries(response.data.map((info) => [info.id, { ...info, location: ref }])),
     }
+  })
+
+  const catalog = createCatalog({
+    key: (ref) => locationKey(ref ?? defaultLocation()),
+    connected: () => !config.connection || config.connection.status() === "connected",
+    async load(ref) {
+      if (!ref) await result.location.syncInfo()
+      if (disposed) return
+      const location = ref ?? defaultLocation()
+      const results = await Promise.allSettled([
+        result.location.provider.sync(location),
+        result.location.model.sync(location),
+        result.location.integration.sync(location),
+      ])
+      const errors = results.flatMap((result) => (result.status === "rejected" ? [result.reason] : []))
+      if (errors.length) throw new AggregateError(errors)
+    },
   })
 
   const result = {
@@ -1916,6 +1941,7 @@ export function createData(config: CreateDataInput) {
       invalidate: shells.invalidate,
     },
     location: {
+      catalog,
       info(ref?: LocationRef) {
         return store.location[locationKey(ref ?? defaultLocation())]?.info
       },
@@ -1926,6 +1952,7 @@ export function createData(config: CreateDataInput) {
         const current = ref ?? defaultLocation()
         return sync.run(`location:${locationKey(current)}`, async () => {
           const location = await api().location.get({ location: locationQuery(current) })
+          if (disposed) return
           const key = locationKey(location)
           if (!store.location[key]) setStore("location", key, {})
           setStore("location", key, "info", location)
@@ -2003,7 +2030,11 @@ export function createData(config: CreateDataInput) {
   }
 
   createEffect(() => {
-    if (config.connection?.status() === "connected") return
+    if (!config.connection || config.connection.status() === "connected") {
+      catalog.resume()
+      return
+    }
+    catalog.pause()
     sync.invalidate()
   })
 

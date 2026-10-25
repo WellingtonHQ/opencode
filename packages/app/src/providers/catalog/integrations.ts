@@ -1,21 +1,11 @@
-import { useServerSDK } from "@/runtime/server/client"
 import { useData } from "@/runtime/server/current"
-import { createEffect, type Accessor } from "solid-js"
+import { createMemo, type Accessor } from "solid-js"
+import type { IntegrationInfo } from "@opencode/client/promise"
+import { useCatalog } from "./load"
 
 export function useIntegrations(directory: Accessor<string | undefined>) {
-  const serverSDK = useServerSDK()
   const data = useData()
-
-  createEffect(() => {
-    if (serverSDK.connection.status() !== "connected") return
-    const value = directory()
-    void (async () => {
-      const ref = value ? { directory: value } : undefined
-
-      if (!ref) await data.location.syncInfo()
-      await data.location.integration.sync(ref ?? data.location.default())
-    })().catch(() => undefined)
-  })
+  const catalog = useCatalog(directory)
 
   const location = () => {
     const value = directory()
@@ -23,8 +13,16 @@ export function useIntegrations(directory: Accessor<string | undefined>) {
     return value ? { directory: value } : undefined
   }
 
+  const snapshot = createMemo<{ directory: string | undefined; list: IntegrationInfo[] | undefined }>((previous) => {
+    const key = directory()
+
+    if (previous && previous.directory === key && (catalog.loading() || catalog.error())) return previous
+    return { directory: key, list: data.location.integration.list(location()) }
+  })
+
   return {
-    ready: () => data.location.integration.list(location()) !== undefined,
-    list: () => data.location.integration.list(location()) ?? [],
+    ...catalog,
+    ready: () => snapshot().list !== undefined,
+    list: () => snapshot().list ?? [],
   }
 }

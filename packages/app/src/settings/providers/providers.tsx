@@ -402,12 +402,47 @@ export const SettingsProviders: Component<{
       </div>
 
       <div class="settings-tab-body settings-tab-body--sectioned settings-providers">
+        <Show when={providers.error()}>
+          {(error) => (
+            <div role="alert" class="flex items-center justify-between gap-4 text-13-regular text-v2-text-text-muted">
+              <div class="flex flex-col gap-1">
+                <span>{language.t("settings.providers.catalog.error")}</span>
+                <span>
+                  {language.t(
+                    error() === "authentication"
+                      ? "settings.providers.catalog.authentication"
+                      : providers.retrying()
+                        ? "settings.providers.catalog.retrying"
+                        : "settings.providers.catalog.failed",
+                  )}
+                </span>
+              </div>
+              <Button
+                size="normal"
+                variant="neutral"
+                disabled={providers.loading()}
+                onClick={() => void providers.retry().catch(() => undefined)}
+              >
+                {language.t("settings.providers.catalog.retry")}
+              </Button>
+            </div>
+          )}
+        </Show>
+        <Show when={!providers.error() && (!providers.ready() || !integrations.ready())}>
+          <div role="status" class="settings-provider-empty">
+            {language.t("settings.providers.catalog.loading")}
+          </div>
+        </Show>
         <div class="settings-section" data-component="connected-providers-section">
           <h3 class="settings-section-title">{language.t("settings.providers.section.connected")}</h3>
           <SettingsList variant="catalog">
             <Show
               when={displayed().length > 0}
-              fallback={<div class="settings-provider-empty">{language.t("settings.providers.connected.empty")}</div>}
+              fallback={
+                <Show when={providers.ready() && integrations.ready() && !providers.error()}>
+                  <div class="settings-provider-empty">{language.t("settings.providers.connected.empty")}</div>
+                </Show>
+              }
             >
               <For each={displayed()}>
                 {(item) => {

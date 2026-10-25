@@ -721,6 +721,64 @@ for (const row of ["configured", "disabled", "failure"] as const) {
   })
 }
 
+test("providers: catalog loading and errors are not empty results, and Retry keeps the last good rows", async ({
+  page,
+}) => {
+  const response = Promise.withResolvers<void>()
+  let phase: "loading" | "failed" | "connected" | "refresh-failed" | "empty" = "loading"
+  const { settings, push } = await open(page, {
+    provider: () =>
+      phase === "empty"
+        ? NO_PROVIDER
+        : {
+            all: [{ id: "openai", name: "OpenAI", models: {} }],
+            connected: ["openai"],
+            default: {},
+          },
+    integrations: [{ id: "openai", name: "OpenAI", methods: [{ type: "key" }], connections: [] }],
+    beforeCatalogResponse: async ({ resource }) => {
+      if (resource !== "model") return
+      if (phase === "loading") await response.promise
+      if (phase === "failed" || phase === "refresh-failed")
+        return { status: 503, body: { _tag: "ServerUnavailableError" } }
+    },
+  })
+  await settings.getByRole("tab", { name: "Providers", exact: true }).click()
+  await expect(settings.getByRole("status")).toHaveText("Loading provider catalog…")
+  await expect(settings.getByText("No connected providers")).toHaveCount(0)
+  phase = "failed"
+  response.resolve()
+  const alert = settings.getByRole("alert")
+  await expect(alert).toContainText("Could not load the provider catalog.")
+  await expect(settings.getByText("No connected providers")).toHaveCount(0)
+  phase = "connected"
+  await alert.getByRole("button", { name: "Retry", exact: true }).click()
+  const connected = settings.locator('[data-component="connected-providers-section"]')
+  await expect(connected.getByText("OpenAI", { exact: true })).toBeVisible()
+  await expect(alert).toHaveCount(0)
+  phase = "refresh-failed"
+  await push([{ id: "evt_catalog", created: Date.now(), type: "model.updated", location: { directory }, data: {} }])
+  await expect(alert).toContainText("Could not load the provider catalog.")
+  await expect(connected.getByText("OpenAI", { exact: true })).toBeVisible()
+  phase = "empty"
+  // An integration update invalidates all three catalogs, as a real credential change does.
+  await push([
+    { id: "evt_catalog_empty", created: Date.now(), type: "integration.updated", location: { directory }, data: {} },
+  ])
+  await expect(settings.getByText("No connected providers")).toBeVisible()
+  await expect(alert).toHaveCount(0)
+})
+
+test("providers: catalog authorization errors explain how to reconnect", async ({ page }) => {
+  const { settings } = await open(page, {
+    beforeCatalogResponse: ({ resource }) => (resource === "provider" ? { status: 403, body: {} } : undefined),
+  })
+  await settings.getByRole("tab", { name: "Providers", exact: true }).click()
+  await expect(settings.getByRole("alert")).toContainText("Sign in again or reconnect to this server, then retry.")
+  await expect(settings.getByRole("alert").getByRole("button", { name: "Retry", exact: true })).toBeEnabled()
+  await expect(settings.getByText("No connected providers")).toHaveCount(0)
+})
+
 // Zen and the Console account share the id `opencode`: the provider comes from models.dev, the
 // integration carries the account sign-in.
 for (const row of [

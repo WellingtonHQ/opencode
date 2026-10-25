@@ -45,6 +45,11 @@ export interface MockServerConfig {
   server?: string
   provider: Resolvable<MockProviderCatalog>
   integrations?: Resolvable<unknown[]>
+  // Holds or fails catalog reads without replacing the catalog's normal response encoding.
+  beforeCatalogResponse?: (input: {
+    resource: "location" | "provider" | "model" | "integration"
+    directory: string | null
+  }) => void | MockAnswer | Promise<void | MockAnswer>
   // Runs on POST /api/credential/:id/activate; the fixture swaps its integrations and catalog to the new account.
   onCredentialActivate?: (credentialID: string) => void
   // Runs on PATCH /api/credential/:id with the request body; the fixture applies the new label.
@@ -381,6 +386,15 @@ export async function mockOpenCodeServer(page: Page, config: MockServerConfig) {
     }
 
     const directory = url.searchParams.get("directory") ?? url.searchParams.get("location[directory]")
+
+    const resource = url.pathname.slice("/api/".length)
+    if (
+      route.request().method() === "GET" &&
+      (resource === "location" || resource === "provider" || resource === "model" || resource === "integration")
+    ) {
+      const answer = await config.beforeCatalogResponse?.({ resource, directory })
+      if (answer) return route.fulfill({ status: answer.status, headers: corsHeaders, json: answer.body })
+    }
 
     if (config.strictDirectory && directory && !ownedDirectories(config).has(directory)) {
       return route.fulfill({ status: 500, headers: corsHeaders, json: { name: "InvalidDirectory" } })

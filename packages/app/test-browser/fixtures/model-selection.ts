@@ -147,6 +147,13 @@ function fixture(input: { session?: Commit; agents?: Agent[]; config?: ConfigMod
     data: {
       session: { get: (id: string) => state.sessions[id] },
       location: {
+        // Selection scenarios start with a loaded catalog; recovery belongs to the catalog tests.
+        catalog: {
+          watch: () => ({
+            state: { loading: false, error: undefined, retrying: false },
+            retry: async () => {},
+          }),
+        },
         agent: { list: () => state.agents },
         config: {
           list: () => (state.configLoaded ? [{ type: "document", info: { model: state.config } }] : undefined),

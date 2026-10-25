@@ -359,12 +359,15 @@ export function make(options: ClientOptions) {
   }
 
   const responseError = async (response: Response, descriptor: RequestDescriptor): Promise<never> => {
-    if (descriptor.declaredStatuses.includes(response.status))
-      throw declared((await json(response)) as DeclaredErrorBody)
+    const cause = { status: response.status, retryAfter: response.headers.get("retry-after") }
+    if (descriptor.declaredStatuses.includes(response.status)) {
+      const body = await json(response).catch(() => undefined)
+      if (body) throw Object.assign(declared(body as DeclaredErrorBody), { cause })
+    }
     try {
       await response.body?.cancel()
     } catch {}
-    throw new ClientError("UnexpectedStatus", { cause: { status: response.status }, detail: String(response.status) })
+    throw new ClientError("UnexpectedStatus", { cause, detail: String(response.status) })
   }
 
   const request = async <A>(descriptor: RequestDescriptor, requestOptions?: RequestOptions): Promise<A> => {

@@ -28,11 +28,12 @@ export function useProviderAccountActions(directory: () => string | undefined) {
     data.location.integration.invalidate(ref)
     data.location.provider.invalidate(ref)
     data.location.model.invalidate(ref)
-    await Promise.all([
-      data.location.integration.sync(ref),
-      data.location.provider.sync(ref),
-      data.location.model.sync(ref),
-    ])
+    await (data.location.catalog.refresh(ref) ??
+      Promise.all([
+        data.location.integration.sync(ref),
+        data.location.provider.sync(ref),
+        data.location.model.sync(ref),
+      ]))
   }
 
   // The server loads a Console workspace's providers after the credential changes, so the first

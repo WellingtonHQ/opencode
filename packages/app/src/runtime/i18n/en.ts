@@ -992,6 +992,13 @@ export const dict = {
   "settings.providers.description": "Connect and manage model providers",
   "settings.providers.section.connected": "Connected providers",
   "settings.providers.connected.empty": "No connected providers",
+  "settings.providers.catalog.loading": "Loading provider catalog…",
+  "settings.providers.catalog.error": "Could not load the provider catalog.",
+  "settings.providers.catalog.authentication": "Sign in again or reconnect to this server, then retry.",
+  "settings.providers.catalog.retrying": "Retrying automatically. Previously loaded providers are still shown.",
+  "settings.providers.catalog.failed":
+    "Check your server connection, then retry. Previously loaded providers are still shown.",
+  "settings.providers.catalog.retry": "Retry",
   "settings.providers.connected.environmentDescription": "Connected from your environment variables",
   "settings.providers.account.manage": "Manage {{provider}} accounts",
   "settings.providers.account.group": "Accounts",
