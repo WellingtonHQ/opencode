@@ -71,7 +71,8 @@ export const currentRoute = (pathname: string, search: string): LayoutRoute => {
     }
   }
 
-  throw new Error("Unrecognised route!")
+  // Unknown paths (stale deep links, the server's sign-in page, typos) land on Home instead of crashing the shell.
+  return { type: "home" }
 }
 
 export const useCurrentRoute = () => {

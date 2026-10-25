@@ -10,6 +10,13 @@ test.each(["settings", "connect"] as const)("%s has its own layout route", (type
   expect(currentRoute(`/${type}`, "")).toEqual({ type })
 })
 
+test.each(["sign-in", "sign-out", "session/stale-link", "workspace/missing"] as const)(
+  "unknown path /%s lands on home instead of throwing",
+  (path) => {
+    expect(currentRoute(`/${path}`, "")).toEqual({ type: "home" })
+  },
+)
+
 describe("layout persistence", () => {
   const schema = Persistence.withInitial(layoutPersistence, initialLayout(ServerConnection.Key.make("local")))
   const decode = Schema.decodeUnknownSync(schema)
