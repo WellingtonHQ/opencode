@@ -12,6 +12,9 @@ function escapeHtml(value: string) {
 
 function safeNext(raw: string | null) {
   if (!raw || !raw.startsWith("/") || raw.startsWith("//") || /[\s\\\u0000-\u001f\u007f]/.test(raw)) return "/"
+  // The auth pages are the sign-in flow itself; returning to them after sign-in loops.
+  const path = raw.split("?")[0]
+  if (path === "/sign-in" || path === "/sign-out") return "/"
   return raw
 }
 
@@ -141,11 +144,15 @@ export const signInRoute = HttpRouter.use((router) =>
     const rateLimit = yield* ServerRateLimit.Service
     const database = yield* Database.Service
     yield* router.add("GET", "/sign-in", (request) =>
-      Effect.succeed(
-        ServerAuth.required(config)
-          ? signInPage(config.username, safeNext(new URL(request.url, "http://localhost").searchParams.get("next")))
-          : HttpServerResponse.redirect("/"),
-      ),
+      Effect.gen(function* () {
+        if (!ServerAuth.required(config)) return HttpServerResponse.redirect("/")
+        const next = safeNext(new URL(request.url, "http://localhost").searchParams.get("next"))
+        // A signed-in browser has nothing to sign in to; send it on its way instead of showing the form.
+        const token = ServerSession.tokenFromCookies(request.cookies, ServerAuth.requestHost(request))
+        if (token !== undefined && (yield* ServerSession.isValid(database.db, token, config)))
+          return HttpServerResponse.redirect(next)
+        return signInPage(config.username, next)
+      }),
     )
     yield* router.add("POST", "/sign-in", (request) => postSignIn(request, config, rateLimit, database.db))
     yield* router.add(

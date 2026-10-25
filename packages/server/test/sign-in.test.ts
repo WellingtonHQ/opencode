@@ -49,6 +49,9 @@ it.live("reserves browser sign-in and sign-out pages ahead of the bundled UI", (
   expect(body).toContain('autocomplete="username"')
   expect(body).toContain('autocomplete="current-password"')
   expect(body).toContain("Remember me for 30 days")
+  const selfRef = yield* server.request("/sign-in?next=%2Fsign-in")
+  expect(selfRef.status).toBe(200)
+  expect(yield* Effect.promise(() => selfRef.text())).toContain('<input type="hidden" name="next" value="/"')
   const signOut = yield* server.request("/sign-out")
   expect(yield* Effect.promise(() => signOut.text())).toContain('<form method="post" action="/sign-out">')
 
@@ -84,6 +87,9 @@ it.live("validates the form and returns signed-in browsers to their local bundle
   expect(setCookie.toLowerCase()).toContain("samesite=lax")
   const session = cookie(signedIn)
   expect((yield* server.request("/api/info", { headers: { cookie: session } })).status).toBe(200)
+  const signedInSignIn = yield* server.request("/sign-in?next=/some/page", { headers: { cookie: session } })
+  expect(signedInSignIn.status).toBe(302)
+  expect(signedInSignIn.headers.get("location")).toBe("/some/page")
   const home = yield* server.request("/some/page", { headers: { cookie: session, accept: "text/html" } })
   expect(home.status).toBe(200)
   expect(yield* Effect.promise(() => home.text())).toBe("<html>local bundled app</html>")
@@ -184,7 +190,7 @@ it.live("rejects cross-origin form posts, escapes HTML, and restricts return pat
   const foreign = yield* server.signIn(undefined, { origin: "http://evil.example" })
   expect(foreign.status).toBe(403)
   expect(foreign.headers.get("set-cookie")).toBeNull()
-  for (const next of ["//evil.example", "https://evil.example", "/\\evil.example", "/\u0000evil"]) {
+  for (const next of ["//evil.example", "https://evil.example", "/\\evil.example", "/\u0000evil", "/sign-in", "/sign-out"]) {
     const response = yield* server.signIn(`username=opencode&password=secret&next=${encodeURIComponent(next)}`)
     expect(response.headers.get("location")).toBe("/")
   }
