@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test"
+import { expect, jest, test } from "bun:test"
 import { getEventListeners } from "node:events"
 import { createRoot } from "solid-js"
 import { createData, type CreateDataInput } from "../src/solid"
@@ -1137,6 +1137,37 @@ test.each([
   }
 })
 
+test("self-heals a stale running session by reconciling against the server's active set", async () => {
+  jest.useFakeTimers()
+  const setup = activityFixture(() => Response.json({ data: {} }))
+  try {
+    // A dropped terminal lifecycle event leaves the local state stuck at "running" while the
+    // server no longer reports the session as active.
+    setup.data.session.setStatus("ses_refresh", "running")
+    expect(setup.data.session.status("ses_refresh")).toBe("running")
+    jest.advanceTimersByTime(15_000)
+    await flushMicrotasks()
+    expect(setup.data.session.status("ses_refresh")).toBe("idle")
+  } finally {
+    setup.dispose()
+    jest.useRealTimers()
+  }
+})
+
+test("keeps a running session that the server still reports as active", async () => {
+  jest.useFakeTimers()
+  const setup = activityFixture(() => Response.json({ data: { ses_refresh: { type: "running" } } }))
+  try {
+    setup.data.session.setStatus("ses_refresh", "running")
+    jest.advanceTimersByTime(15_000)
+    await flushMicrotasks()
+    expect(setup.data.session.status("ses_refresh")).toBe("running")
+  } finally {
+    setup.dispose()
+    jest.useRealTimers()
+  }
+})
+
 test("ignores activity snapshots from an older connection", async () => {
   const reads: ReturnType<typeof Promise.withResolvers<Response>>[] = []
   const setup = activityFixture(() => {
@@ -1244,4 +1275,9 @@ async function wait(check: () => boolean) {
     if (Date.now() - started > 2_000) throw new Error("Timed out waiting for condition")
     await Bun.sleep(10)
   }
+}
+
+// Flush promise-based fetch/JSON decoding without advancing the fake clock.
+async function flushMicrotasks() {
+  for (let turn = 0; turn < 100; turn++) await Promise.resolve()
 }

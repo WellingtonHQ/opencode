@@ -288,7 +288,44 @@ export function createData(config: CreateDataInput) {
   function setSessionActive(sessionID: string, status: DataSessionStatus) {
     activeUpdates?.set(sessionID, status)
     setStore("session", "active", sessionID, status)
+    if (status === "running") scheduleActiveReconcile()
   }
+
+  // A terminal lifecycle event (session.execution.succeeded/failed/interrupted) can be dropped on a
+  // stable connection, leaving a session stuck at "running" until the next server.connected. While
+  // anything is running, reconcile the active set against the server on a cooldown so it self-heals.
+  const activeReconcileInterval = 15_000
+  let activeReconcile: ReturnType<typeof setTimeout> | undefined
+  const runningSessions = () => Object.keys(store.session.active)
+  function scheduleActiveReconcile() {
+    if (activeReconcile || disposed || runningSessions().length === 0) return
+    activeReconcile = setTimeout(() => {
+      activeReconcile = undefined
+      void reconcileActive()
+    }, activeReconcileInterval)
+  }
+  function reconcileActive() {
+    if (disposed || (config.connection && config.connection.status() !== "connected")) return scheduleActiveReconcile()
+    if (runningSessions().length === 0) return
+    return api()
+      .session.active()
+      .then((active) => {
+        const known = new Set(Object.keys(active))
+        const stale = runningSessions().filter((id) => store.session.active[id] === "running" && !known.has(id))
+        if (stale.length)
+          setStore(
+            "session",
+            produce((draft) => {
+              for (const id of stale) delete draft.active[id]
+            }),
+          )
+      })
+      .catch(() => undefined)
+      .then(() => scheduleActiveReconcile())
+  }
+  onCleanup(() => {
+    if (activeReconcile) clearTimeout(activeReconcile)
+  })
 
   function removePending(sessionID: string, inboxID?: string) {
     if (!inboxID) return
@@ -649,6 +686,7 @@ export function createData(config: CreateDataInput) {
               })
               activeUpdates = undefined
               setStore("session", "active", reconcile(Object.fromEntries(snapshot)))
+              scheduleActiveReconcile()
             })
             .catch(() => {
               if (activeUpdates === updates) activeUpdates = undefined
