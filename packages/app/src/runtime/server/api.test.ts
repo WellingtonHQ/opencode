@@ -24,12 +24,14 @@ test.each([undefined, "custom", "équipe"])("authTokenFromCredentials preserves 
 })
 
 test.each([
-  { server: "http://localhost:4444", status: 401, next: "/sign-in?next=%2Fserver%2Flocal%2Fsession%2Fses_active" },
-  { server: "http://localhost:4444", status: 200, next: "/server/local/session/ses_active" },
-  { server: "http://localhost:4096", status: 401, next: "/server/local/session/ses_active" },
-  { server: "not a URL", status: 401, next: "/server/local/session/ses_active" },
+  { server: "http://localhost:4444", status: 401, location: "/server/local/session/ses_active", next: "/sign-in?next=%2Fserver%2Flocal%2Fsession%2Fses_active" },
+  { server: "http://localhost:4444", status: 200, location: "/server/local/session/ses_active", next: "/server/local/session/ses_active" },
+  { server: "http://localhost:4096", status: 401, location: "/server/local/session/ses_active", next: "/server/local/session/ses_active" },
+  { server: "not a URL", status: 401, location: "/server/local/session/ses_active", next: "/server/local/session/ses_active" },
+  { server: "http://localhost:4444", status: 401, location: "/sign-in", next: "/sign-in" },
+  { server: "http://localhost:4444", status: 401, location: "/sign-out", next: "/sign-in" },
 ])("server fetch preserves the transport and redirects $server ($status) appropriately", async (row) => {
-  window.location.href = "http://localhost:4444/server/local/session/ses_active"
+  window.location.href = `http://localhost:4444${row.location}`
 
   const response = new Response(null, { status: row.status })
 

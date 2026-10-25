@@ -37,7 +37,8 @@ export function withSignInRedirect(
       )
         return response
 
-      const next = window.location.pathname
+      // The sign-in pages are the destination itself; a self-referential return path loops after sign-in.
+      const next = window.location.pathname === "/sign-in" || window.location.pathname === "/sign-out" ? "/" : window.location.pathname
       window.location.assign(next === "/" ? "/sign-in" : `/sign-in?next=${encodeURIComponent(next)}`)
 
       return response
