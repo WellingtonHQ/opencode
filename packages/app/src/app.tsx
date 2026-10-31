@@ -90,6 +90,9 @@ export function AppInterface(props: {
   servers?: Array<ServerConnection.Any>
   router?: Component<BaseRouterProps>
 }) {
+  // The visual layout lives in the router root so it remains mounted across
+  // route changes. Draft and session routes override only their server-bound data
+  // providers beneath it.
   const Root = (rootProps: ParentProps) => (
     <TabsProvider>
       <GlobalProvider>

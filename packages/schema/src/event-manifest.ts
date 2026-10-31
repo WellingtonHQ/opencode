@@ -26,7 +26,6 @@ import { Provider } from "./provider.js"
 import { Worktree } from "./worktree.js"
 import { Pty } from "./pty.js"
 import { Reference } from "./reference.js"
-import { Schedule } from "./schedule.js"
 import { ServerEvent } from "./server-event.js"
 import { Shell } from "./shell.js"
 import { Skill } from "./skill.js"
@@ -45,7 +44,6 @@ const foundationDefinitions = Event.inventory(
   ...ModelsDev.Event.Definitions,
   ...Credential.Event.Definitions,
   ...Integration.Event.Definitions,
-  ...Schedule.Event.Definitions,
   ...Provider.Event.Definitions,
   ...Model.Event.Definitions,
   ...Agent.Event.Definitions,

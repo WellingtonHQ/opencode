@@ -5,10 +5,8 @@ import { ServerProvider } from "@/runtime/server/current"
 import { useGlobal } from "@/runtime/server/runtime"
 import { ServerConnection, useServers } from "@/runtime/server/registry"
 import { SessionPanelFrame, SessionRouteFrame } from "@/session/session-frame"
-import { LayoutProvider, useLayout } from "@/shell/state/layout"
-import { SettingsSurfaceProvider, useSettingsSurface } from "@/settings/surface"
-import { useTabs } from "@/shell/tabs/tabs"
-import { AutoApproveSync } from "@/runtime/server/auto-approve"
+import { LayoutProvider } from "@/shell/state/layout"
+import { SettingsSurfaceProvider } from "@/settings/surface"
 import Shell from "@/shell/shell"
 import { requireServerKey } from "./session"
 import { ExtensionAttachment } from "@/runtime/extension/root"
@@ -103,39 +101,10 @@ function AppLayout(props: ParentProps) {
       <LayoutProvider>
         <SettingsSurfaceProvider>
           <ExtensionAttachment>
-            <AppShell>{props.children}</AppShell>
+            <Shell>{props.children}</Shell>
           </ExtensionAttachment>
         </SettingsSurfaceProvider>
       </LayoutProvider>
     </Show>
-  )
-}
-
-function AppShell(props: ParentProps) {
-  const servers = useServers()
-  const global = useGlobal()
-  const layout = useLayout()
-  const tabs = useTabs()
-  const settings = useSettingsSurface()
-
-  const currentServer = createMemo(() => {
-    const current = layout.route()
-    const route = current.type === "settings" ? settings.route() : current
-    const key =
-      route.type === "session"
-        ? route.server
-        : route.type === "draft"
-          ? tabs.store.find((item) => item.type === "draft" && item.draftID === route.draftID)?.server
-          : layout.home.selection().server
-    const selected = global.servers.list().find((conn) => ServerConnection.key(conn) === key)
-
-    return selected ?? servers.list[0]
-  })
-
-  return (
-    <>
-      <AutoApproveSync server={currentServer} />
-      <Shell>{props.children}</Shell>
-    </>
   )
 }

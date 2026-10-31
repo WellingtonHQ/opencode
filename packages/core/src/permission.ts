@@ -12,7 +12,6 @@ import { SessionStore } from "./session/store.js"
 import { Wildcard } from "./util/wildcard.js"
 import { PermissionSaved } from "./permission/saved.js"
 import { PluginHooks } from "./plugin/hooks.js"
-import { AppState } from "./app-state.js"
 
 const PermissionEffect = Permission.Effect
 export { PermissionEffect as Effect }
@@ -128,7 +127,6 @@ const layer = Layer.effect(
     const sessions = yield* SessionStore.Service
     const saved = yield* PermissionSaved.Service
     const hooks = yield* PluginHooks.Service
-    const appState = yield* AppState.Service
     const pending = new Map<ID, Pending>()
     let closed = false
 
@@ -187,8 +185,7 @@ const layer = Layer.effect(
         source: input.source,
         effect,
       })
-      const autoApprove = event.effect === "ask" && (yield* appState.autoApprove())
-      return { effect: autoApprove ? ("allow" as const) : event.effect, message: event.message, rules: all }
+      return { effect: event.effect, message: event.message, rules: all }
     })
 
     function request(input: AssertInput, message?: string): Request {
@@ -350,5 +347,5 @@ const layer = Layer.effect(
 export const node = makeLocationNode({
   service: Service,
   layer,
-  deps: [Bus.node, Location.node, Agent.node, SessionStore.node, PermissionSaved.node, PluginHooks.node, AppState.node],
+  deps: [Bus.node, Location.node, Agent.node, SessionStore.node, PermissionSaved.node, PluginHooks.node],
 })

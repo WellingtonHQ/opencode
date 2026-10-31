@@ -6,7 +6,6 @@ import { ConfigProvider, Effect, Layer } from "effect"
 import { Headers } from "effect/http"
 import { AISDKNative } from "@opencode/core/aisdk-native"
 import { Credential } from "@opencode/core/credential"
-import { Config } from "@opencode/core/config"
 import { Integration } from "@opencode/core/integration"
 import { Compatibility, ID, Info, Model, VariantID } from "@opencode/core/model"
 import { Provider } from "@opencode/core/provider"
@@ -402,9 +401,7 @@ describe("ModelResolver", () => {
       },
       model: () => Effect.die("unused"),
     })
-    const layer = ModelResolver.layer.pipe(
-      Layer.provide(Layer.mergeAll(providers, models, integrations, npm, aisdk, Config.testLayer())),
-    )
+    const layer = ModelResolver.layer.pipe(Layer.provide(Layer.mergeAll(providers, models, integrations, npm, aisdk)))
 
     return withConfigEnv({}, () =>
       Effect.gen(function* () {

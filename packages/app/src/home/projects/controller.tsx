@@ -2,7 +2,7 @@ import { useDirectoryPicker } from "@/workspaces/selection/picker"
 import { useServerActionsController } from "@/servers/registry/controller"
 import { useSettingsCommand } from "@/settings/command"
 import { useSettingsSurface } from "@/settings/surface"
-import { useLayout, type LocalProject } from "@/shell/state/layout"
+import { type LocalProject } from "@/shell/state/layout"
 import { useLanguage } from "@/runtime/i18n/language"
 import { usePlatform } from "@/runtime/platform/platform"
 import { ServerConnection } from "@/runtime/server/registry"
@@ -10,7 +10,7 @@ import { closeHomeProject, errorMessage, homeProjectDirectories } from "@/shell/
 import { Persist, persisted } from "@/runtime/persistence/storage"
 import { showToast } from "@/shell/notifications/toast"
 import { useDialog } from "@opencode/ui/context/dialog"
-import { createEffect, createResource, on } from "solid-js"
+import { createResource } from "solid-js"
 import { Schema } from "effect"
 import { Persistence } from "@/runtime/persistence/schema"
 import type { HomeController } from "../model"
@@ -31,18 +31,7 @@ export function createHomeProjectsController(home: HomeController) {
   const serverManagement = useServerActionsController()
   const global = useGlobal()
   const revealProject = useRevealProject()
-  const layout = useLayout()
   const [_state, setState, _, ready] = persisted(Persist.global("home.servers"), HomeServersSchema, { collapsed: {} })
-
-  createEffect(
-    on(
-      home.selection.value,
-      () => {
-        if (layout.home.schedules.open()) layout.home.schedules.setOpen(false)
-      },
-      { defer: true },
-    ),
-  )
 
   const [state] = createResource(
     () => ready.promise ?? Promise.resolve(),
@@ -193,10 +182,6 @@ export function createHomeProjectsController(home: HomeController) {
     utility: {
       settings: openSettings,
       help: () => platform.openExternal("https://opencode.ai/desktop-feedback"),
-      schedules: {
-        open: layout.home.schedules.open,
-        toggle: layout.home.schedules.toggle,
-      },
     },
   }
 }

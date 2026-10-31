@@ -229,7 +229,6 @@ export default defineConfig({
             { label: "Go", link: "https://opencode.ai/v2/docs/console/go/" },
             "tui",
             "cli",
-            "schedules",
             "web",
             "ide",
             { label: "Console", link: "https://opencode.ai/v2/docs/console/" },
