@@ -215,6 +215,7 @@ const makeRunnerState = (compaction?: SessionRunnerModel.Resolved["compaction"])
     systemRemoved: false,
     systemUnavailable: false,
     systemLoadHook: Effect.void,
+    activationHook: Effect.void,
     skillBaselines: new Map<Agent.ID, string>(),
     authorizations: new Array<Tool.Context>(),
     executions: new Array<string>(),
@@ -422,7 +423,7 @@ const layer = Layer.unwrap(
       Permission.node.replace(permission),
       Config.node.replace(config),
       PluginSupervisor.node.replace(Layer.empty),
-      Plugin.node.replace(Layer.mock(Plugin.Service, { awaitActivation: Effect.void })),
+      Plugin.node.replace(Layer.mock(Plugin.Service, { awaitActivation: Effect.suspend(() => state.activationHook) })),
       SessionModelTransport.node.replace(modelTransport),
     ]
     const runnerLayer = AppNodeBuilder.build(SessionRunnerLLM.node, [
@@ -1140,6 +1141,22 @@ describe("SessionRunnerLLM", () => {
     expect(s.requests[0]?.tools.map((tool) => tool.name)).toContain("renamed_echo")
     expect(s.requests[0]?.tools.map((tool) => tool.name)).not.toContain("echo")
     expect(s.executions).toEqual(["renamed"])
+  })
+
+  scenario("waits for plugin activation before each step and tool call", function* (s) {
+    const waits: Array<[number, number]> = []
+    s.activationHook = Effect.sync(() => {
+      waits.push([s.requests.length, s.executions.length])
+    })
+    yield* s.llm.push(TestLLM.tool("call-activation", "echo", { text: "echo" }), TestLLM.text("Done", "text-after-activation"))
+    yield* s.runPrompt("Question")
+
+    expect(waits).toEqual([
+      [0, 0],
+      [0, 0],
+      [1, 0],
+      [1, 1],
+    ])
   })
 
   scenario("executes the tool advertised before a registry reload", function* (s) {
