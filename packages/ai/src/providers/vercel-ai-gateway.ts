@@ -11,18 +11,20 @@ import {
 import { AnthropicMessages } from "../protocols/anthropic-messages.js"
 import { OpenAIChat } from "../protocols/openai-chat.js"
 import { OpenResponses } from "../protocols/open-responses.js"
-import { optionalNull, ProviderShared } from "../protocols/shared.js"
+import { OpenAIImages } from "../protocols/openai-images.js"
+import { JsonObject, optionalNull, ProviderShared } from "../protocols/shared.js"
 import { gatewayProtocol } from "../protocols/utils/gateway-protocol.js"
 import type { ProviderPackage } from "../provider-package.js"
 import { Auth } from "../route/auth.js"
 import { AuthOptions, type ProviderAuthOption } from "../route/auth-options.js"
 import { Route, type RouteDefaultsInput } from "../route/client.js"
 import { Endpoint } from "../route/endpoint.js"
+import { RequestExecutor } from "../route/executor.js"
 import { Framing } from "../route/framing.js"
+import { MediaRoute } from "../route/media.js"
 import type { Protocol } from "../route/protocol.js"
 import {
   AIError,
-  HttpContext,
   HttpOptions,
   InvalidProviderOutputError,
   InvalidRequestError,
@@ -30,6 +32,7 @@ import {
   ModelID,
   ProviderID,
   ProviderMetadata,
+  ProviderOptions,
   ReasoningEffort,
   Usage,
 } from "../schema/index.js"
@@ -125,7 +128,7 @@ export type Settings = ProviderPackage.Settings & ProviderOptionsInput & { reado
 
 const GatewayOptionsSchema = Schema.Struct({
   gateway: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
-  upstream: Schema.optional(Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.Unknown))),
+  upstream: Schema.optional(ProviderMetadata),
   reasoningEffort: Schema.optional(ReasoningEffort),
   thinking: Schema.optional(
     Schema.Struct({
@@ -233,9 +236,9 @@ const Request = Schema.StructWithRest(
     model: Schema.String,
     state: EvaluationInput,
     questions: Schema.Record(Schema.String, EvaluationQuestion),
-    providerOptions: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
+    providerOptions: Schema.optional(ProviderOptions),
   }),
-  [Schema.Record(Schema.String, Schema.Any)],
+  [JsonObject],
 )
 const Response = Schema.Struct({
   model: optionalNull(Schema.String),
@@ -310,7 +313,7 @@ export const configure = (input: Options = {}) => {
                 HttpClientRequest.bodyText(body, "application/json"),
               ),
             )
-            const http = new HttpContext({ url: res.request.url, status: res.status, headers: res.headers })
+            const http = RequestExecutor.responseHttp(res)
             const fail = (message: string, cause: unknown, body?: string) =>
               new AIError({
                 reason: new InvalidProviderOutputError({
@@ -349,7 +352,9 @@ export const configure = (input: Options = {}) => {
           }),
       },
     })
-  return { id, model, messages, responses, chat, experimental: { evaluation }, configure }
+  const media = MediaRoute.deployment({ ...input, baseURL: configured.endpoint.baseURL }, configured.auth)
+  const image = (modelID: string | ModelID) => OpenAIImages.model({ ...media, id: modelID, provider: id })
+  return { id, model, messages, responses, chat, image, experimental: { evaluation }, configure }
 }
 
 export const provider = configure()
@@ -357,6 +362,7 @@ export const experimental = provider.experimental
 export const messages = provider.messages
 export const responses = provider.responses
 export const chat = provider.chat
+export const image = provider.image
 
 export const model: ProviderPackage.Definition<Settings, ProviderOptionsInput>["model"] = (modelID, settings) =>
   fromSettings(settings).model(modelID)

@@ -148,8 +148,8 @@ export type Ref = Integration.Ref
 
 type Entry = {
   ref: Types.DeepMutable<Ref>
-  methods: Types.DeepMutable<Method>[]
-  implementations: Map<MethodID, Types.DeepMutable<OAuthImplementation>>
+  methods: Method[]
+  implementations: Map<MethodID, OAuthImplementation>
 }
 
 type Data = {
@@ -157,8 +157,8 @@ type Data = {
 }
 
 export type Editor = {
-  list: () => readonly Ref[]
-  get: (id: ID) => Ref | undefined
+  list: () => readonly Types.DeepMutable<Ref>[]
+  get: (id: ID) => Types.DeepMutable<Ref> | undefined
   update: (id: ID, update: (integration: Types.DeepMutable<Ref>) => void) => void
   remove: (id: ID) => void
   method: {
@@ -320,8 +320,8 @@ const layer = Layer.effect(
       name: "integration",
       initial: () => ({ integrations: new Map<ID, Entry>() }),
       editor: (editor) => ({
-        list: () => Array.from(editor.integrations.values(), (entry) => entry.ref) as Ref[],
-        get: (id) => editor.integrations.get(id)?.ref as Ref | undefined,
+        list: () => Array.from(editor.integrations.values(), (entry) => entry.ref),
+        get: (id) => editor.integrations.get(id)?.ref,
         update: (id, update) => {
           const current = editor.integrations.get(id) ?? {
             ref: { id, name: id },
@@ -334,7 +334,7 @@ const layer = Layer.effect(
         },
         remove: (id) => editor.integrations.delete(id),
         method: {
-          list: (integrationID) => (editor.integrations.get(integrationID)?.methods as Method[] | undefined) ?? [],
+          list: (integrationID) => editor.integrations.get(integrationID)?.methods ?? [],
           update: (implementation) => {
             const current = editor.integrations.get(implementation.integrationID) ?? {
               ref: {
@@ -342,7 +342,7 @@ const layer = Layer.effect(
                 name: implementation.integrationID,
               },
               methods: [],
-              implementations: new Map<MethodID, Types.DeepMutable<OAuthImplementation>>(),
+              implementations: new Map<MethodID, OAuthImplementation>(),
             }
             if (!editor.integrations.has(implementation.integrationID)) {
               editor.integrations.set(implementation.integrationID, current)
@@ -357,13 +357,10 @@ const layer = Layer.effect(
                 return method.id === implementation.method.id
               return true
             })
-            if (index === -1) current.methods.push(implementation.method as Types.DeepMutable<Method>)
-            else current.methods[index] = implementation.method as Types.DeepMutable<Method>
-            if (implementation.method.type === "oauth") {
-              current.implementations.set(
-                implementation.method.id,
-                implementation as Types.DeepMutable<OAuthImplementation>,
-              )
+            if (index === -1) current.methods.push(implementation.method)
+            else current.methods[index] = implementation.method
+            if ("authorize" in implementation) {
+              current.implementations.set(implementation.method.id, implementation)
             }
           },
           remove: (integrationID, method) => {
