@@ -1,7 +1,7 @@
 import type { SessionMessageAssistant, SessionMessageInfo } from "@opencode/client/promise"
 import { shellResultFailed } from "../message/current-tool-state"
 
-export const timelineCategories = ["shell", "edit", "thinking", "subagents", "notices", "tools"] as const
+export const timelineCategories = ["shell", "edit", "thinking", "subagents", "notices", "compactions", "tools"] as const
 
 export type TimelineCategory = (typeof timelineCategories)[number]
 
@@ -15,6 +15,7 @@ export type TimelineDetail = {
   thinking: { placement: TimelinePlacement; details: TimelineExpansion }
   subagents: { placement: TimelinePlacement }
   notices: { placement: TimelinePlacement }
+  compactions: { placement: TimelinePlacement; details: TimelineExpansion }
   tools: { placement: TimelinePlacement }
 }
 
@@ -27,6 +28,7 @@ export const timelinePresets = [
       thinking: { placement: "separate", details: "expanded" },
       subagents: { placement: "separate" },
       notices: { placement: "separate" },
+      compactions: { placement: "separate", details: "expanded" },
       tools: { placement: "separate" },
     },
   },
@@ -38,6 +40,7 @@ export const timelinePresets = [
       thinking: { placement: "grouped", details: "collapsed" },
       subagents: { placement: "separate" },
       notices: { placement: "grouped" },
+      compactions: { placement: "separate", details: "expanded" },
       tools: { placement: "grouped" },
     },
   },
@@ -49,6 +52,7 @@ export const timelinePresets = [
       thinking: { placement: "grouped", details: "collapsed" },
       subagents: { placement: "grouped" },
       notices: { placement: "grouped" },
+      compactions: { placement: "separate", details: "collapsed" },
       tools: { placement: "grouped" },
     },
   },
@@ -60,6 +64,7 @@ export const timelinePresets = [
       thinking: { placement: "hidden", details: "collapsed" },
       subagents: { placement: "grouped" },
       notices: { placement: "hidden" },
+      compactions: { placement: "hidden", details: "collapsed" },
       tools: { placement: "hidden" },
     },
   },
@@ -71,6 +76,7 @@ export const timelinePresets = [
       thinking: { placement: "hidden", details: "collapsed" },
       subagents: { placement: "hidden" },
       notices: { placement: "hidden" },
+      compactions: { placement: "hidden", details: "collapsed" },
       tools: { placement: "hidden" },
     },
   },

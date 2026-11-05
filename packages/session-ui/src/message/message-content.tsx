@@ -583,9 +583,18 @@ function CompactionDivider(props: { label: string }) {
   )
 }
 
-export function SessionCompactionMessage(props: { message: SessionMessageCompaction; error: string }) {
+export function SessionCompactionMessage(props: {
+  message: SessionMessageCompaction
+  error: string
+  showSummary: boolean
+  summaryDefaultOpen?: boolean
+  summaryOpen?: boolean
+  onSummaryOpenChange?: (open: boolean) => void
+}) {
   const i18n = useI18n()
+  const [summaryState, setSummaryState] = createStore<{ open?: boolean }>({})
   const summary = () => (props.message.status === "failed" ? "" : props.message.summary)
+  const summaryOpen = () => props.summaryOpen ?? summaryState.open ?? props.summaryDefaultOpen ?? false
 
   const error = () => {
     if (props.message.status !== "failed") return ""
@@ -632,16 +641,28 @@ export function SessionCompactionMessage(props: { message: SessionMessageCompact
   return (
     <div data-component="session-compaction-message">
       <CompactionDivider label={i18n.t("ui.messagePart.compaction.started")} />
-      <Show when={summary().trim()}>
-        <div data-component="text-part" data-timeline-part-id={props.message.id}>
-          <div data-slot="text-part-body">
-            <PacedMarkdown
-              text={summary()}
-              cacheKey={props.message.id}
-              streaming={props.message.status === "running"}
-            />
+      <Show when={props.showSummary && summary().trim()}>
+        <BasicTool
+          icon="archive"
+          status="completed"
+          hasContent
+          open={summaryOpen()}
+          onOpenChange={(value) => {
+            setSummaryState("open", value)
+            props.onSummaryOpenChange?.(value)
+          }}
+          trigger={{ title: i18n.t("ui.messagePart.compaction.summary") }}
+        >
+          <div data-component="text-part" data-timeline-part-id={props.message.id}>
+            <div data-slot="text-part-body">
+              <PacedMarkdown
+                text={summary()}
+                cacheKey={props.message.id}
+                streaming={props.message.status === "running"}
+              />
+            </div>
           </div>
-        </div>
+        </BasicTool>
       </Show>
       <Show when={props.message.status === "running"}>
         <div role="status" class="py-2">

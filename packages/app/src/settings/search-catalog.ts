@@ -71,7 +71,7 @@ export const clientSettings: Entry<SettingsRootTab>[] = [
     label: "settings.timeline.detail",
     target: "settings-timeline-detail",
     section: "settings.timeline.title",
-    keywords: "thinking reasoning tools timeline summary detailed",
+    keywords: "thinking reasoning tools compaction timeline summary detailed",
   },
   {
     tab: "general",

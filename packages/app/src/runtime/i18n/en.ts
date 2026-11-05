@@ -870,6 +870,7 @@ export const dict = {
   "settings.timeline.category.thinking": "Thinking",
   "settings.timeline.category.subagents": "Subagents",
   "settings.timeline.category.notices": "Notices",
+  "settings.timeline.category.compactions": "Compaction summaries",
   "settings.timeline.category.tools": "Other tools",
 
   "settings.general.row.language.title": "Language",

@@ -587,7 +587,14 @@ export function createSessionTimelineRowRenderer(input: {
           {(message) => (
             <div data-slot="session-turn-message-container" class={`w-full ${inset()}`}>
               <div data-slot="session-turn-compaction">
-                <SessionCompactionMessage message={message()} error={compactionError()} />
+                <SessionCompactionMessage
+                  message={message()}
+                  error={compactionError()}
+                  showSummary={input.timelineDetail?.().compactions.placement !== "hidden"}
+                  summaryDefaultOpen={input.timelineDetail ? input.timelineDetail().compactions.details === "expanded" : true}
+                  summaryOpen={input.disclosure.value(`compaction:${message().id}`)}
+                  onSummaryOpenChange={(open) => input.disclosure.set(`compaction:${message().id}`, open)}
+                />
               </div>
             </div>
           )}

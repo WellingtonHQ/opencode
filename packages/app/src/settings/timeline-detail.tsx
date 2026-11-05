@@ -135,7 +135,9 @@ export function TimelineDetailControl(props: { value: TimelineDetail; onChange: 
                               [category]: {
                                 ...props.value[category],
                                 placement:
-                                  placement === "hidden" ? (visiblePlacements[category] ?? "grouped") : "hidden",
+                                  placement === "hidden"
+                                    ? (visiblePlacements[category] ?? (category === "compactions" ? "separate" : "grouped"))
+                                    : "hidden",
                               },
                             })
                           }}
@@ -151,33 +153,39 @@ export function TimelineDetailControl(props: { value: TimelineDetail; onChange: 
                       </label>
                     </div>
                     <div data-slot="timeline-detail-placement">
-                      <span data-slot="timeline-detail-field-label" aria-hidden="true">
-                        {language.t("settings.timeline.group")}
-                      </span>
                       <Show
-                        when={props.value[category].placement !== "hidden"}
+                        when={category !== "compactions"}
                         fallback={<span data-slot="timeline-detail-unavailable" aria-hidden="true" />}
                       >
-                        <Switch
-                          data-category={category}
-                          data-field="placement"
-                          hideLabel
-                          checked={props.value[category].placement === "grouped"}
-                          onChange={(checked) =>
-                            props.onChange({
-                              ...props.value,
-                              [category]: { ...props.value[category], placement: checked ? "grouped" : "separate" },
-                            })
-                          }
+                        <span data-slot="timeline-detail-field-label" aria-hidden="true">
+                          {language.t("settings.timeline.group")}
+                        </span>
+                        <Show
+                          when={props.value[category].placement !== "hidden"}
+                          fallback={<span data-slot="timeline-detail-unavailable" aria-hidden="true" />}
                         >
-                          {language.t("settings.timeline.grouped.label", {
-                            activity: language.t(`settings.timeline.category.${category}`),
-                          })}
-                        </Switch>
+                          <Switch
+                            data-category={category}
+                            data-field="placement"
+                            hideLabel
+                            checked={props.value[category].placement === "grouped"}
+                            onChange={(checked) =>
+                              props.onChange({
+                                ...props.value,
+                                [category]: { ...props.value[category], placement: checked ? "grouped" : "separate" },
+                              })
+                            }
+                          >
+                            {language.t("settings.timeline.grouped.label", {
+                              activity: language.t(`settings.timeline.category.${category}`),
+                            })}
+                          </Switch>
+                        </Show>
                       </Show>
                     </div>
                     <div data-slot="timeline-detail-expansion">
-                      {category === "shell" || category === "edit" || category === "thinking" ? (
+                      {category === "shell" || category === "edit" || category === "thinking" ||
+                      category === "compactions" ? (
                         <>
                           <span data-slot="timeline-detail-field-label" aria-hidden="true">
                             {language.t("settings.timeline.collapse")}

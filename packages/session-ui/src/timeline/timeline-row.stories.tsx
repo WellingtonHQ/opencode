@@ -2,6 +2,7 @@ import type { SessionMessageAssistant, SessionMessageInfo } from "@opencode/clie
 import { createMemo } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { SessionDocument } from "../document"
+import { timelinePresets } from "./detail"
 import { SessionTimeline } from "./session-timeline"
 import type { ReasoningMode } from "./projection"
 import { CurrentSessionProviders, CurrentSessionTimelineStory } from "../storybook/current-session-story"
@@ -390,6 +391,34 @@ export const CompactionAndContinuation = {
       title="Compaction and continuation"
       description="The context summary separates earlier output from the continued response."
       document={compactionDocument}
+      width="600px"
+    />
+  ),
+}
+
+export const CompactionSummaryHidden = {
+  render: () => (
+    <CurrentSessionTimelineStory
+      title="Compaction summary hidden"
+      description="The summary is hidden while compaction boundaries and token usage remain visible."
+      document={compactionDocument}
+      timelineDetail={{
+        ...timelinePresets[2].value,
+        notices: { placement: "hidden" },
+        compactions: { placement: "hidden", details: "collapsed" },
+      }}
+      width="600px"
+    />
+  ),
+}
+
+export const CompactionSummaryCollapsed = {
+  render: () => (
+    <CurrentSessionTimelineStory
+      title="Compaction summary collapsed"
+      description="The summary starts collapsed behind a disclosure while compaction boundaries and token usage remain visible."
+      document={compactionDocument}
+      timelineDetail={timelinePresets[2].value}
       width="600px"
     />
   ),

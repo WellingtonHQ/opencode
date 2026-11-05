@@ -163,6 +163,83 @@ describe("current session timeline rows", () => {
     ])
   })
 
+  test("keeps compaction markers while hiding summaries and queued-compaction markers", () => {
+    const timelineDetail = {
+      ...timelinePresets[2].value,
+      compactions: { placement: "hidden", details: "collapsed" },
+      notices: { placement: "separate" },
+    } as const
+    const messages = [
+      { id: "msg_user", type: "user", text: "prompt", time: { created: 1 } },
+      {
+        id: "msg_compaction_complete",
+        type: "compaction",
+        status: "completed",
+        reason: "auto",
+        summary: "Compacted context",
+        time: { created: 2 },
+      },
+      {
+        id: "msg_notice",
+        type: "synthetic",
+        text: "Background work completed",
+        description: "Background work completed",
+        time: { created: 3 },
+      },
+      {
+        id: "msg_compaction_running",
+        type: "compaction",
+        status: "running",
+        reason: "auto",
+        summary: "Compacting context",
+        time: { created: 4 },
+      },
+      {
+        id: "msg_compaction_failed",
+        type: "compaction",
+        status: "failed",
+        reason: "auto",
+        error: { type: "compaction.failed", message: "Compaction failed" },
+        time: { created: 5 },
+      },
+    ] satisfies SessionMessageInfo[]
+
+    expect(
+      Timeline.constructSessionMessageRows(
+        messages,
+        true,
+        { type: "idle" },
+        undefined,
+        false,
+        false,
+        undefined,
+        timelineDetail,
+      ).rows.map(TimelineRow.key),
+    ).toEqual([
+      "user-message:msg_user",
+      "notice:msg_compaction_complete",
+      "notice:msg_notice",
+      "notice:msg_compaction_running",
+      "notice:msg_compaction_failed",
+    ])
+
+    const document = storyDocument([{ type: "text", text: "Working" }], true)
+
+    expect(
+      Timeline.constructSessionMessageRows(
+        document.messages,
+        true,
+        document.status,
+        undefined,
+        false,
+        false,
+        undefined,
+        timelineDetail,
+        ["inb_compact"],
+      ).rows.map((row) => row._tag),
+    ).toEqual(["UserMessage", "AssistantPart", "Activity"])
+  })
+
   test("does not infer thinking from an optimistic busy turn", () => {
     const source = [
       { id: "msg_z", type: "user", text: "existing", time: { created: 1 } },

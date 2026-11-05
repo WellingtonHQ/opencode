@@ -60,6 +60,32 @@ story("aligns the retry icon with the error label", async ({ mount }) => {
   expect(iconY).toBe(labelY)
 })
 
+story("keeps compaction boundaries and token usage when its summary is hidden", async ({ mount }) => {
+  const timeline = await mount("current-session-timeline-rows--compaction-summary-hidden")
+  const compaction = timeline.locator('[data-component="session-compaction-message"]')
+
+  await expect(compaction).toContainText("Session compaction started")
+  await expect(compaction).toContainText("Session compacted")
+  await expect(compaction).toContainText("11.9K in")
+  await expect(compaction).toContainText("508 out")
+  await expect(compaction).not.toContainText("The Session timeline now consumes current nested assistant content.")
+})
+
+story("collapses the compaction summary behind a disclosure", async ({ mount }) => {
+  const timeline = await mount("current-session-timeline-rows--compaction-summary-collapsed")
+  const compaction = timeline.locator('[data-component="session-compaction-message"]')
+  const trigger = compaction.locator('[data-slot="collapsible-trigger"]')
+
+  await expect(trigger).toContainText("Compaction summary")
+  await expect(compaction).toContainText("Session compaction started")
+  await expect(compaction).toContainText("Session compacted")
+  await expect(compaction).toContainText("11.9K in")
+  await expect(compaction).toContainText("508 out")
+  await expect(compaction).not.toContainText("The Session timeline now consumes current nested assistant content.")
+  await trigger.click()
+  await expect(compaction).toContainText("The Session timeline now consumes current nested assistant content.")
+})
+
 story("centers the error icon on the first line of short and wrapped errors", async ({ mount }) => {
   const timeline = await mount("current-session-error-card--provider-errors")
   const cards = timeline.locator('[data-kind="session-error-card"]')

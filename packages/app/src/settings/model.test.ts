@@ -34,6 +34,40 @@ describe("settings timeline detail migration", () => {
     expect(settings.appearance.fontSize).toBe(16)
     expect(decode(encode(settings))).toEqual(settings)
   })
+
+  test("persists independent compaction visibility", () => {
+    const settings = decode({
+      general: {
+        timelineDetail: {
+          ...timelinePresets[2].value,
+          compactions: { placement: "hidden", details: "collapsed" },
+        },
+      },
+    })
+
+    expect(settings.general.timelineDetail.compactions).toEqual({ placement: "hidden", details: "collapsed" })
+    expect(decode(encode(settings)).general.timelineDetail.compactions).toEqual({ placement: "hidden", details: "collapsed" })
+  })
+
+  test("inherits saved compaction visibility from notices when upgrading older preferences", () => {
+    const settings = decode({ general: { timelineDetail: { notices: { placement: "hidden" } } } })
+
+    expect(settings.general.timelineDetail.notices).toEqual({ placement: "hidden" })
+    expect(settings.general.timelineDetail.compactions).toEqual({ placement: "hidden", details: "collapsed" })
+  })
+
+  test("keeps an explicit compaction choice when upgrading older preferences", () => {
+    const settings = decode({
+      general: {
+        timelineDetail: {
+          notices: { placement: "hidden" },
+          compactions: { placement: "separate", details: "expanded" },
+        },
+      },
+    })
+
+    expect(settings.general.timelineDetail.compactions).toEqual({ placement: "separate", details: "expanded" })
+  })
 })
 
 describe("settings schema", () => {

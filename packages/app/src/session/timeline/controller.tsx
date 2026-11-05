@@ -157,6 +157,7 @@ export function createTimelineController(input: { session: TimelineSessionSource
       thinking: { ...detail.thinking },
       subagents: { ...detail.subagents },
       notices: { ...detail.notices },
+      compactions: { ...detail.compactions },
       tools: { ...detail.tools },
     }
   })

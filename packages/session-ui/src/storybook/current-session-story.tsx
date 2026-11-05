@@ -2,6 +2,7 @@ import type { SessionDocument } from "../document"
 import { File } from "../components/file"
 import { DataProvider } from "../context/data"
 import type { SessionUserActions } from "../message/current-message"
+import type { TimelineDetail } from "../timeline/detail"
 import type { SessionUserPresentation } from "../timeline/session-timeline"
 import { SessionTimeline } from "../timeline/session-timeline"
 import { FileComponentProvider } from "@opencode/ui/context/file"
@@ -79,6 +80,7 @@ export function CurrentSessionTimelineStory(props: {
   editToolDefaultOpen?: boolean
   showMessageMetadata?: boolean
   turnDiffs?: boolean
+  timelineDetail?: TimelineDetail
 }) {
   // Inline story documents rebuild their messages on every prop read, and the timeline projection keys text by identity.
   const document = createMemo(() => props.document)
@@ -123,6 +125,7 @@ export function CurrentSessionTimelineStory(props: {
                   editToolDefaultOpen={props.editToolDefaultOpen}
                   showMessageMetadata={props.showMessageMetadata}
                   turnDiffs={props.turnDiffs}
+                  timelineDetail={props.timelineDetail}
                 />
               </CurrentSessionProviders>
             </div>

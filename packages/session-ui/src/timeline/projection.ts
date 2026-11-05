@@ -356,8 +356,7 @@ export namespace Timeline {
       turns.findLast((turn) => !pendingInputIDs?.has(turn.id) || turn.entries.some((entry) => entry.type === "idle"))
         ?.id ?? turns.at(-1)?.id
 
-    const visibleNotice = (message: Notice) =>
-      !detail || detail.notices.placement !== "hidden" || timelineNoticeRequired(message)
+    const visibleNotice = (message: Notice) => isVisibleNotice(message, detail)
 
     const visibleTurns = detail
       ? turns.filter((turn) => {
@@ -428,9 +427,11 @@ export namespace Timeline {
       ...(status.type !== "idle" && activeMessageID && (pendingAt >= 0 || queuedCompactionIDs.length > 0)
         ? [new TimelineRow.Activity({ userMessageID: activeMessageID })]
         : []),
-      ...queuedCompactionIDs.map(
-        (inboxID) => new TimelineRow.CompactionQueued({ userMessageID: activeMessageID ?? inboxID, inboxID }),
-      ),
+      ...(detail?.compactions.placement === "hidden"
+        ? []
+        : queuedCompactionIDs.map(
+            (inboxID) => new TimelineRow.CompactionQueued({ userMessageID: activeMessageID ?? inboxID, inboxID }),
+          )),
     )
 
     return {
@@ -607,7 +608,7 @@ export namespace Timeline {
 
           return
         case "notice":
-          if (detail?.notices.placement === "hidden" && !timelineNoticeRequired(entry.message)) return
+          if (!isVisibleNotice(entry.message, detail)) return
           appendAssistantSegment(assistantSegment)
           assistantSegment = []
           rows.push(new TimelineRow.Notice({ userMessageID: turnID, messageID: entry.message.id }))
@@ -1084,4 +1085,11 @@ function isNotice(message: SessionMessageInfo): message is Notice {
   if (message.type !== "synthetic") return true
 
   return !!message.description?.trim() || timelineNoticeRequired(message)
+}
+
+function isVisibleNotice(message: Notice, detail: TimelineDetail | undefined) {
+  // The setting hides the generated summary, not the started/completed marker or token usage.
+  if (message.type === "compaction") return true
+
+  return !detail || detail.notices.placement !== "hidden" || timelineNoticeRequired(message)
 }

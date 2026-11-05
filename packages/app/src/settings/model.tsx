@@ -115,6 +115,7 @@ const generalSchema = Persistence.struct({
     thinking: activitySchema,
     subagents: placementOnlySchema,
     notices: placementOnlySchema,
+    compactions: activitySchema,
     tools: placementOnlySchema,
   }),
   showCustomAgents: Schema.Boolean,
@@ -240,6 +241,7 @@ export const settingsPersistence = Persistence.migrate(
               thinking: storedTimelineCategory("thinking"),
               subagents: storedTimelineCategory("subagents"),
               notices: storedTimelineCategory("notices"),
+              compactions: storedTimelineCategory("compactions"),
               tools: storedTimelineCategory("tools"),
             }),
           ),
@@ -257,7 +259,28 @@ export const settingsPersistence = Persistence.migrate(
       decode: SchemaGetter.transform((value) => {
         const general = value.general
 
-        if (!general || general.timelineDetail !== undefined) return value
+        if (!general || general.timelineDetail === null) return value
+
+        if (general.timelineDetail !== undefined) {
+          const timelineDetail = general.timelineDetail
+
+          if (timelineDetail.compactions !== undefined) return value
+          // The read schema normalizes legacy string placements to objects, but the static type still carries the strings.
+          const notices = timelineDetail.notices
+
+          return {
+            ...value,
+            general: {
+              ...general,
+              timelineDetail: {
+                ...timelineDetail,
+                compactions: {
+                  placement: typeof notices === "object" && notices.placement === "hidden" ? "hidden" : "separate",
+                },
+              },
+            },
+          }
+        }
 
         return {
           ...value,
