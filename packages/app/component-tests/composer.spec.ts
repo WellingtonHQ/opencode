@@ -143,6 +143,14 @@ story("grows suggestions while preserving visible timeline context", async ({ mo
 
   await expect(suggestions).toHaveCSS("max-height", "166px")
   await expect(suggestions).toHaveCSS("scroll-padding-bottom", "18px")
+  // The scroll container must not carry a translate or transform: WebKit touch scrolling
+  // inside a transformed element stops short of the edges, and drags must not chain
+  // into the timeline scroll behind the popover. Tailwind v4 emits translate utilities
+  // as the standalone `translate` property, so assert both.
+  await expect(suggestions).toHaveCSS("translate", "none")
+  await expect(suggestions).toHaveCSS("transform", "none")
+  await expect(suggestions).toHaveCSS("overscroll-behavior-x", "contain")
+  await expect(suggestions).toHaveCSS("overscroll-behavior-y", "contain")
   await expect.poll(() => suggestions.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true)
   await expect
     .poll(async () => {

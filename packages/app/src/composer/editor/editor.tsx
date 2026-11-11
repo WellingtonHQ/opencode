@@ -1022,7 +1022,11 @@ export function ComposerEditorPopover(props: {
   return (
     <div
       data-component="composer-suggestions"
-      class="absolute inset-x-0 -top-2 z-40 flex -translate-y-full scroll-pb-[18px] flex-col overflow-auto rounded-xl bg-v2-background-bg-base p-2 shadow-[var(--v2-elevation-raised)] no-scrollbar"
+      // The scroll container must not carry a transform: WebKit touch scrolling inside a
+      // transformed element stops short of the edges. `bottom-full mb-2` matches the old
+      // `-top-2 -translate-y-full` position without one, and `overscroll-contain` keeps a
+      // drag on the list from chaining into the timeline scroll behind it.
+      class="absolute inset-x-0 bottom-full mb-2 z-40 flex overscroll-contain scroll-pb-[18px] flex-col overflow-auto rounded-xl bg-v2-background-bg-base p-2 shadow-[var(--v2-elevation-raised)] no-scrollbar"
       style={{ "max-height": `${store.maxHeight}px` }}
       onMouseDown={(event) => event.preventDefault()}
     >
