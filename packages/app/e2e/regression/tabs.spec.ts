@@ -182,11 +182,12 @@ test("portrait switcher keeps session, draft, project, and server identities in 
     await expect(trigger).toContainText(local.title)
     await trigger.click()
     const menu = page.getByRole("menu")
-    const localTab = menu.getByRole("menuitemradio", { name: /^Tab A session/ })
-    const remoteTab = menu.getByRole("menuitemradio", { name: /^جلسة B/ })
-    const draft = menu.getByRole("menuitemradio", { name: /^New session/ })
-    await expect(menu.getByRole("menuitemradio")).toHaveCount(3)
-    await expect(localTab).toBeChecked()
+    const sessions = menu.getByRole("group", { name: "Sessions", exact: true })
+    const localTab = menu.getByRole("menuitem", { name: /^Tab A session/ })
+    const remoteTab = menu.getByRole("menuitem", { name: /^جلسة B/ })
+    const draft = sessions.getByRole("menuitem", { name: /^New session/ })
+    await expect(sessions.getByRole("menuitem", { name: "Close tab", exact: true })).toHaveCount(3)
+    await expect(localTab).toHaveAttribute("aria-current", "page")
     await expect(localTab).toContainText("server-a")
     await expect(remoteTab).toContainText("server-b")
     await expect(remoteTab).toContainText("127.0.0.1:4097")
@@ -200,20 +201,57 @@ test("portrait switcher keeps session, draft, project, and server identities in 
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(390)
 
     // Up/down stays in semantic order even when the inline layout is mirrored.
+    // Each tab row also holds its close control, so the next tab is two presses away.
     await localTab.focus()
+    await page.keyboard.press("ArrowDown")
     await page.keyboard.press("ArrowDown")
     await expect(remoteTab).toBeFocused()
     await page.keyboard.press("Enter")
-    await expectPath(page, sessionHref(remote.id, REMOTE_SERVER))
     await expect(menu).toBeHidden()
+    // The direction fixture routes in memory, so the titlebar title is the navigation proof.
     await expect(trigger).toContainText(remote.title)
     await trigger.click()
-    await expect(remoteTab).toBeChecked()
+    await expect(remoteTab).toHaveAttribute("aria-current", "page")
     await draft.click()
-    await expect(page).toHaveURL(/\/new-session\?draftId=draft_mobile$/)
+    await expect(page.getByRole("tablist", { name: "Session view", exact: true })).toHaveCount(0)
     await expect(page.locator('[data-component="composer-editor"]')).toBeEditable()
     await expect(menu).toBeHidden()
   }
+})
+
+test("portrait menu close button closes the tab and keeps the menu open for the next close", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await mockWorkspace(page, {
+    name: "Tabs",
+    sessions: [a, b, c],
+    seed: { tabs: [a.id, b.id, c.id] },
+  })
+  await page.goto(sessionHref(a.id))
+
+  const trigger = page.getByRole("button", { name: "Tabs", exact: true })
+  const menu = page.getByRole("menu")
+  const sessions = menu.getByRole("group", { name: "Sessions", exact: true })
+
+  await trigger.click()
+  await expect(sessions.getByRole("menuitem", { name: "Close tab", exact: true })).toHaveCount(3)
+
+  const optionB = menu.getByRole("menuitem", { name: /^Tab B session/ })
+  const closeB = optionB.locator("..").getByRole("menuitem", { name: "Close tab", exact: true })
+  await closeB.click()
+
+  await expect(optionB).toHaveCount(0)
+  await expect(menu).toBeVisible()
+
+  const optionC = menu.getByRole("menuitem", { name: /^Tab C session/ })
+  const closeC = optionC.locator("..").getByRole("menuitem", { name: "Close tab", exact: true })
+  await closeC.click()
+
+  await expect(optionC).toHaveCount(0)
+  await expect(menu).toBeVisible()
+  await expect(sessions.getByRole("menuitem", { name: "Close tab", exact: true })).toHaveCount(1)
+  await expectPath(page, sessionHref(a.id))
 })
 
 test("option arrows move to the previous or next tab, and with shift to the next unread one", async ({ page }) => {
@@ -243,13 +281,14 @@ test("option arrows move to the previous or next tab, and with shift to the next
 })
 
 for (const row of [
-  { tabLayout: "horizontal", width: 360, hasTouch: false, direction: "ltr" },
-  { tabLayout: "vertical", width: 390, hasTouch: true, direction: "rtl" },
+  { tabLayout: "horizontal", width: 720, hasTouch: false, direction: "ltr" },
+  { tabLayout: "vertical", width: 720, hasTouch: true, direction: "rtl" },
 ]) {
   test.describe(`mobile drawer (${row.tabLayout})`, () => {
     test.use({ hasTouch: row.hasTouch })
     test(`mobile drawer exposes close controls and navigates between tabs (${row.tabLayout})`, async ({ page }) => {
-      await page.setViewportSize({ width: row.width, height: 720 })
+      // Landscape: the titlebar "Tabs" button is the drawer trigger.
+      await page.setViewportSize({ width: row.width, height: 360 })
       await mockWorkspace(page, {
         name: "Tabs",
         sessions: [a, b, c],

@@ -585,10 +585,6 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                           }}
                         >
                           <Menu.Separator />
-                          <Menu.Item onSelect={() => setMobileTabs("open", true)}>
-                            <Icon name="menu" />
-                            {language.t("titlebar.tabs")}
-                          </Menu.Item>
                           <Menu.Item onSelect={openNewTab}>
                             <Icon name="plus" />
                             {language.t("command.session.new")}

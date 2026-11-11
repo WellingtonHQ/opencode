@@ -538,6 +538,7 @@ export function MobileTitlebarTabSwitcher(props: {
                   <Menu.Item
                     class="mobile-titlebar-tab-close"
                     aria-label={language.t("common.closeTab")}
+                    closeOnSelect={false}
                     onSelect={() => props.onClose(tab)}
                   >
                     <Icon name="xmark-small" size="small" />
