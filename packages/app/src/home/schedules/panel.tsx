@@ -1,4 +1,4 @@
-import { For, Show, createEffect, onCleanup } from "solid-js"
+import { For, Show, createEffect, createMemo, onCleanup } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Button } from "@opencode/ui/button"
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@opencode/ui/dialog"
@@ -6,6 +6,7 @@ import { Divider } from "@opencode/ui/divider"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
 import { Spinner } from "@opencode/ui/spinner"
+import { Select } from "@opencode/ui/select"
 import { Switch } from "@opencode/ui/switch"
 import { Tooltip } from "@opencode/ui/tooltip"
 import { useDialog } from "@opencode/ui/context/dialog"
@@ -17,6 +18,14 @@ import { useGlobal } from "@/runtime/server/runtime"
 import { ServerConnection } from "@/runtime/server/registry"
 import { useLanguage } from "@/runtime/i18n/language"
 import { useSettings } from "@/settings/model"
+import { Persist, persisted } from "@/runtime/persistence/storage"
+import { Persistence } from "@/runtime/persistence/schema"
+import { Schema } from "effect"
+import { sortSchedules, type ScheduleSort } from "./sort"
+
+const SortPreference = Persistence.struct({
+  sort: Persistence.fallback(Schema.Literals(["name", "lastRun", "status"]), () => "name" as const),
+})
 
 export function SchedulePanel(props: { server: ServerConnection.Any; defaultDirectory?: string }) {
   const global = useGlobal()
@@ -33,6 +42,9 @@ function SchedulePanelReady(props: { server: ServerConnection.Any; defaultDirect
 
   type Task = ScheduleListOutput[number]
   const [state, setState] = createStore<{ items?: Task[]; error: boolean; busy?: string }>({ error: false })
+  const [preference, setPreference, , ready] = persisted(Persist.global("home.schedules.sort"), SortPreference, { sort: "name" })
+  const sorted = createMemo(() => sortSchedules(state.items ?? [], preference.sort, language.intl()))
+  const sorts: ScheduleSort[] = ["name", "lastRun", "status"]
 
   function load() {
     const run = ++sequence
@@ -226,6 +238,15 @@ function SchedulePanelReady(props: { server: ServerConnection.Any; defaultDirect
       <div class="flex items-center justify-between px-3 pt-3 pb-1">
         <span class="text-12-medium text-text-weak">{language.t("sidebar.schedules")}</span>
         <div class="flex items-center gap-1">
+          <Select<ScheduleSort>
+            options={sorts}
+            current={preference.sort}
+            value={(option) => option}
+            label={(option) => language.t(`schedule.sort.${option}`)}
+            onSelect={(option) => { if (option) setPreference("sort", option) }}
+            disabled={!ready()}
+            aria-label={language.t("schedule.sort.label")}
+          />
           {policyIndicator()}
           <Tooltip placement="top" value={language.t("schedule.panel.new")}>
             <IconButton
@@ -258,7 +279,7 @@ function SchedulePanelReady(props: { server: ServerConnection.Any; defaultDirect
         }
       >
         <div class="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
-          <For each={state.items}>{row}</For>
+          <For each={sorted()}>{row}</For>
         </div>
       </Show>
     </div>

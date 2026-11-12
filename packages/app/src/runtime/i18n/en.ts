@@ -835,6 +835,10 @@ export const dict = {
   "sidebar.project.clearNotifications": "Clear notifications",
 
   "schedule.panel.new": "New schedule",
+  "schedule.sort.label": "Sort schedules",
+  "schedule.sort.name": "Name",
+  "schedule.sort.lastRun": "Last run",
+  "schedule.sort.status": "Status",
   "schedule.panel.error": "Couldn't load schedules.",
   "schedule.empty.title": "No schedules yet",
   "schedule.empty.hint": "Create a schedule to run a prompt automatically.",
