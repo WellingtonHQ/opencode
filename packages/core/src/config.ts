@@ -17,6 +17,10 @@ import { ConfigVariable } from "./config/variable.js"
 import { ConfigNormalize } from "./config/normalize.js"
 import { ConfigDiscovery } from "./config/discovery.js"
 import { ConfigWatch } from "./config/watch.js"
+import { ConfigIntegration } from "./config/integration.js"
+import { ConfigManaged } from "./config/managed.js"
+import { ManagedPolicy } from "./managed-policy.js"
+import { Connection } from "@opencode/schema/connection"
 import { WellKnown } from "./wellknown.js"
 import { AppProcess } from "@opencode/util/process"
 import { ChildProcess } from "effect/process"
@@ -54,6 +58,15 @@ export interface Interface {
   readonly changes: () => Stream.Stream<Watcher.Update>
   /** Updates supported global config fields while preserving unrelated JSONC content. */
   readonly update?: (patch: Patch) => Effect.Effect<void, FSUtil.Error>
+  /**
+   * Replaces, or clears with `undefined`, the document an integration connection contributes. It loads right after
+   * managed policies: its settings layer below remote, user, and project config, while its policies outrank theirs.
+   * Changing it reloads config like any other source.
+   */
+  readonly integration?: (
+    integrationID: ConfigIntegration.Document["integrationID"],
+    document: ConfigIntegration.Document | undefined,
+  ) => Effect.Effect<void>
 }
 
 export const Options = Schema.Struct({
@@ -91,13 +104,25 @@ export const testLayer = (
   Layer.effectContext(
     Effect.gen(function* () {
       const entries = yield* Ref.make(initial)
+      const integrations = yield* Ref.make(new Map<string, ConfigIntegration.Document>())
       const updates = yield* PubSub.unbounded<Watcher.Update>()
       const service = Test.of({
-        entries: () => Ref.get(entries),
+        entries: () =>
+          Effect.all([Ref.get(integrations), Ref.get(entries)]).pipe(
+            Effect.map(([documents, entries]) => [...documents.values(), ...entries]),
+          ),
         compatibility: () => Effect.succeed(compatibility),
         changes: () => Stream.fromPubSub(updates),
         setEntries: (next) => Ref.set(entries, next),
         emitChange: (update) => PubSub.publish(updates, update).pipe(Effect.asVoid),
+        integration: (integrationID, document) =>
+          Ref.update(integrations, (current) => {
+            // Like config, keeps the document it holds when handed a deep-equal one.
+            if (isDeepStrictEqual(current.get(integrationID), document)) return current
+            const next = new Map(current)
+            next.delete(integrationID)
+            return document ? next.set(integrationID, document) : next
+          }),
       })
       return Context.empty().pipe(Context.add(Service, service), Context.add(Test, service))
     }),
@@ -116,10 +141,9 @@ export const layer = (options?: Options) =>
       const wellknown = yield* WellKnown.Service
       const processes = yield* AppProcess.Service
       const environment = yield* EnvironmentVariables.Service
-      const context = Context.make(FSUtil.Service, fs).pipe(
-        Context.add(Global.Service, globalService),
-        Context.add(Location.Service, location),
-      )
+      const integrations = new Map<string, ConfigIntegration.Document>()
+      // Integrations and environment refreshes reload with this layer's services.
+      const context = yield* Effect.context<FSUtil.Service | Global.Service | Location.Service>()
       const listeners = new Set<(entries: Entry[]) => Effect.Effect<void>>()
       const references = new WeakMap<Document, readonly ConfigVariable.CredentialReference[]>()
       const substitute = (input: Parameters<typeof ConfigVariable.substitute>[0]) => {
@@ -148,14 +172,17 @@ export const layer = (options?: Options) =>
           return
         }
         const result = ConfigNormalize.normalize(input)
-        yield* Effect.forEach(result.diagnostics, (diagnostic) =>
-          Effect.logWarning("configuration normalization diagnostic", {
+        // Every reload repeats the routine notes on a config that loads. A rejected config or a dropped malformed
+        // setting is the user's to fix, so those stay warnings.
+        yield* Effect.forEach(result.diagnostics, (diagnostic) => {
+          const log = result.type === "rejected" || diagnostic.kind === "invalid" ? Effect.logWarning : Effect.logDebug
+          return log("configuration normalization diagnostic", {
             source,
             path: diagnostic.path[0] === "$" ? "$" : `$.${diagnostic.path.join(".")}`,
             kind: diagnostic.kind,
             action: diagnostic.message,
-          }),
-        )
+          })
+        })
         if (result.type === "rejected") return
         const info = Option.getOrUndefined(decodeInfo(result.encoded))
         if (info) return info
@@ -189,11 +216,10 @@ export const layer = (options?: Options) =>
         const auth = entry.manifest.auth
         const credential = (yield* credentials.list(entry.integrationID)).at(-1)
         const variables = auth && credential?.value.type === "key" ? { [auth.env]: credential.value.key } : undefined
-        // A failed refresh, including a missing credential, keeps the last resolved config so remote providers
-        // and allowlists do not disappear; only removing the source clears it.
-        const configs = yield* (
-          variables ? wellknown.resolve(entry, variables) : Effect.fail(new Error("No usable wellknown credential"))
-        ).pipe(
+        // Logging out drops the saved remote config, so the source supplies nothing until a fresh fetch succeeds.
+        if (!variables) return yield* wellknown.clearCached(entry.origin).pipe(Effect.as([]))
+        // A failed refresh keeps the last resolved config so remote providers and allowlists do not disappear.
+        const configs = yield* wellknown.resolve(entry, variables).pipe(
           Effect.catch((error) =>
             Effect.logWarning("failed to load wellknown config", { source: entry.origin, error }).pipe(
               Effect.andThen(wellknown.cached(entry.origin)),
@@ -207,7 +233,17 @@ export const layer = (options?: Options) =>
             dir: entry.origin,
             text: JSON.stringify(config),
             env: variables,
-          }),
+          }).pipe(
+            Effect.map((document) => {
+              if (!document) return
+              const integrated = new ConfigIntegration.WellKnownDocument({
+                ...document,
+                integrationID: entry.integrationID,
+              })
+              references.set(integrated, references.get(document) ?? [])
+              return integrated
+            }),
+          ),
         ).pipe(Effect.map((documents) => documents.filter((document) => document !== undefined)))
       })
 
@@ -219,7 +255,28 @@ export const layer = (options?: Options) =>
               Effect.logWarning("failed to discover wellknown config", { error }).pipe(Effect.as([] as const)),
             ),
           )
-        return yield* Effect.forEach(entries, loadWellknownEntry).pipe(Effect.map((documents) => documents.flat()))
+        return yield* Effect.forEach(entries, (entry) =>
+          loadWellknownEntry(entry).pipe(
+            Effect.map((documents) => ({ integrationID: entry.integrationID, documents })),
+          ),
+        )
+      })
+
+      // `integration.use` decides whether an integration may supply anything. Only managed policies can withhold the
+      // documents an integration delivers, so a project file can never strip the Console document carrying org policy.
+      // A withheld document keeps its policies, so denying an integration never lifts the restrictions it carries.
+      const supplies = Effect.fnUntraced(function* (
+        lockdown: ReturnType<typeof ManagedPolicy.statements>,
+        integrationID: string,
+        connection?: Connection.Info,
+      ) {
+        const stored =
+          connection?.type === "credential" ? yield* credentials.get(Credential.ID.make(connection.id)) : undefined
+        const resource = ManagedPolicy.integrationResource(
+          integrationID,
+          stored ? ManagedPolicy.account(stored.value) : undefined,
+        )
+        return ManagedPolicy.decision(lockdown, "integration.use", resource) !== "deny"
       })
 
       const loadPreferences = Effect.fn("Config.loadPreferences")(function* (plist: AbsolutePath) {
@@ -290,7 +347,7 @@ export const layer = (options?: Options) =>
           .flatMap((entry) =>
             entry.type === "document" && entry.info.policies
               ? [
-                  new Document({
+                  new ConfigManaged.Document({
                     type: "document",
                     path: entry.path,
                     info: new Info({ policies: entry.info.policies }),
@@ -300,11 +357,13 @@ export const layer = (options?: Options) =>
           )
           .toReversed()
         const managedSettings = managed.map((entry) => {
-          if (entry.type !== "document" || !entry.info.policies) return entry
-          const document = new Document({ ...entry, info: new Info({ ...entry.info, policies: undefined }) })
+          if (entry.type !== "document") return entry
+          const document = new ConfigManaged.Document({ ...entry, info: new Info({ ...entry.info, policies: undefined }) })
           references.set(document, references.get(entry) ?? [])
           return document
         })
+        // Integration documents load right after managed policies: every remote, user, and project layer overrides
+        // their settings, and since policies evaluate earliest-loaded first, only managed policies outrank theirs.
         // Global entries sit below explicit and direct files; project directories rank above them.
         const globalSupplementary = sources.global ? yield* loadDirectory(sources.global).pipe(Effect.orDie) : []
         const projectSupplementary = yield* Effect.forEach(
@@ -314,9 +373,35 @@ export const layer = (options?: Options) =>
           Effect.orDie,
           Effect.map((entries) => entries.flat()),
         )
+        const lockdown = ManagedPolicy.statements(managedPolicies)
+        const integrated = yield* Effect.forEach(integrations.values(), (document) =>
+          supplies(lockdown, document.integrationID, document.connection).pipe(
+            Effect.map((allowed) =>
+              allowed
+                ? document
+                : new ConfigIntegration.Document({ ...document, info: new Info({ policies: document.info.policies }) }),
+            ),
+          ),
+        )
+        const wellknownDocuments = yield* Effect.forEach(yield* loadWellknown().pipe(Effect.orDie), (entry) =>
+          supplies(lockdown, entry.integrationID).pipe(
+            Effect.map((allowed) =>
+              allowed
+                ? entry.documents
+                : entry.documents.map(
+                    (document) =>
+                      new ConfigIntegration.WellKnownDocument({
+                        ...document,
+                        info: new Info({ policies: document.info.policies }),
+                      }),
+                  ),
+            ),
+          ),
+        )
         return [
           ...managedPolicies,
-          ...(yield* loadWellknown().pipe(Effect.orDie)),
+          ...integrated,
+          ...wellknownDocuments.flat(),
           ...globalSupplementary,
           ...explicit,
           ...direct,
@@ -486,6 +571,15 @@ export const layer = (options?: Options) =>
           }),
         changes: () => Stream.fromPubSub(updates),
         update,
+        integration: Effect.fn("Config.integration")(function* (integrationID, document) {
+          if (isDeepStrictEqual(integrations.get(integrationID), document)) return
+          integrations.delete(integrationID)
+          if (document) integrations.set(integrationID, document)
+          yield* reload().pipe(
+            Effect.provide(context),
+            Effect.catchCause((cause) => Effect.logError("failed to reload config", { cause })),
+          )
+        }),
       })
     }),
   )

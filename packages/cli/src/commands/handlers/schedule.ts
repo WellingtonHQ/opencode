@@ -3,7 +3,6 @@ import {
   OpenCode,
   isUnauthorizedError,
   type ScheduleListOutput,
-  type ScheduleSpec,
 } from "@opencode/client/promise"
 import { Service, type Endpoint } from "@opencode/client/effect/service"
 import { Effect, Option } from "effect"
@@ -14,6 +13,7 @@ import { ServerConnection } from "../../services/server-connection"
 import { errorMessage } from "../../util/error"
 
 type Task = ScheduleListOutput[number]
+type ScheduleSpec = Task["spec"]
 type ListInput = Runtime.Input<typeof Commands.commands.schedule.commands.list>
 type AddInput = Runtime.Input<typeof Commands.commands.schedule.commands.add>
 type TaskIDInput = Runtime.Input<typeof Commands.commands.schedule.commands.enable>

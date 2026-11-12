@@ -19,6 +19,17 @@ const database = Effect.gen(function* () {
   return Context.get(context, Database.Service).db
 })
 
+it.live("concurrent server starts reconcile the same credentials without losing cookies", () => Effect.gen(function* () {
+  const directory = yield* tmpdirScoped()
+  const layer = Database.layer({ path: `${directory.path}/shared.db` }).pipe(Layer.provide(Global.layerWith({ data: directory.path })))
+  const first = Context.get(yield* Layer.build(layer), Database.Service).db
+  const second = Context.get(yield* Layer.build(layer), Database.Service).db
+  yield* Effect.all([AuthSession.configure(first, credentials), AuthSession.configure(second, credentials)], { concurrency: 2 })
+  const token = yield* AuthSession.issue(first, true, credentials)
+  yield* Effect.all([AuthSession.configure(first, credentials), AuthSession.configure(second, credentials)], { concurrency: 2 })
+  expect(yield* AuthSession.isValid(second, token, credentials)).toBe(true)
+}))
+
 it.live("stores only hashes, expires remembered and ordinary sessions, and deletes expired records", () => Effect.gen(function* () {
   const db = yield* database
   yield* AuthSession.configure(db, credentials)

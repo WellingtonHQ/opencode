@@ -10,7 +10,7 @@ import { Switch } from "@opencode/ui/switch"
 import { Tooltip } from "@opencode/ui/tooltip"
 import { useDialog } from "@opencode/ui/context/dialog"
 import type { ScheduleListOutput } from "@opencode/client/promise"
-import { Schedule } from "@opencode/schema/schedule"
+import { Schedule } from "@opencode/schema/scheduled-task"
 import { formatClock, formatDateTime, formatTimeZoneName, weekdayLabels } from "@/runtime/server/schedule"
 import { formatServerError } from "@/runtime/server/errors"
 import { useGlobal } from "@/runtime/server/runtime"
@@ -20,10 +20,14 @@ import { useSettings } from "@/settings/model"
 
 export function SchedulePanel(props: { server: ServerConnection.Any; defaultDirectory?: string }) {
   const global = useGlobal()
+  return <Show when={global.serverCtx(ServerConnection.key(props.server))} keyed>{(ctx) => <SchedulePanelReady {...props} ctx={ctx} />}</Show>
+}
+
+function SchedulePanelReady(props: { server: ServerConnection.Any; defaultDirectory?: string; ctx: NonNullable<ReturnType<ReturnType<typeof useGlobal>["serverCtx"]>> }) {
   const language = useLanguage()
   const dialog = useDialog()
   const settings = useSettings()
-  const ctx = global.ensureServerCtx(props.server)
+  const ctx = props.ctx
   const api = ctx.sdk.api.schedule
   let sequence = 0
 
@@ -263,9 +267,13 @@ export function SchedulePanel(props: { server: ServerConnection.Any; defaultDire
 
 function DeleteScheduleDialog(props: { item: ScheduleListOutput[number]; server: ServerConnection.Any; onDone: () => void }) {
   const global = useGlobal()
+  return <Show when={global.serverCtx(ServerConnection.key(props.server))} keyed>{(ctx) => <DeleteScheduleDialogReady {...props} ctx={ctx} />}</Show>
+}
+
+function DeleteScheduleDialogReady(props: { item: ScheduleListOutput[number]; server: ServerConnection.Any; onDone: () => void; ctx: NonNullable<ReturnType<ReturnType<typeof useGlobal>["serverCtx"]>> }) {
   const language = useLanguage()
   const dialog = useDialog()
-  const api = global.ensureServerCtx(props.server).sdk.api.schedule
+  const api = props.ctx.sdk.api.schedule
   const [state, setState] = createStore<{ busy: boolean; error?: string }>({ busy: false })
 
   function remove() {

@@ -1,5 +1,5 @@
 import { DateTime } from "luxon"
-import type { Schedule } from "@opencode/schema/schedule"
+import type { Schedule } from "@opencode/schema/scheduled-task"
 
 // Computes the next run instant strictly after `anchorMs`. Returns null when the
 // spec can never match again (past one-shot or impossible cron pattern). Cron
