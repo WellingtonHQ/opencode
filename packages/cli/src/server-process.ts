@@ -97,6 +97,9 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
       const password = environmentPassword
         ? Redacted.value(environmentPassword)
         : config.password || randomBytes(32).toString("base64url")
+      // A credential minted here (no env or config password) is ephemeral: this process must not reconcile the
+      // shared auth verifier, which belongs to the canonical server on this data directory.
+      const ephemeral = !environmentPassword && !config.password
       if (!password) return yield* Effect.fail(new Error("Missing server password"))
       const instanceID = randomUUID()
       const transform = yield* WebUi.handler()
@@ -113,6 +116,7 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
           cors: options.cors ?? config.cors,
           password,
           username,
+          ephemeral,
           pty: { handoff },
           simulation: truthy(process.env.OPENCODE_SIMULATE),
           database: {

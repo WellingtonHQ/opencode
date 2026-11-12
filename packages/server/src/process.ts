@@ -71,7 +71,7 @@ export const start = Effect.fn("ServerProcess.start")(function* <E, R>(
   const application = yield* Ref.make(Option.none<App>())
   const rateLimit = ServerRateLimit.make()
   const app = dispatch(
-    ServerAuth.Config.of({ password: Option.some(password), username: options.username ?? "opencode" }),
+    ServerAuth.Config.of({ password: Option.some(password), username: options.username ?? "opencode", ephemeral: options.ephemeral ?? false }),
     status,
     application,
     options.app?.version ?? "unknown",

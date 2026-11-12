@@ -12,7 +12,7 @@ import { Global } from "@opencode/util/global"
 import { tmpdirScoped } from "./fixture/tmpdir"
 import { it } from "./lib/effect"
 
-const credentials = { username: "opencode", password: Option.some("secret") }
+const credentials = { username: "opencode", password: Option.some("secret"), ephemeral: false }
 const database = Effect.gen(function* () {
   const directory = yield* tmpdirScoped()
   const context = yield* Layer.build(Database.layer().pipe(Layer.provide(Global.layerWith({ data: directory.path }))))
@@ -28,6 +28,18 @@ it.live("concurrent server starts reconcile the same credentials without losing 
   const token = yield* AuthSession.issue(first, true, credentials)
   yield* Effect.all([AuthSession.configure(first, credentials), AuthSession.configure(second, credentials)], { concurrency: 2 })
   expect(yield* AuthSession.isValid(second, token, credentials)).toBe(true)
+}))
+
+it.live("an ephemeral credential does not wipe the canonical server's remembered sessions", () => Effect.gen(function* () {
+  const db = yield* database
+  const canonical = { ...credentials, ephemeral: false }
+  const ephemeral = { ...credentials, password: Option.some("aux-random"), ephemeral: true }
+  yield* AuthSession.configure(db, canonical)
+  const token = yield* AuthSession.issue(db, true, canonical)
+  // An auxiliary process (stdio/ACP) mints its own random credential and starts on the shared database.
+  yield* AuthSession.configure(db, ephemeral)
+  // The canonical server's remembered session survives and its token stays valid.
+  expect(yield* AuthSession.isValid(db, token, canonical)).toBe(true)
 }))
 
 it.live("stores only hashes, expires remembered and ordinary sessions, and deletes expired records", () => Effect.gen(function* () {

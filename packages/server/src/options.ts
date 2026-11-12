@@ -16,6 +16,8 @@ export const ServerOptions = Schema.Struct({
   port: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(65_535))),
   password: Schema.optional(Schema.String),
   username: Schema.optional(Schema.String),
+  /** True when the password was minted by the process (no env/config password); such a server must not reconcile the shared auth verifier. */
+  ephemeral: Schema.optional(Schema.Boolean),
   cors: Schema.optional(Schema.Array(Schema.String)),
   simulation: Schema.optional(Schema.Boolean),
   database: Schema.optional(Database.Options),

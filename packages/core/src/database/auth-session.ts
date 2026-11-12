@@ -12,6 +12,8 @@ export const SESSION_MAX_AGE_SECONDS = 12 * 60 * 60
 type Credentials = {
   readonly username: string
   readonly password: Option.Option<string>
+  /** True for a credential the process minted itself (random, not user-configured). Such a process must not reconcile the shared verifier. */
+  readonly ephemeral: boolean
 }
 
 function hash(token: string) {
@@ -31,6 +33,11 @@ function credentialHash(token: string, config: Credentials) {
 // cannot revive sessions issued before a credential change or disabling auth.
 export function configure(db: Database.Interface["db"], config: Credentials) {
   return Effect.gen(function* () {
+    // An auxiliary process (stdio/ACP) mints its own random credential and shares this database with
+    // the canonical server. Reconciling would treat the mismatch as a credential change: it would wipe
+    // the remembered sessions the canonical server issued and adopt a random verifier. Leave the shared
+    // auth rows untouched; the process authenticates with its in-memory credential and its own sessions.
+    if (config.ephemeral) return
     const credentials = Option.isSome(config.password) && config.password.value !== ""
       ? `enabled\0${config.username}\0${config.password.value}`
       : "disabled"
