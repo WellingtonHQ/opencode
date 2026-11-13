@@ -213,7 +213,7 @@ export const unsupportedParts = (
   provider?: string,
 ) => replaceMedia(messages, (media) => unsupportedMedia(media.mime, media.name, capabilities, provider))
 
-export const boundImages = (messages: LLMRequest["messages"]) => {
+export const boundImages = (messages: LLMRequest["messages"], budget?: "recovery") => {
   const isImage = (mime: string) => mime.toLowerCase().startsWith("image/")
   const sizes = messages.flatMap((message) =>
     message.content.flatMap((part) => {
@@ -224,6 +224,9 @@ export const boundImages = (messages: LLMRequest["messages"]) => {
       )
     }),
   )
+  // Leave room for text and JSON after a 413; a smaller rejected payload is halved instead.
+  const limit =
+    budget === "recovery" ? Math.min(5 * 1024 * 1024, Math.floor(sizes.reduce((a, b) => a + b, 0) / 2)) : budget
   // Replay the images in order, dropping the oldest down to the target whenever the kept payload passes the trigger.
   // A new image then moves the cut only every (trigger - target) bytes instead of on every request, so the replaced
   // prefix, and with it the provider's prompt cache, stays the same between cuts.
@@ -231,8 +234,9 @@ export const boundImages = (messages: LLMRequest["messages"]) => {
   let kept = 0
   for (const size of sizes) {
     kept += size
-    if (kept <= IMAGE_BYTES_TRIGGER) continue
-    while (kept > IMAGE_BYTES_TARGET) kept -= sizes[cut++]!
+    if (kept <= (limit ?? IMAGE_BYTES_TRIGGER)) continue
+    while (kept > (limit ?? IMAGE_BYTES_TARGET) && (budget !== "recovery" || cut < sizes.length - 1))
+      kept -= sizes[cut++]!
   }
   if (cut === 0) return messages
 

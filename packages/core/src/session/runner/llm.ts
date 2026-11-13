@@ -67,6 +67,7 @@ const layer = Layer.effect(
       let step = input.continuation?.step ?? 1
       let entering = true
       let stepped = input.stepped ?? false
+      const payload = { reduced: false }
       const promotable = input.promotable ?? "input"
       if (!force && !continuing && !stepped) {
         const pending = yield* SessionInbox.nextPromotable(db, sessionID, "input")
@@ -216,7 +217,7 @@ const layer = Layer.effect(
       while (true) {
         const next = yield* advanceToStep()
         if (next._tag !== "Ready") return next
-        continuing = yield* runStep(next.context, step, input.interruption)
+        continuing = yield* runStep(next.context, step, input.interruption, payload)
         stepped = true
         step++
         force = false
@@ -238,6 +239,7 @@ const layer = Layer.effect(
       first: SessionContext.Loaded,
       step: number,
       interruption: DrainInput["interruption"],
+      payload: { reduced: boolean },
     ) {
       const sessionID = first.session.id
       let assistantMessageID = SessionMessage.ID.create()
@@ -292,6 +294,7 @@ const layer = Layer.effect(
               executeTool: prepared.executeTool,
             })),
           )
+        const messages = SessionModelRequest.boundImages(prepared.request.messages, "recovery")
         const outcome = yield* steps.attempt({
           isLocationClosed: lifecycle.isClosed,
           interruption,
@@ -302,6 +305,7 @@ const layer = Layer.effect(
           model: loaded.model,
           prepared: {
             ...prepared,
+            request: payload.reduced ? { ...prepared.request, messages } : prepared.request,
             // A tool call can arrive during a reload; its permission check reads the session's agent.
             executeTool: (call) => plugins.awaitActivation.pipe(Effect.andThen(prepared.executeTool(call))),
           },
@@ -316,6 +320,7 @@ const layer = Layer.effect(
               retry: proposed,
             }),
           recoverContinuation,
+          recoverPayload: !payload.reduced && messages !== prepared.request.messages,
           recoverOverflow: Effect.suspend(() =>
             recoverOverflow
               ? compaction
@@ -380,6 +385,9 @@ const layer = Layer.effect(
           }),
           RecoverFull: Effect.fnUntraced(function* () {
             recoverContinuation = false
+          }),
+          RecoverPayload: Effect.fnUntraced(function* () {
+            payload.reduced = true
           }),
         })
         if (completed !== undefined) return completed

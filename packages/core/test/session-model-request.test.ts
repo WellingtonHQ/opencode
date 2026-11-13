@@ -179,6 +179,37 @@ describe("SessionModelRequest.unsupportedParts", () => {
 })
 
 describe("SessionModelRequest.boundImages", () => {
+  test("recovery preserves the newest image even when it alone exceeds the budget", () => {
+    const first = Message.user({ type: "media", media: Media.base64("a".repeat(20), "image/png") })
+    const latest = Message.user({ type: "media", media: Media.base64("b".repeat(40), "image/png") })
+    const result = boundImages([first, latest], "recovery")
+    expect(result[0]?.content[0]).toMatchObject({ type: "text" })
+    expect(result[1]).toBe(latest)
+    expect(boundImages([latest], "recovery")[0]).toBe(latest)
+  })
+
+  test("recovery removes older tool screenshots without changing the stored result", () => {
+    const message = Message.tool(
+      ToolResultPart.make({
+        id: "call",
+        name: "snapshot",
+        result: {
+          type: "content",
+          value: [
+            { type: "file", uri: `data:image/png;base64,${"a".repeat(100)}`, mime: "image/png", name: "old.png" },
+            { type: "file", uri: `data:image/png;base64,${"b".repeat(100)}`, mime: "image/png", name: "new.png" },
+          ],
+        },
+      }),
+    )
+    const result = boundImages([message], "recovery")
+    expect(result[0]?.content[0]).toMatchObject({
+      result: { value: [{ type: "text" }, { type: "file", name: "new.png" }] },
+    })
+    expect(message.content[0]).toMatchObject({
+      result: { value: [{ type: "file", name: "old.png" }, { type: "file", name: "new.png" }] },
+    })
+  })
   test("preserves images below the trigger", () => {
     const messages = [Message.user({ type: "media", media: Media.base64("aGVsbG8=", "image/png") })]
     expect(boundImages(messages)).toBe(messages)

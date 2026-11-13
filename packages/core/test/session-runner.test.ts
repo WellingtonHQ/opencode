@@ -3213,6 +3213,59 @@ describe("SessionRunnerLLM", () => {
     expect(userTexts(s.requests[5])).toContain(`Request 0: ${filler}`)
   })
 
+  scenario("recovers a payload rejection by dropping older images without changing history", function* (s) {
+    const image = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+    yield* s.session.prompt({
+      sessionID,
+      text: "Compare these images",
+      files: [{ uri: `data:image/png;base64,${image}` }, { uri: `data:image/png;base64,${image}` }],
+      resume: false,
+    })
+    yield* s.llm.push(
+      Stream.fail(payloadTooLarge()),
+      TestLLM.toolCall("call-echo", "echo", { text: "hello" }),
+      TestLLM.text("Recovered", "recovered"),
+    )
+    yield* s.resume
+
+    expect(s.requests).toHaveLength(3)
+    const images = (request: LLMRequest) =>
+      request.messages.flatMap((message) => message.content.filter((part) => part.type === "media"))
+    expect(images(s.requests[0])).toHaveLength(2)
+    expect(images(s.requests[1])).toHaveLength(1)
+    expect(images(s.requests[2])).toHaveLength(1)
+    expect(userTexts(s.requests[1]).join(" ")).toContain("image was removed")
+    expect((yield* s.messages).find((message) => message.type === "user")).toMatchObject({ files: [{}, {}] })
+  })
+
+  scenario("stops after a second payload rejection", function* (s) {
+    const image = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+    yield* s.session.prompt({
+      sessionID,
+      text: "Compare these images",
+      files: [{ uri: `data:image/png;base64,${image}` }, { uri: `data:image/png;base64,${image}` }],
+      resume: false,
+    })
+    yield* s.llm.push(Stream.fail(payloadTooLarge()), Stream.fail(payloadTooLarge()))
+    const exit = yield* s.resume.pipe(Effect.exit)
+    expect(Exit.isFailure(exit)).toBe(true)
+    expect(s.requests).toHaveLength(2)
+  })
+
+  scenario("does not recover a payload rejection after output has started", function* (s) {
+    const image = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+    yield* s.session.prompt({
+      sessionID,
+      text: "Compare these images",
+      files: [{ uri: `data:image/png;base64,${image}` }, { uri: `data:image/png;base64,${image}` }],
+      resume: false,
+    })
+    yield* s.llm.push(TestLLM.failAfter(payloadTooLarge(), LLMEvent.textStart({ id: "partial" })))
+
+    expect((yield* s.resume.pipe(Effect.flip)).message).toBe("Too large")
+    expect(s.requests).toHaveLength(1)
+  })
+
   scenario("resends compaction as text after payload too large, then shrinks later rejections", function* (s) {
     const image = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
     const filler = "context ".repeat(1_000)

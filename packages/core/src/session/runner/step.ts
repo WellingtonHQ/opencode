@@ -35,6 +35,7 @@ export type Outcome = Data.TaggedEnum<{
     readonly freshAssistant?: boolean
   }
   RecoverFull: {}
+  RecoverPayload: {}
   Compacted: {}
   OutputLimit: { readonly needsContinuation: boolean }
 }>
@@ -59,6 +60,7 @@ interface Input {
     retry: boolean,
   ) => Effect.Effect<{ readonly retry: false } | SessionRunnerRetry.Decision>
   readonly recoverContinuation: boolean
+  readonly recoverPayload?: boolean
   /** The runner owns compaction policy; the attempt invokes it only before durable output. */
   readonly recoverOverflow: Effect.Effect<boolean>
 }
@@ -207,6 +209,15 @@ export const make = Effect.gen(function* () {
           })
           return Outcome.Compacted()
         }
+
+        if (
+          input.recoverPayload &&
+          !publisher.record().outputStarted &&
+          streamFailure instanceof AIError &&
+          streamFailure.reason._tag === "InvalidRequest" &&
+          streamFailure.reason.classification === "payload-too-large"
+        )
+          return Outcome.RecoverPayload()
 
         const recorded = publisher.record()
         const unknownFinish =
