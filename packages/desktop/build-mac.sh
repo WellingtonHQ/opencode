@@ -7,15 +7,12 @@ echo "=== Installing dependencies ==="
 cd "$SCRIPT_DIR/../.."
 bun install --frozen-lockfile
 
-echo "=== Prebuilding ==="
-cd "$SCRIPT_DIR"
-bun run prebuild
-
 echo "=== Building ==="
+cd "$SCRIPT_DIR"
 bun run build
 
 echo "=== Packaging for macOS ==="
-bun run package:mac
+bunx electron-builder --mac --publish never --config electron-builder.config.ts
 
 echo "=== Done ==="
 echo "Output: dist/"

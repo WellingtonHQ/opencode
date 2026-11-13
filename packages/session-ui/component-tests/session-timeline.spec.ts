@@ -1,4 +1,4 @@
-import { expect, story } from "../../storybook/playwright/story"
+import { expect, story } from "../../stories/playwright/story"
 
 story("spaces an error between a shell result and expanded updates", async ({ mount }) => {
   const timeline = await mount("current-session-error-spacing--error-and-updates")
@@ -16,7 +16,7 @@ story("spaces an error between a shell result and expanded updates", async ({ mo
   await expect(notice).toContainText("Instructions updated")
   const expandedBox = (await updates.boundingBox())!
   expect((await notice.boundingBox())!.y - (expandedBox.y + expandedBox.height)).toBe(0)
-  expect((await notice.boundingBox())!.x - expandedBox.x).toBe(12)
+  expect((await notice.boundingBox())!.x - expandedBox.x).toBe(24)
   expect(expandedBox.height).toBe(28)
 })
 
@@ -60,6 +60,32 @@ story("aligns the retry icon with the error label", async ({ mount }) => {
   expect(iconY).toBe(labelY)
 })
 
+story("keeps compaction boundaries and token usage when its summary is hidden", async ({ mount }) => {
+  const timeline = await mount("current-session-timeline-rows--compaction-summary-hidden")
+  const compaction = timeline.locator('[data-component="session-compaction-message"]')
+
+  await expect(compaction).toContainText("Session compaction started")
+  await expect(compaction).toContainText("Session compacted")
+  await expect(compaction).toContainText("11.9K in")
+  await expect(compaction).toContainText("508 out")
+  await expect(compaction).not.toContainText("The Session timeline now consumes current nested assistant content.")
+})
+
+story("collapses the compaction summary behind a disclosure", async ({ mount }) => {
+  const timeline = await mount("current-session-timeline-rows--compaction-summary-collapsed")
+  const compaction = timeline.locator('[data-component="session-compaction-message"]')
+  const trigger = compaction.locator('[data-slot="collapsible-trigger"]')
+
+  await expect(trigger).toContainText("Compaction summary")
+  await expect(compaction).toContainText("Session compaction started")
+  await expect(compaction).toContainText("Session compacted")
+  await expect(compaction).toContainText("11.9K in")
+  await expect(compaction).toContainText("508 out")
+  await expect(compaction).not.toContainText("The Session timeline now consumes current nested assistant content.")
+  await trigger.click()
+  await expect(compaction).toContainText("The Session timeline now consumes current nested assistant content.")
+})
+
 story("centers the error icon on the first line of short and wrapped errors", async ({ mount }) => {
   const timeline = await mount("current-session-error-card--provider-errors")
   const cards = timeline.locator('[data-kind="session-error-card"]')
@@ -84,6 +110,15 @@ story("centers the error icon on the first line of short and wrapped errors", as
   geometry.forEach((card) => expect(card.offset).toBeCloseTo(0, 0))
 })
 
+story("links URLs in an error without splitting them at a colon", async ({ mount }) => {
+  const timeline = await mount("current-session-error-card--linked-error")
+  const card = timeline.locator('[data-kind="session-error-card"]')
+  const url = "http://localhost:11434/api"
+
+  await expect(card.getByRole("link", { name: url, exact: true })).toHaveAttribute("href", url)
+  await expect(card.locator("strong")).toHaveCount(0)
+})
+
 // Moved from packages/app/e2e/regression/session-timeline-context-state.spec.ts
 story("preserves a collapsed context group through count and status updates", async ({ mount }) => {
   const timeline = await mount("current-session-research-agents--agent-research", { args: { scenario: "exploration" } })
@@ -94,6 +129,24 @@ story("preserves a collapsed context group through count and status updates", as
   await expect(trigger).toHaveAttribute("aria-expanded", "false")
   await timeline.getByRole("button", { name: "Complete glob" }).click()
   await expect(trigger).toHaveAttribute("aria-expanded", "false")
+})
+
+// A failed turn diff load used to look like one still loading, with no way to retry until the row remounted.
+story("offers a retry for a turn diff that failed to load", async ({ mount }) => {
+  const timeline = await mount("current-session-file-changes--turn-change-summary-failed")
+  const summary = timeline.locator('[data-slot="session-turn-diffs"]')
+  const counts = summary.locator('[data-component="diff-changes"]')
+
+  await expect(summary).toContainText("2 Changed files")
+  await expect(summary).toContainText("Diff unavailable")
+  await expect(counts).toHaveCount(0)
+
+  const retry = summary.getByRole("button", { name: "Retry", exact: true })
+  await retry.click()
+  // The header totals the turn; each file row then shows its own counts.
+  await expect(counts.first()).toHaveText("+2-1")
+  await expect(summary).not.toContainText("Diff unavailable")
+  await expect(retry).toHaveCount(0)
 })
 
 // Moved from packages/app/e2e/regression/session-timeline-file-projection.spec.ts

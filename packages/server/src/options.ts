@@ -2,6 +2,7 @@ import { Database } from "@opencode/core/database/database"
 import { ModelsDev } from "@opencode/core/models-dev"
 import { PersistentPty } from "@opencode/core/persistent-pty"
 import { Schema } from "effect"
+import type { LayerNodePlatform } from "@opencode/util/effect/app-node-platform"
 
 export const ServerOptions = Schema.Struct({
   app: Schema.optional(
@@ -15,6 +16,8 @@ export const ServerOptions = Schema.Struct({
   port: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(65_535))),
   password: Schema.optional(Schema.String),
   username: Schema.optional(Schema.String),
+  /** True when the password was minted by the process (no env/config password); such a server must not reconcile the shared auth verifier. */
+  ephemeral: Schema.optional(Schema.Boolean),
   cors: Schema.optional(Schema.Array(Schema.String)),
   simulation: Schema.optional(Schema.Boolean),
   database: Schema.optional(Database.Options),
@@ -25,6 +28,12 @@ export const ServerOptions = Schema.Struct({
     }),
   ),
   models: Schema.optional(ModelsDev.Options),
+  /**
+   * Replaces `globalThis.fetch` for OpenCode's own HTTP requests: OpenCode Console config, model requests, web fetch
+   * and search, well-known config, and remote MCP servers. Agent code in Code Mode keeps `globalThis.fetch`. For
+   * example, a Cloudflare Worker can route requests through a Service Binding.
+   */
+  fetch: Schema.optional(Schema.declare((input): input is LayerNodePlatform.Fetch => typeof input === "function")),
   config: Schema.optional(
     Schema.Struct({
       directory: Schema.optional(Schema.String),

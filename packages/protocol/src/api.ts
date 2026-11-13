@@ -2,6 +2,7 @@ import { Context } from "effect"
 import { HttpApi, HttpApiGroup, HttpApiMiddleware, OpenApi } from "effect/http-api"
 import { SchemaErrorMiddleware } from "./middleware/schema-error.js"
 import { GenerateGroup } from "./groups/generate.js"
+import { ExperimentalGroup } from "./groups/experimental.js"
 import { VoiceGroup } from "./groups/voice.js"
 import { MessageGroup } from "./groups/message.js"
 import { ModelGroup } from "./groups/model.js"
@@ -20,13 +21,13 @@ import { PluginGroup } from "./groups/plugin.js"
 import { ServerGroup } from "./groups/server.js"
 import { DebugGroup } from "./groups/debug.js"
 import { makePtyGroup } from "./groups/pty.js"
-import { PersistentPtyGroup } from "./groups/persistent-pty.js"
 import { ShellGroup } from "./groups/shell.js"
 import { ReferenceGroup } from "./groups/reference.js"
 import { Authorization } from "./middleware/authorization.js"
 import { makeLocationGroup } from "./groups/location.js"
 import { IntegrationGroup } from "./groups/integration.js"
 import { WebSearchGroup } from "./groups/websearch.js"
+import { UsageGroup } from "./groups/usage.js"
 import { makeMcpGroup } from "./groups/mcp.js"
 import { CredentialGroup } from "./groups/credential.js"
 import { ProjectGroup } from "./groups/project.js"
@@ -34,7 +35,7 @@ import { WorktreeGroup } from "./groups/worktree.js"
 import { VcsGroup } from "./groups/vcs.js"
 import { MigrationGroup } from "./groups/migration.js"
 import { ConfigGroup } from "./groups/config.js"
-import { ScheduleGroup } from "./groups/schedule.js"
+import { ScheduleGroup } from "./groups/scheduled-task.js"
 import { GlobalGroup } from "./groups/global.js"
 
 type LocationGroups<LocationId extends HttpApiMiddleware.AnyId> =
@@ -44,7 +45,7 @@ type LocationGroups<LocationId extends HttpApiMiddleware.AnyId> =
   | HttpApiGroup.AddMiddleware<typeof ProviderGroup, LocationId>
   | HttpApiGroup.AddMiddleware<typeof IntegrationGroup, LocationId>
   | HttpApiGroup.AddMiddleware<typeof WebSearchGroup, LocationId>
-  | HttpApiGroup.AddMiddleware<typeof ProjectGroup, LocationId>
+  | HttpApiGroup.AddMiddleware<typeof UsageGroup, LocationId>
   | HttpApiGroup.AddMiddleware<typeof FileSystemGroup, LocationId>
   | HttpApiGroup.AddMiddleware<typeof CommandGroup, LocationId>
   | HttpApiGroup.AddMiddleware<typeof SkillGroup, LocationId>
@@ -101,10 +102,11 @@ type ApiGroups<
   | typeof WorktreeGroup
   | typeof GenerateGroup
   | typeof VoiceGroup
-  | typeof PersistentPtyGroup
+  | typeof ExperimentalGroup
   | typeof CredentialGroup
   | typeof ScheduleGroup
   | typeof GlobalGroup
+  | typeof ProjectGroup
   | LocationGroups<LocationId>
   | LocationGroup<LocationId, LocationService>
   | PtyGroups<LocationId, LocationService>
@@ -180,7 +182,7 @@ const makeApiFromGroup = <
     .add(IntegrationGroup.middleware(locationMiddleware))
     .add(makeMcpGroup(locationMiddleware))
     .add(CredentialGroup)
-    .add(ProjectGroup.middleware(locationMiddleware))
+    .add(ProjectGroup)
     .add(makeFormGroup(locationMiddleware))
     .add(ScheduleGroup)
     .add(GlobalGroup)
@@ -191,7 +193,7 @@ const makeApiFromGroup = <
     .add(RpcGroup.middleware(locationMiddleware))
     .add(eventGroup)
     .add(makePtyGroup(locationMiddleware))
-    .add(PersistentPtyGroup)
+    .add(ExperimentalGroup)
     .add(ShellGroup.middleware(locationMiddleware))
     .add(ReferenceGroup.middleware(locationMiddleware))
     .add(WorktreeGroup)
@@ -199,6 +201,7 @@ const makeApiFromGroup = <
     .add(DebugGroup)
     .add(MigrationGroup)
     .add(WebSearchGroup.middleware(locationMiddleware))
+    .add(UsageGroup.middleware(locationMiddleware))
     .add(ConfigGroup.middleware(locationMiddleware))
     .annotateMerge(
       OpenApi.annotations({

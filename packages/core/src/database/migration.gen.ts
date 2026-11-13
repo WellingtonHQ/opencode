@@ -57,6 +57,15 @@ import m54 from "./migration/20261007190000_azure_cli_external_credential.js"
 import m55 from "./migration/20261010180456_project_time_archived.js"
 import m56 from "./migration/20261013030935_add_scheduled_task_timezone.js"
 import m57 from "./migration/20261023060420_add_scheduled_task_session.js"
+import m58 from "./migration/20261024002554_session_allowance.js"
+import m59 from "./migration/20261024175301_drop_session_allowance.js"
+import m60 from "./migration/20261025123711_blob.js"
+import m61 from "./migration/20261025154125_drop_session_pending.js"
+import m62 from "./migration/20261026223005_schedule.js"
+import m63 from "./migration/20261029002625_session_part.js"
+import m64 from "./migration/20261029073502_session_time_busy.js"
+import m65 from "./migration/20261029165540_schedule_checks.js"
+import m66 from "./migration/20261030054400_job.js"
 
 export const migrations = [
   m00,
@@ -117,4 +126,13 @@ export const migrations = [
   m55,
   m56,
   m57,
+  m58,
+  m59,
+  m60,
+  m61,
+  m62,
+  m63,
+  m64,
+  m65,
+  m66,
 ] satisfies DatabaseMigration.Migration[]

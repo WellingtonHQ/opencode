@@ -1,5 +1,5 @@
 import { expect } from "bun:test"
-import { Schedule } from "@opencode/schema/schedule"
+import { Schedule } from "@opencode/schema/scheduled-task"
 import { Effect, Schema } from "effect"
 import { it } from "../../core/test/lib/effect"
 import { ServerFetch } from "../src/fetch"

@@ -1,4 +1,4 @@
-import { expect, story } from "../../storybook/playwright/story"
+import { expect, story } from "../../stories/playwright/story"
 
 story("maps grouped and collapsed switches to the timeline settings", async ({ mount }) => {
   const component = await mount("settings-timeline-detail--interactive")
@@ -8,7 +8,7 @@ story("maps grouped and collapsed switches to the timeline settings", async ({ m
   const collapsed = shell.getByRole("switch", { name: "Shell collapsed", exact: true })
   const value = component.locator('[data-slot="timeline-detail-fixture-value"]')
 
-  await expect(component.getByRole("switch")).toHaveCount(9)
+  await expect(component.getByRole("switch")).toHaveCount(11)
   await expect(component.getByText("Activity", { exact: true })).toHaveCount(0)
   await expect(grouped).toBeChecked()
   await expect(collapsed).toBeChecked()
@@ -21,6 +21,26 @@ story("maps grouped and collapsed switches to the timeline settings", async ({ m
   await collapsed.press("Space")
   await expect(value).toContainText('"shell":{"placement":"grouped","details":"collapsed"}')
   await expect(component.getByRole("group", { name: "Subagents", exact: true }).getByRole("switch")).toHaveCount(1)
+})
+
+story("hides compactions without changing the other notice settings", async ({ mount }) => {
+  const component = await mount("settings-timeline-detail--interactive")
+  await component.getByRole("button", { name: "Advanced", exact: true }).click()
+  const compactions = component.getByRole("group", { name: "Compaction summaries", exact: true })
+  const visibility = compactions.getByRole("button", { name: "Compaction summaries visibility" })
+  const value = component.locator('[data-slot="timeline-detail-fixture-value"]')
+
+  await expect(compactions.getByRole("switch", { name: "Compaction summaries collapsed", exact: true })).toHaveCount(1)
+  await expect(compactions.locator('[data-slot="timeline-detail-unavailable"]')).toHaveCount(1)
+  await expect(component.getByRole("button", { name: "Notices visibility" })).toHaveAttribute("aria-pressed", "true")
+  await visibility.click()
+  await expect(visibility).toHaveAttribute("aria-pressed", "false")
+  await expect(value).toContainText('"compactions":{"placement":"hidden","details":"collapsed"}')
+  await expect(component.getByRole("slider")).toHaveAttribute("aria-valuetext", "Custom")
+  await visibility.click()
+  await expect(visibility).toHaveAttribute("aria-pressed", "true")
+  await expect(value).toContainText('"compactions":{"placement":"separate","details":"collapsed"}')
+  await expect(component.getByRole("slider")).toHaveAttribute("aria-valuetext", "Compact")
 })
 
 story("replaces hidden switches with solid lines and restores options", async ({ mount, page }) => {
@@ -138,18 +158,19 @@ story("keeps visibility and switches in sync with the preset slider", async ({ m
   await slider.focus()
   await slider.press("Home")
   await expect(slider).toHaveAttribute("aria-valuetext", "Messages only")
-  await expect(component.getByRole("switch")).toHaveCount(0)
-  await expect(component.locator('[data-slot="timeline-detail-unavailable"]')).toHaveCount(9)
-  await expect(component.locator('[data-action="timeline-detail-visibility"][aria-pressed="false"]')).toHaveCount(6)
+  // Messages only hides every activity but keeps commentary, which is text.
+  await expect(component.getByRole("switch")).toHaveAccessibleName("Commentary grouped")
+  await expect(component.locator('[data-slot="timeline-detail-unavailable"]')).toHaveCount(11)
+  await expect(component.locator('[data-action="timeline-detail-visibility"][aria-pressed="false"]')).toHaveCount(7)
   await component.getByRole("button", { name: "Shell visibility" }).click()
   await expect(component.getByRole("switch", { name: "Shell grouped", exact: true })).toBeChecked()
   await expect(slider).toHaveAttribute("aria-valuetext", "Custom")
   await slider.focus()
   await slider.press("End")
   await expect(slider).toHaveAttribute("aria-valuetext", "Everything")
-  await expect(component.getByRole("switch")).toHaveCount(9)
-  await expect(component.locator('[data-slot="timeline-detail-unavailable"]')).toHaveCount(0)
-  await expect(component.locator('[data-action="timeline-detail-visibility"][aria-pressed="true"]')).toHaveCount(6)
+  await expect(component.getByRole("switch")).toHaveCount(11)
+  await expect(component.locator('[data-slot="timeline-detail-unavailable"]')).toHaveCount(1)
+  await expect(component.locator('[data-action="timeline-detail-visibility"][aria-pressed="true"]')).toHaveCount(8)
   await expect(component.getByRole("switch", { checked: true })).toHaveCount(0)
 })
 
