@@ -249,6 +249,7 @@ export function GenericTool(
   },
 ) {
   const i18n = useI18n()
+  const input = () => (props.input && Object.keys(props.input).length > 0 ? props.input : undefined)
 
   return (
     <BasicTool
@@ -266,6 +267,20 @@ export function GenericTool(
         args: args(props.input),
       }}
     >
+      <Show when={input()}>
+        {(value) => (
+          <div
+            data-component="tool-input"
+            data-scrollable
+            tabIndex={0}
+            role="region"
+            aria-label={i18n.t("ui.scrollView.ariaLabel")}
+          >
+            <div class="text-12-medium">{i18n.t("ui.basicTool.input")}</div>
+            <pre class="text-12-mono">{JSON.stringify(value(), null, 2)}</pre>
+          </div>
+        )}
+      </Show>
       <Show when={props.output}>
         {(output) => (
           <div
@@ -275,6 +290,7 @@ export function GenericTool(
             role="region"
             aria-label={i18n.t("ui.scrollView.ariaLabel")}
           >
+            <div class="text-12-medium">{i18n.t("ui.basicTool.output")}</div>
             <Markdown text={output()} />
           </div>
         )}

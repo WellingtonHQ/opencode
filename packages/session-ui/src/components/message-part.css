@@ -786,6 +786,34 @@
   }
 }
 
+[data-component="tool-input"] {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 0;
+  margin-bottom: 0px;
+  height: fit-content;
+
+  pre {
+    margin: 0;
+    padding: 0;
+    background: none;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  &[data-scrollable] {
+    height: auto;
+    max-height: 240px;
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+}
+
 [data-component="read-image"] {
   min-width: 0;
 
