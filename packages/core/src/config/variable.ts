@@ -4,7 +4,7 @@ import os from "os"
 import path from "path"
 import { Effect } from "effect"
 import { createScanner, type ParseError, parse } from "jsonc-parser"
-import { isRecord } from "@opencode/ai/utils/record"
+import { isRecord } from "@opencode/util/record"
 import { FSUtil } from "@opencode/util/fs-util"
 import { ConfigNormalize } from "./normalize.js"
 

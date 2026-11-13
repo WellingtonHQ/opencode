@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { Schema } from "effect"
-import { Schedule } from "../src/schedule.js"
+import { Schedule } from "../src/scheduled-task.js"
 
 describe("Schedule.TimeZone", () => {
   test("accepts IANA time zones and rejects unknown zone names", () => {

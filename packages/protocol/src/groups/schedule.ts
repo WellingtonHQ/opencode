@@ -1,109 +1,68 @@
 import { Schedule } from "@opencode/schema/schedule"
+import { Session } from "@opencode/schema/session"
 import { Schema } from "effect"
-import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/http-api"
-import { InvalidRequestError, ScheduleLimitExceededError, ScheduleNotFoundError } from "../errors.js"
+import { HttpApiEndpoint, HttpApiSchema, OpenApi } from "effect/http-api"
+import { ForbiddenError, InvalidRequestError, ScheduleNotFoundError, SessionNotFoundError } from "../errors.js"
 
-// Keep the wire shape canonical while leaving the custom Intl-based time-zone check to Core.
-const TimeZone = Schema.String
-const ScheduleID = Schedule.ID.annotate({ identifier: "Schedule.ID" })
-const Run = Schema.Struct({ ...Schedule.Run.fields, taskID: ScheduleID })
-const Info = Schema.Struct({
-  ...Schedule.Info.fields,
-  id: ScheduleID,
-  timezone: TimeZone,
-  recentRuns: Schema.Array(Run).pipe(Schema.optional),
-})
-const CreateInput = Schema.Struct({
-  ...Schedule.CreateInput.fields,
-  timezone: TimeZone.pipe(Schema.optional),
-})
-const UpdateInput = Schema.Struct({
-  ...Schedule.UpdateInput.fields,
-  timezone: TimeZone.pipe(Schema.optional),
-})
+const EXPERIMENTAL = "Experimental: needs experimental.schedules in the Session's config and may change without notice."
+const errors = [ScheduleNotFoundError, ForbiddenError] as const
+const params = { scheduleID: Schedule.ID }
+const annotations = (identifier: string, summary: string, description: string) =>
+  OpenApi.annotations({
+    identifier: `experimental.schedule.${identifier}`,
+    summary,
+    description: `${description} ${EXPERIMENTAL}`,
+    // The routes share the `server.experimental` group with the persistent PTY prototype; tag them on their own.
+    transform: (operation) => ({ ...operation, tags: ["experimental"] }),
+  })
 
-export const ScheduleGroup = HttpApiGroup.make("server.schedule")
-  .add(
-    HttpApiEndpoint.get("schedule.list", "/api/schedule", {
-      success: Schema.Array(Info),
-    })
-      .annotateMerge(
-        OpenApi.annotations({
-          identifier: "v2.schedule.list",
-          summary: "List scheduled tasks",
-          description: "Retrieve all scheduled tasks.",
-        }),
-      ),
-  )
-  .add(
-    HttpApiEndpoint.get("schedule.get", "/api/schedule/:scheduleID", {
-      params: { scheduleID: ScheduleID },
-      success: Info,
-      error: ScheduleNotFoundError,
-    })
-      .annotateMerge(
-        OpenApi.annotations({
-          identifier: "v2.schedule.get",
-          summary: "Get scheduled task",
-          description: "Retrieve one scheduled task by ID.",
-        }),
-      ),
-  )
-  .add(
-    HttpApiEndpoint.post("schedule.create", "/api/schedule", {
-      payload: CreateInput,
-      success: Info,
-      error: [InvalidRequestError, ScheduleLimitExceededError],
-    })
-      .annotateMerge(
-        OpenApi.annotations({
-          identifier: "v2.schedule.create",
-          summary: "Create scheduled task",
-          description: "Create a scheduled task and compute its first next run time.",
-        }),
-      ),
-  )
-  .add(
-    HttpApiEndpoint.patch("schedule.update", "/api/schedule/:scheduleID", {
-      params: { scheduleID: ScheduleID },
-      payload: UpdateInput,
-      success: Info,
-      error: [InvalidRequestError, ScheduleNotFoundError],
-    })
-      .annotateMerge(
-        OpenApi.annotations({
-          identifier: "v2.schedule.update",
-          summary: "Update scheduled task",
-          description: "Update one or more fields of a scheduled task; recomputes the next run when the spec changes.",
-        }),
-      ),
-  )
-  .add(
-    HttpApiEndpoint.delete("schedule.remove", "/api/schedule/:scheduleID", {
-      params: { scheduleID: ScheduleID },
-      success: Info,
-      error: ScheduleNotFoundError,
-    })
-      .annotateMerge(
-        OpenApi.annotations({
-          identifier: "v2.schedule.remove",
-          summary: "Remove scheduled task",
-          description: "Remove a scheduled task and return the removed record.",
-        }),
-      ),
-  )
-  .add(
-    HttpApiEndpoint.post("schedule.runNow", "/api/schedule/:scheduleID/run-now", {
-      params: { scheduleID: ScheduleID },
-      success: Info,
-      error: ScheduleNotFoundError,
-    })
-      .annotateMerge(
-        OpenApi.annotations({
-          identifier: "v2.schedule.runNow",
-          summary: "Run scheduled task now",
-          description: "Run one scheduled task immediately regardless of its enabled state or next run time.",
-        }),
-      ),
-  )
-  .annotateMerge(OpenApi.annotations({ title: "schedule", description: "Scheduled prompt execution routes." }))
+export const CreatePayload = Schema.Struct({ sessionID: Session.ID, ...Schedule.Request.fields }).annotate({
+  identifier: "Schedule.CreatePayload",
+})
+export type CreatePayload = typeof CreatePayload.Type
+
+/** Lives in the `server.experimental` group (see `groups/experimental.ts`). */
+export const ScheduleEndpoints = [
+  HttpApiEndpoint.post("schedule.create", "/api/experimental/schedule", {
+    payload: CreatePayload,
+    success: Schema.Struct({ data: Schedule.Info }),
+    error: [InvalidRequestError, SessionNotFoundError, ForbiddenError],
+  }).annotateMerge(
+    annotations(
+      "create",
+      "Create schedule",
+      "Schedule a prompt that wakes the Session once after a delay, at a time, every interval, or on a cron.",
+    ),
+  ),
+  HttpApiEndpoint.get("schedule.list", "/api/experimental/schedule", {
+    query: { sessionID: Session.ID },
+    success: Schema.Struct({ data: Schema.Array(Schedule.Info) }),
+    error: [SessionNotFoundError, ForbiddenError],
+  }).annotateMerge(annotations("list", "List schedules", "List a Session's schedules, oldest first.")),
+  HttpApiEndpoint.get("schedule.get", "/api/experimental/schedule/:scheduleID", {
+    params,
+    success: Schema.Struct({ data: Schedule.Info }),
+    error: errors,
+  }).annotateMerge(annotations("get", "Get schedule", "Read one schedule.")),
+  HttpApiEndpoint.post("schedule.pause", "/api/experimental/schedule/:scheduleID/pause", {
+    params,
+    success: Schema.Struct({ data: Schedule.Info }),
+    error: errors,
+  }).annotateMerge(annotations("pause", "Pause schedule", "Stop a schedule from firing until it is resumed.")),
+  HttpApiEndpoint.post("schedule.resume", "/api/experimental/schedule/:scheduleID/resume", {
+    params,
+    success: Schema.Struct({ data: Schedule.Info }),
+    error: errors,
+  }).annotateMerge(
+    annotations(
+      "resume",
+      "Resume schedule",
+      "Resume a paused schedule. A one-shot that fell due while paused fires once; a repeating schedule resumes at its next slot.",
+    ),
+  ),
+  HttpApiEndpoint.delete("schedule.delete", "/api/experimental/schedule/:scheduleID", {
+    params,
+    success: HttpApiSchema.NoContent,
+    error: errors,
+  }).annotateMerge(annotations("delete", "Delete schedule", "Delete a schedule.")),
+] as const

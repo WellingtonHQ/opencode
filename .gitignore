@@ -1,7 +1,6 @@
 .DS_Store
 node_modules
 .worktrees
-.sst
 .env
 .env.local
 .idea
@@ -15,6 +14,11 @@ dist-node
 ts-dist
 .turbo
 .typecheck-profiles
+
+# Astro + Cloudflare generated build artifacts
+.astro
+.wrangler
+services/www/public/cli.json
 **/.serena
 .serena/
 **/.omo
@@ -31,10 +35,12 @@ target
 
 # Local dev files
 opencode-dev
-UPCOMING_CHANGELOG.md
 RELEASE_REVIEW.md
 logs/
 *.bun-build
 tsconfig.tsbuildinfo
 /artifacts/
 /packages/cli/.bun-cache
+
+# Legal drafts pending review are kept outside the repository; never copy them in.
+legal-drafts-private/

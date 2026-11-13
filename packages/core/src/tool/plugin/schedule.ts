@@ -1,15 +1,15 @@
 export * as ScheduleTools from "./schedule.js"
 
-import { ToolFailure } from "@opencode/ai"
+import { ToolFailure } from "@opencode/ai/effect"
 import type { Context } from "@opencode/plugin/effect/plugin"
 import { Agent } from "@opencode/schema/agent"
 import { Model } from "@opencode/schema/model"
 import { AbsolutePath, optional } from "@opencode/schema/schema"
-import { Schedule } from "@opencode/schema/schedule"
+import { Schedule } from "@opencode/schema/scheduled-task"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Clock, Effect, Schema } from "effect"
 import { Permission } from "../../permission.js"
-import { ScheduleTask } from "../../schedule.js"
+import { ScheduleTask } from "../../scheduled-task.js"
 import PROMPT from "../schedule.txt"
 
 const OptionsInput = Schema.Struct({
@@ -115,9 +115,7 @@ export const Plugin = {
               action: "schedule",
               resources: [directory],
               save: [directory],
-              sessionID: context.sessionID,
-              agent: context.agent,
-              source: { type: "tool", messageID: context.messageID, id: context.id },
+              ...Permission.invocation(context),
             })
             const available = yield* catalog(directory)
             if (

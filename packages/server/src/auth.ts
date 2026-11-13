@@ -12,13 +12,15 @@ export type DecodedCredentials = {
 export type Info = {
   readonly password: Option.Option<string>
   readonly username: string
+  /** True for a credential the process minted itself; such a process must not reconcile the shared auth verifier. */
+  readonly ephemeral: boolean
 }
 
 export const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60
 
 export class Config extends Context.Service<Config, Info>()("@opencode/ServerAuthConfig") {
-  static configLayer(input: Pick<Info, "password"> & { readonly username?: string }) {
-    return Layer.succeed(this, this.of({ ...input, username: input.username ?? "opencode" }))
+  static configLayer(input: Pick<Info, "password"> & { readonly username?: string; readonly ephemeral?: boolean }) {
+    return Layer.succeed(this, this.of({ ...input, username: input.username ?? "opencode", ephemeral: input.ephemeral ?? false }))
   }
 
   static get layer() {
