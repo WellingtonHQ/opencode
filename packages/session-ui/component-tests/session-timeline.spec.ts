@@ -86,6 +86,27 @@ story("collapses the compaction summary behind a disclosure", async ({ mount }) 
   await expect(compaction).toContainText("The Session timeline now consumes current nested assistant content.")
 })
 
+story("honors compaction summary settings in the new timeline", async ({ mount }) => {
+  const timeline = await mount("current-session-timeline-rows--next-compaction-summary")
+  const compaction = timeline.locator('[data-component="session-compaction-message"]')
+  const trigger = compaction.locator('[data-slot="collapsible-trigger"]')
+
+  await expect(trigger).toHaveAttribute("aria-expanded", "false")
+  await expect(compaction).not.toContainText("The Session timeline now consumes current nested assistant content.")
+  await trigger.click()
+  await expect(compaction).toContainText("The Session timeline now consumes current nested assistant content.")
+})
+
+story("hides the quiet compaction summary in the new timeline", async ({ mount }) => {
+  const timeline = await mount("current-session-timeline-rows--next-compaction-summary", {
+    args: { hidden: true, backgroundCompaction: true },
+  })
+  const compaction = timeline.locator('[data-component="session-compaction-message"]')
+
+  await expect(compaction.locator('[data-slot="session-compaction-divider"]')).toBeDisabled()
+  await expect(compaction).not.toContainText("The Session timeline now consumes current nested assistant content.")
+})
+
 story("centers the error icon on the first line of short and wrapped errors", async ({ mount }) => {
   const timeline = await mount("current-session-error-card--provider-errors")
   const cards = timeline.locator('[data-kind="session-error-card"]')

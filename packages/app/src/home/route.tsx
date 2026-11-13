@@ -1,6 +1,7 @@
 import { ScrollView } from "@opencode/ui/scroll-view"
 import { createMediaQuery } from "@solid-primitives/media"
-import { Show } from "solid-js"
+import { onMount, Show } from "solid-js"
+import { useLayout } from "@/shell/state/layout"
 import { createHomeController } from "./model"
 import { createHomeProjectsController } from "./projects/controller"
 import { HomeUtilityNav } from "./projects/view"
@@ -12,12 +13,28 @@ import { HomeSessions } from "./sessions/region"
 import { SchedulePanel } from "./schedules/panel"
 
 export function Home() {
-  const mobile = createMediaQuery("(max-width: 767px)")
+  const layout = useLayout()
   const home = createHomeController()
   const projects = createHomeProjectsController(home)
   const sessions = createHomeSessionsController(home)
   const search = createHomeSessionSearchController(home, sessions)
-  const scroll = createHomeScrollController(sessions.data.groups)
+
+  onMount(() => {
+    if (layout.home.searchFocus.take()) search.query.focus()
+  })
+
+  return <HomeView home={home} projects={projects} sessions={sessions} search={search} />
+}
+
+export function HomeView(props: {
+  home: ReturnType<typeof createHomeController>
+  projects: ReturnType<typeof createHomeProjectsController>
+  sessions: ReturnType<typeof createHomeSessionsController>
+  search: ReturnType<typeof createHomeSessionSearchController>
+}) {
+  const mobile = createMediaQuery("(max-width: 767px)")
+
+  const scroll = createHomeScrollController(props.sessions.data.groups)
 
   return (
     <div
@@ -29,7 +46,7 @@ export function Home() {
     >
       <Show when={mobile()}>
         <div class="relative z-40 -mb-3 shrink-0 px-3 pt-3">
-          <HomeProjects projects={projects} scroll={scroll} dropdown />
+          <HomeProjects projects={props.projects} scroll={scroll} dropdown />
         </div>
       </Show>
       <ScrollView
@@ -46,15 +63,15 @@ export function Home() {
           `}
         >
           <Show when={!mobile()}>
-            <HomeProjects projects={projects} scroll={scroll} />
+            <HomeProjects projects={props.projects} scroll={scroll} />
           </Show>
           <Show
-            when={projects.utility.schedules.open() ? home.server.focused() : undefined}
+            when={props.projects.utility.schedules.open() ? props.home.server.focused() : undefined}
             keyed
-            fallback={<HomeSessions sessions={sessions} search={search} scroll={scroll} />}
+            fallback={<HomeSessions sessions={props.sessions} search={props.search} scroll={scroll} />}
           >
             {(server) => (
-              <SchedulePanel server={server} defaultDirectory={home.selection.value().directory} />
+              <SchedulePanel server={server} defaultDirectory={props.home.selection.value().directory} />
             )}
           </Show>
         </div>
@@ -62,11 +79,11 @@ export function Home() {
       <div class="hidden shrink-0 px-3 py-2 md:block lg:hidden">
         <HomeUtilityNav
           class="flex"
-          onOpenSettings={projects.utility.settings}
-          onOpenHelp={projects.utility.help}
-          onToggleSchedules={projects.utility.schedules.toggle}
-          schedulesActive={projects.utility.schedules.open}
-          language={projects.copy.language}
+          onOpenSettings={props.projects.utility.settings}
+          onOpenHelp={props.projects.utility.help}
+          onToggleSchedules={props.projects.utility.schedules.toggle}
+          schedulesActive={props.projects.utility.schedules.open}
+          language={props.projects.copy.language}
         />
       </div>
     </div>

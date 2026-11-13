@@ -304,7 +304,7 @@ export const dict = {
   "provider.connect.title": "Connetti {{provider}}",
   "provider.connect.method.apiKey": "Chiave API",
   "provider.connect.status.inProgress": "Autorizzazione in corso…",
-  "provider.connect.status.waiting": "In attesa di autorizzazione…",
+  "provider.connect.status.waiting": "In attesa di autorizzazione",
   "provider.connect.status.failed": "Autorizzazione fallita: {{error}}",
   "provider.connect.apiKey.description":
     "Inserisci la chiave API di {{provider}} per connettere il tuo account e utilizzare i modelli {{provider}} in OpenCode.",
@@ -846,7 +846,6 @@ export const dict = {
   "session.background.runningCount.many": "{{count}} di elementi in esecuzione in background",
   "command.session.location.cycle": "Cambia la posizione della sessione",
   "dialog.provider.anthropic.note": "Accesso diretto ai modelli Claude tramite chiave API",
-  "provider.connect.title.anthropicProMax": "Accedi con Anthropic",
   "prompt.toast.uploading.percent": "{{percent}}%",
   "prompt.toast.uploading.cancelFile": "Annulla il caricamento di {{filename}}",
   "prompt.toast.uploadFailed.title": "Caricamento non riuscito",

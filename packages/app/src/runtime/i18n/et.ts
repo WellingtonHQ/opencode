@@ -149,7 +149,7 @@ export const dict = {
   "provider.connect.title": "Ühenda {{provider}}",
   "provider.connect.method.apiKey": "API klahv",
   "provider.connect.status.inProgress": "Autoriseerimine on pooleli…",
-  "provider.connect.status.waiting": "Autoriseerimise ootel…",
+  "provider.connect.status.waiting": "Autoriseerimise ootel",
   "provider.connect.status.failed": "Autoriseerimine ebaõnnestus: {{error}}",
   "provider.connect.apiKey.description":
     "Sisestage {{provider}} API võti, et ühendada konto ja kasutada {{provider}} mudeleid OpenCode'is.",
@@ -813,7 +813,6 @@ export const dict = {
   "toast.migration.progress.working.progress": "Andmete üleviimine {{current}}/{{total}}",
   "command.session.location.cycle": "Vaheta seansi asukohta",
   "dialog.provider.anthropic.note": "Otsejuurdepääs Claude’i mudelitele API-võtmega",
-  "provider.connect.title.anthropicProMax": "Logi Anthropicuga sisse",
   "prompt.toast.uploading.percent": "{{percent}}%",
   "prompt.toast.uploading.cancelFile": "Tühista faili {{filename}} üleslaadimine",
   "prompt.toast.uploadFailed.title": "Üleslaadimine nurjus",
