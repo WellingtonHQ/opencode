@@ -12,6 +12,8 @@ export const SESSION_MAX_AGE_SECONDS = 12 * 60 * 60
 type Credentials = {
   readonly username: string
   readonly password: Option.Option<string>
+  /** True for a credential the process minted itself (random, not user-configured). Such a process must not reconcile the shared verifier. */
+  readonly ephemeral: boolean
 }
 
 function hash(token: string) {
@@ -30,42 +32,41 @@ function credentialHash(token: string, config: Credentials) {
 // Reconcile at boot even if no old cookie is presented, so restoring credentials
 // cannot revive sessions issued before a credential change or disabling auth.
 export function configure(db: Database.Interface["db"], config: Credentials) {
-  return db
-    .transaction((tx) =>
-      Effect.gen(function* () {
-        const existing = yield* tx.select().from(AuthConfigTable).get()
-        const credentials =
-          Option.isSome(config.password) && config.password.value !== ""
-            ? `enabled\0${config.username}\0${config.password.value}`
-            : "disabled"
-        if (existing) {
-          const actual = existing.verifier.startsWith("pbkdf2:")
-            ? yield* verifier(credentials, existing.salt)
-            : yield* Effect.gen(function* () {
-                // Wellington's existing SQLite verifier used scrypt. Keep those
-                // sessions valid on upgrade, then migrate to Workerd's Web Crypto API.
-                const { scryptSync } = yield* Effect.promise(() => import("node:crypto"))
-                return scryptSync(credentials, Buffer.from(existing.salt, "hex"), 32).toString("hex")
-              })
-          if (timingSafeEqual(Buffer.from(actual), Buffer.from(existing.verifier))) {
-            if (!existing.verifier.startsWith("pbkdf2:")) {
-              const value = yield* verifier(credentials, existing.salt)
-              yield* tx.update(AuthConfigTable).set({ verifier: value }).where(eq(AuthConfigTable.id, 1))
-            }
-            return
-          }
-        }
-
-        yield* tx.delete(AuthSessionTable)
-        const salt = randomBytes(16).toString("hex")
-        const value = yield* verifier(credentials, salt)
-        yield* tx
-          .insert(AuthConfigTable)
-          .values({ id: 1, salt, verifier: value })
+  return Effect.gen(function* () {
+    // An auxiliary process (stdio/ACP) mints its own random credential and shares this database with
+    // the canonical server. Reconciling would treat the mismatch as a credential change: it would wipe
+    // the remembered sessions the canonical server issued and adopt a random verifier. Leave the shared
+    // auth rows untouched; the process authenticates with its in-memory credential and its own sessions.
+    if (config.ephemeral) return
+    const credentials = Option.isSome(config.password) && config.password.value !== ""
+      ? `enabled\0${config.username}\0${config.password.value}`
+      : "disabled"
+    while (true) {
+      const existing = yield* db.select().from(AuthConfigTable).get()
+      const actual = !existing ? undefined : existing.verifier.startsWith("pbkdf2:")
+        ? yield* verifier(credentials, existing.salt)
+        : yield* Effect.gen(function* () {
+            // The old fork used scrypt for its verifier.
+            const { scryptSync } = yield* Effect.promise(() => import("node:crypto"))
+            return scryptSync(credentials, Buffer.from(existing.salt, "hex"), 32).toString("hex")
+          })
+      const same = existing !== undefined && actual !== undefined && timingSafeEqual(Buffer.from(actual), Buffer.from(existing.verifier))
+      if (same && existing.verifier.startsWith("pbkdf2:")) return
+      const salt = same ? existing.salt : randomBytes(16).toString("hex")
+      // Derivation is intentionally outside the write transaction: two concurrent
+      // server starts must not block the event loop while waiting for Web Crypto.
+      const value = yield* verifier(credentials, salt)
+      const written = yield* db.transaction((tx) => Effect.gen(function* () {
+        const current = yield* tx.select().from(AuthConfigTable).get()
+        if (current?.salt !== existing?.salt || current?.verifier !== existing?.verifier) return false
+        if (!same) yield* tx.delete(AuthSessionTable)
+        yield* tx.insert(AuthConfigTable).values({ id: 1, salt, verifier: value })
           .onConflictDoUpdate({ target: AuthConfigTable.id, set: { salt, verifier: value } })
-      }),
-    )
-    .pipe(Effect.orDie)
+        return true
+      }), { behavior: "immediate" })
+      if (written) return
+    }
+  }).pipe(Effect.orDie)
 }
 
 function verifier(credentials: string, salt: string) {

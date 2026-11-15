@@ -1,20 +1,63 @@
+import { sql } from "drizzle-orm"
 import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core"
-import type { Agent } from "@opencode-ai/schema/agent"
-import type { Model } from "@opencode-ai/schema/model"
-import type { Schedule } from "@opencode-ai/schema/schedule"
-import type { Session } from "@opencode-ai/schema/session"
+import type { Schema } from "effect"
+import type { Agent } from "@opencode/schema/agent"
+import type { Model } from "@opencode/schema/model"
+import type { Schedule } from "@opencode/schema/schedule"
+import type { Schedule as ScheduledTask } from "@opencode/schema/scheduled-task"
+import type { Session } from "@opencode/schema/session"
 import * as DatabasePath from "../database/path.js"
 import { Timestamps } from "../database/schema.sql.js"
+import type { SessionMessage } from "../session/message.js"
+import type { SessionSchema } from "../session/schema.js"
+import { SessionTable } from "../session/sql.js"
+
+export const ScheduleTable = sqliteTable(
+  "schedule",
+  {
+    id: text().$type<Schedule.ID>().primaryKey(),
+    /** The Session a prompt action wakes. */
+    session_id: text()
+      .$type<SessionSchema.ID>()
+      .references(() => SessionTable.id, { onDelete: "cascade" }),
+    name: text(),
+    action: text({ mode: "json" }).$type<Schedule.Action>().notNull(),
+    check: text({ mode: "json" }).$type<Schedule.StoredCheck>(),
+    when: text({ mode: "json" }).$type<Schedule.When>().notNull(),
+    tz: text().notNull(),
+    status: text().$type<Schedule.Status>().notNull().default("active"),
+    next_due_at: integer(),
+    ends_at: integer(),
+    remaining_runs: integer(),
+    run_count: integer().notNull().default(0),
+    checks: integer().notNull().default(0),
+    failures: integer().notNull().default(0),
+    last_fired_at: integer(),
+    last_message_id: text().$type<SessionMessage.ID>(),
+    last_outcome: text().$type<Schedule.Outcome>(),
+    /** The loop leaves a due row alone until then, e.g. while its location has schedules turned off. */
+    retry_at: integer(),
+    /** Condition state persisted across checks (e.g. previous stdout for shell `changes`). */
+    state: text({ mode: "json" }).$type<Schema.Json>(),
+    ...Timestamps,
+  },
+  (table) => [
+    index("schedule_session_idx").on(table.session_id),
+    index("schedule_due_idx")
+      .on(table.next_due_at)
+      .where(sql`${table.status} = 'active' and ${table.next_due_at} is not null`),
+  ],
+)
 
 export const ScheduleTaskTable = sqliteTable(
   "scheduled_task",
   {
-    id: text().$type<Schedule.ID>().primaryKey(),
+    id: text().$type<ScheduledTask.ID>().primaryKey(),
     name: text(),
     prompt: text().notNull(),
-    session: text().$type<Schedule.SessionMode>().notNull().default("new"),
-    kind: text().$type<Schedule.Kind>().notNull(),
-    timezone: text().$type<Schedule.TimeZone>().notNull(),
+    session: text().$type<ScheduledTask.SessionMode>().notNull().default("new"),
+    kind: text().$type<ScheduledTask.Kind>().notNull(),
+    timezone: text().$type<ScheduledTask.TimeZone>().notNull(),
     at_ms: integer(),
     hour: integer(),
     minute: integer(),
@@ -39,11 +82,11 @@ export const ScheduleRunTable = sqliteTable(
   {
     id: text().primaryKey(),
     task_id: text()
-      .$type<Schedule.ID>()
+      .$type<ScheduledTask.ID>()
       .notNull()
       .references(() => ScheduleTaskTable.id, { onDelete: "cascade" }),
     session_id: text().$type<Session.ID>(),
-    status: text().$type<Schedule.RunStatus>().notNull(),
+    status: text().$type<ScheduledTask.RunStatus>().notNull(),
     started_at: integer().notNull(),
     finished_at: integer(),
     error_text: text(),

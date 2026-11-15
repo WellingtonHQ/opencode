@@ -13,7 +13,7 @@ import type { ScheduleListOutput } from "@opencode/client/promise"
 import { Agent } from "@opencode/schema/agent"
 import { Model } from "@opencode/schema/model"
 import { AbsolutePath } from "@opencode/schema/schema"
-import { Schedule } from "@opencode/schema/schedule"
+import { Schedule } from "@opencode/schema/scheduled-task"
 import { getFilename } from "@opencode/util/path"
 import { formatClock, formatDateTime, isValidCronExpression, nextRunAfter, parseDateTimeLocal, formatDateTimeLocal, weekdayLabels } from "@/runtime/server/schedule"
 import { formatServerError } from "@/runtime/server/errors"
@@ -52,10 +52,19 @@ export const DialogSchedule: Component<{
   defaultDirectory?: string
 }> = (props) => {
   const global = useGlobal()
+  return <Show when={global.serverCtx(ServerConnection.key(props.server))} keyed>{(ctx) => <DialogScheduleReady {...props} ctx={ctx} />}</Show>
+}
+
+const DialogScheduleReady: Component<{
+  server: ServerConnection.Any
+  task?: ScheduleListOutput[number]
+  defaultDirectory?: string
+  ctx: NonNullable<ReturnType<ReturnType<typeof useGlobal>["serverCtx"]>>
+}> = (props) => {
   const language = useLanguage()
   const dialog = useDialog()
   const pickDirectory = useDirectoryPicker()
-  const ctx = global.ensureServerCtx(props.server)
+  const ctx = props.ctx
   const timezone = props.task?.timezone ?? browserTimeZone()
   const spec = props.task?.spec
 

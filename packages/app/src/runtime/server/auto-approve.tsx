@@ -14,9 +14,10 @@ export function useAutoApproveToggle(server: Accessor<ServerConnection.Any | und
   return (checked: boolean) => {
     const conn = server()
     if (!conn) return
+    const ctx = global.serverCtx(ServerConnection.key(conn))
+    if (!ctx) return
     settings.permissions.setAutoApproveDefault(checked)
-    void global
-      .ensureServerCtx(conn)
+    void ctx
       .sdk.api.global["auto-approve"]
       .set({ enabled: checked })
       .catch((error: unknown) => {
@@ -38,9 +39,10 @@ export function AutoApproveSync(props: { server: Accessor<ServerConnection.Any |
   createEffect(() => {
     const run = ++sequence
     const conn = props.server()
-    if (!conn || global.servers.health[ServerConnection.key(conn)]?.healthy !== true) return
-    void global
-      .ensureServerCtx(conn)
+    if (!conn || global.servers.health[ServerConnection.key(conn)]?.type !== "healthy") return
+    const ctx = global.serverCtx(ServerConnection.key(conn))
+    if (!ctx) return
+    void ctx
       .sdk.api.global["auto-approve"]
       .get()
       .then((state) => {

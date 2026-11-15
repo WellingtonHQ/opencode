@@ -16,7 +16,7 @@ test.each([undefined, "custom"])("accepts only the configured username (%s)", as
 })
 
 test("session tokens expire, resist tampering, and are revoked by changing the password", () => {
-  const config = { password: Option.some("secret"), username: "opencode" }
+  const config = { password: Option.some("secret"), username: "opencode", ephemeral: false }
   const now = Date.now()
   const token = ServerAuth.issueSession(config, now)
   if (!token) throw new Error("Expected a session token")

@@ -55,7 +55,12 @@ export function mountGenericTool() {
     () => (
       <DialogProvider>
         <MarkdownProvider>
-          <GenericTool tool="search" input={{ query: "OpenCode" }} output="MCP tool output is visible." />
+          <div data-testid="generic-tool-search">
+            <GenericTool tool="search" input={{ query: "OpenCode", options: { limit: 10, tags: ["one", "two"] } }} output="MCP tool output is visible." />
+          </div>
+          <div data-testid="generic-tool-ping">
+            <GenericTool tool="ping" />
+          </div>
         </MarkdownProvider>
       </DialogProvider>
     ),

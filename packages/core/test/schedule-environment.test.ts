@@ -1,5 +1,5 @@
 import { expect } from "bun:test"
-import { LLM, LLMClient, type LLMRequest } from "@opencode/ai"
+import { ai, LLMClient, type LLMRequest } from "@opencode/ai/effect"
 import { TestLLM } from "@opencode/ai/testing"
 import { Bus } from "@opencode/core/bus"
 import { Config } from "@opencode/core/config"
@@ -14,14 +14,14 @@ import { Location } from "@opencode/core/location"
 import { LocationServiceMap } from "@opencode/core/location-service-map"
 import { ModelResolver } from "@opencode/core/model-resolver"
 import { Plugin } from "@opencode/core/plugin"
-import { ScheduleTask } from "@opencode/core/schedule"
+import { ScheduleTask } from "@opencode/core/scheduled-task"
 import { ScheduleRunTable, ScheduleTaskTable } from "@opencode/core/schedule/sql"
 import { Session } from "@opencode/core/session"
 import { SessionExecution } from "@opencode/core/session/execution"
 import { ConfigProvider } from "@opencode/schema/config/provider"
 import { Model } from "@opencode/schema/model"
 import { Provider } from "@opencode/schema/provider"
-import { Schedule } from "@opencode/schema/schedule"
+import { Schedule } from "@opencode/schema/scheduled-task"
 import { AbsolutePath } from "@opencode/schema/schema"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Global } from "@opencode/util/global"
@@ -114,7 +114,7 @@ const assertBearer = (request: LLMRequest | undefined, key: string) =>
       method: "POST",
       url: "https://gateway.invalid/v1/chat/completions",
       body: "{}",
-      headers: Headers.fromInput(request.model.route.defaults.headers),
+      headers: Headers.fromInput(request.model.options?.headers),
     })
     expect(headers.authorization).toBe(`Bearer ${key}`)
   })
@@ -402,13 +402,13 @@ it.live("resolves only effective credential references across documents, models 
             const resolved = yield* resolver.resolve(ref)
             if (!resolved) throw new Error(`Expected model for ${item.name}`)
             if (item.configuredHeaders)
-              expect(Headers.fromInput(resolved.model.route.defaults.headers)).toMatchObject(item.configuredHeaders)
+              expect(Headers.fromInput(resolved.model.options?.headers)).toMatchObject(item.configuredHeaders)
             const headers = yield* resolved.model.route.auth.apply({
-              request: LLM.request({ model: resolved.model, prompt: "Check credential precedence" }),
+              request: ai.request({ model: resolved.model, prompt: "Check credential precedence" }),
               method: "POST",
               url: "https://gateway.invalid/v1/chat/completions",
               body: "{}",
-              headers: Headers.fromInput(resolved.model.route.defaults.headers),
+              headers: Headers.fromInput(resolved.model.options?.headers),
             })
             if (!item.authorization) throw new Error(`Expected authorization fixture for ${item.name}`)
             expect(headers.authorization).toBe(item.authorization)

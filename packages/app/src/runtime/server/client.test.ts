@@ -86,7 +86,7 @@ describe("server event stream", () => {
   })
 })
 
-test("rotates HTTP and PTY clients together", async () => {
+test("rotates the HTTP client with the endpoint", async () => {
   const requests: Array<{ url: string; authorization: string | null }> = []
 
   const fetch: typeof globalThis.fetch = Object.assign(
@@ -109,8 +109,6 @@ test("rotates HTTP and PTY clients together", async () => {
     fetch,
   })
 
-  const initialPty = transport.pty
-
   await transport.api.server.info()
 
   const replacement = transport.update({
@@ -122,8 +120,11 @@ test("rotates HTTP and PTY clients together", async () => {
   await transport.api.server.info()
 
   expect(replacement).toBe(transport.api)
-  expect(transport.pty).not.toBe(initialPty)
   expect(transport.url).toBe("http://127.0.0.1:4200")
+  transport.update({ url: "http://127.0.0.1:4200", username: "other", password: "second" })
+  expect(transport.api).not.toBe(replacement)
+  await transport.api.server.info()
+
   expect(requests).toEqual([
     {
       url: "http://127.0.0.1:4100/api/info",
@@ -133,5 +134,10 @@ test("rotates HTTP and PTY clients together", async () => {
       url: "http://127.0.0.1:4200/api/info",
       authorization: `Basic ${btoa("custom:second")}`,
     },
+    {
+      url: "http://127.0.0.1:4200/api/info",
+      authorization: `Basic ${btoa("other:second")}`,
+    },
   ])
+  transport.dispose()
 })

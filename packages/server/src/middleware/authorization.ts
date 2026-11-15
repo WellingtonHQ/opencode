@@ -7,6 +7,7 @@ import {
   hasPersistentPtyConnectTicketURL,
   PERSISTENT_PTY_CONNECT_PATH,
 } from "@opencode/protocol/groups/persistent-pty"
+import { MCP_CLIENT_PATH, hasMcpClientTicketURL } from "@opencode/protocol/groups/mcp"
 import { isPairingConnectURL, PAIRING_CONNECT_PATH } from "@opencode/protocol/groups/server"
 import { Clock, Effect, Layer, Redacted } from "effect"
 import { Base64 } from "effect/encoding"
@@ -134,7 +135,12 @@ export function isPublicUIPath(method: string, pathname: string) {
 
 function ticketed(request: HttpServerRequest.HttpServerRequest) {
   const url = new URL(request.url, "http://localhost")
-  return hasPtyConnectTicketURL(url) || hasPersistentPtyConnectTicketURL(url) || isPairingConnectURL(url)
+  return (
+    hasPtyConnectTicketURL(url) ||
+    hasPersistentPtyConnectTicketURL(url) ||
+    hasMcpClientTicketURL(url) ||
+    isPairingConnectURL(url)
+  )
 }
 
 export const authorizationRouterMiddleware = HttpRouter.middleware()(
@@ -165,11 +171,14 @@ export const authorizationLayer = Layer.effect(
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
         const route = yield* HttpRouter.RouteContext
-        // These handlers consume and validate their own single-use ticket or pairing code. Use the
+        // Ticketed PTY and client MCP connects (browsers cannot set headers on WebSocket upgrades) and pairing links
+        // skip credential checks here; their handlers consume and validate the ticket or code. Use the
         // route selected by Effect so authorization and dispatch cannot disagree about the request path.
         const url = new URL(request.url, "http://localhost")
         if (
-          ((route.route.path === PTY_CONNECT_PATH || route.route.path === PERSISTENT_PTY_CONNECT_PATH) &&
+          ((route.route.path === PTY_CONNECT_PATH ||
+            route.route.path === PERSISTENT_PTY_CONNECT_PATH ||
+            route.route.path === MCP_CLIENT_PATH) &&
             !!url.searchParams.get(PTY_CONNECT_TICKET_QUERY)) ||
           route.route.path === PAIRING_CONNECT_PATH
         )

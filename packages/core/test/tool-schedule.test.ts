@@ -1,6 +1,6 @@
 import { expect } from "bun:test"
 import path from "path"
-import { LanguageModel, LLMClient } from "@opencode/ai"
+import { LanguageModel, LLMClient } from "@opencode/ai/effect"
 import { OpenAIChat } from "@opencode/ai/protocols/openai-chat"
 import { TestLLM } from "@opencode/ai/testing"
 import { Agent } from "@opencode/core/agent"
@@ -13,6 +13,7 @@ import { AppNodeBuilder } from "@opencode/core/effect/app-node-builder"
 import { llmClient } from "@opencode/core/effect/app-node-platform"
 import { Watcher } from "@opencode/core/filesystem/watcher"
 import { InstructionDiscovery } from "@opencode/core/instruction-discovery"
+import { InstructionEntry } from "@opencode/core/session/instruction-entry"
 import { Location } from "@opencode/core/location"
 import { KV } from "@opencode/core/kv"
 import { LocationServiceMap } from "@opencode/core/location-service-map"
@@ -22,7 +23,7 @@ import { PersistentPty } from "@opencode/core/persistent-pty"
 import { Plugin } from "@opencode/core/plugin"
 import { PluginHost } from "@opencode/core/plugin/host"
 import { Provider } from "@opencode/core/provider"
-import { ScheduleTask } from "@opencode/core/schedule"
+import { ScheduleTask } from "@opencode/core/scheduled-task"
 import { Session } from "@opencode/core/session"
 import { SessionEvent } from "@opencode/core/session/event"
 import { SessionExecution } from "@opencode/core/session/execution"
@@ -32,13 +33,13 @@ import { ScheduleTools } from "@opencode/core/tool/plugin/schedule"
 import { Worktree } from "@opencode/core/worktree"
 import type { Context } from "@opencode/plugin/effect/plugin"
 import { AbsolutePath } from "@opencode/schema/schema"
-import { Schedule } from "@opencode/schema/schedule"
+import { Schedule } from "@opencode/schema/scheduled-task"
 import { SessionInbox } from "@opencode/schema/session-inbox"
 import { SessionMessage } from "@opencode/schema/session-message"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Global } from "@opencode/util/global"
-import { Clock, DateTime, Deferred, Effect, Fiber, Layer, Schema } from "effect"
+import { Clock, DateTime, Deferred, Effect, Layer, Schema } from "effect"
 import { offlineModels } from "./fixture/models"
 import { tempGlobalLayer } from "./fixture/global"
 import { tmpdirScoped } from "./fixture/tmpdir"
@@ -98,7 +99,7 @@ const catalog = Effect.gen(function* () {
 
 const setup = Effect.gen(function* () {
   const plugins = yield* Plugin.Service
-  const ctx = yield* PluginHost.make(plugins)
+  const ctx = yield* PluginHost.make(plugins, "test")
   yield* catalog
   yield* ScheduleTools.Plugin.effect(ctx)
   const tools = yield* Tool.Service
@@ -178,7 +179,7 @@ integration.live("Session.command runs /schedule through the runner and Code Mod
         "Saved Report review for January 2, 2099 at 9:15 AM America/New_York in this project, using the plan agent and default model in a new session. You can edit it in Scheduled Prompts. The server must be running."
       // Script the model decision: this verifies routing and persistence, not natural-language interpretation.
       yield* llm.push(
-        TestLLM.tool("call_schedule_integration", "execute", {
+        TestLLM.toolCall("call_schedule_integration", "execute", {
           code: `return await tools.opencode.schedule_create(${JSON.stringify(input)})`,
         }),
         TestLLM.text(confirmation, "schedule-confirmation"),
@@ -266,7 +267,7 @@ it.live(
   () =>
     Effect.gen(function* () {
       const plugins = yield* Plugin.Service
-      const ctx = yield* PluginHost.make(plugins)
+      const ctx = yield* PluginHost.make(plugins, "test")
       const commands = yield* Command.Service
       const tasks = yield* ScheduleTask.Service
       const prompts: Parameters<Context["session"]["prompt"]>[0][] = []
@@ -481,6 +482,7 @@ const projects = testEffect(
       Database.node,
       Bus.node,
       Credential.node,
+      InstructionEntry.node,
       KV.node,
       Session.node,
       PersistentPty.node,
@@ -497,14 +499,14 @@ const projects = testEffect(
   ),
 )
 
-projects.live("PluginHost model.list uses the target project's catalog and waits for its pending activation", () =>
+projects.live("PluginHost model.list reads the target project's current catalog during activation", () =>
   Effect.gen(function* () {
     const current = yield* tmpdirScoped()
     const other = yield* tmpdirScoped()
     const locations = yield* LocationServiceMap.Service
     return yield* Effect.gen(function* () {
       const plugins = yield* Plugin.Service
-      const ctx = yield* PluginHost.make(plugins)
+      const ctx = yield* PluginHost.make(plugins, "test")
       const ref = Location.Ref.make({ directory: AbsolutePath.make(other.path) })
       const target = yield* locations.contextEffect(ref)
       const targetPlugins = yield* Plugin.Service.pipe(Effect.provideContext(target))
@@ -512,12 +514,8 @@ projects.live("PluginHost model.list uses the target project's catalog and waits
       yield* targetPlugins.awaitActivation
       yield* catalog
       const release = yield* targetPlugins.hold()
-      const completed = yield* Deferred.make<void>()
-      const read = yield* ctx.model.list({ location: ref }).pipe(
-        Effect.tap(() => Deferred.succeed(completed, undefined)),
-        Effect.forkScoped({ startImmediately: true }),
-      )
-      expect(yield* Deferred.isDone(completed)).toBe(false)
+      const current = yield* ctx.model.list({ location: ref })
+      expect(current.location.directory).toBe(targetLocation.directory)
       const providers = yield* Provider.Service.pipe(Effect.provideContext(target))
       yield* providers.transform((editor) => {
         editor.list().forEach((definition) => editor.remove(definition.provider.id))
@@ -527,7 +525,7 @@ projects.live("PluginHost model.list uses the target project's catalog and waits
         })
       })
       yield* release
-      const result = yield* Fiber.join(read)
+      const result = yield* ctx.model.list({ location: ref })
       expect(result.location.directory).toBe(targetLocation.directory)
       expect(result.data.map((model) => `${model.providerID}/${model.id}`)).toEqual(["target/target-only"])
       expect((yield* ctx.model.list()).data.map((model) => String(model.id))).toEqual([modelID, "fast"])

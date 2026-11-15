@@ -1,76 +1,76 @@
-import { ScheduleTask } from "@opencode/core/schedule"
-import { InvalidRequestError, ScheduleLimitExceededError, ScheduleNotFoundError } from "@opencode/protocol/errors"
+import { Permission } from "@opencode/core/permission"
+import { Schedule } from "@opencode/core/schedule"
+import type { Session } from "@opencode/core/session"
+import { ForbiddenError, InvalidRequestError, ScheduleNotFoundError } from "@opencode/protocol/errors"
+import type { CreatePayload } from "@opencode/protocol/groups/schedule"
 import { Effect } from "effect"
-import { HttpApiBuilder } from "effect/http-api"
-import { Api } from "../api"
+import { HttpApiSchema } from "effect/http-api"
+import { missingSession } from "./session-error"
 
-const badSpec = <A, R>(effect: Effect.Effect<A, ScheduleTask.InvalidSpecError, R>) =>
-  effect.pipe(Effect.mapError((error) => new InvalidRequestError({ message: error.message })))
+/** `schedule.*` in the `server.experimental` group. Every route needs experimental.schedules where the Session lives. */
+export const makeSchedule = Effect.gen(function* () {
+  const schedules = yield* Schedule.Service
 
-const badCreate = <A, R>(effect: Effect.Effect<A, ScheduleTask.InvalidSpecError | ScheduleTask.LimitExceededError, R>) =>
-  effect.pipe(
-    Effect.mapError(
-      (error) =>
-        error instanceof ScheduleTask.LimitExceededError
-          ? new ScheduleLimitExceededError({ message: error.message })
-          : new InvalidRequestError({ message: error.message }),
-    ),
-  )
+  const allowed = (sessionID: Session.ID) =>
+    schedules.enabled(sessionID).pipe(
+      Effect.mapError(missingSession),
+      Effect.flatMap((enabled) => (enabled ? Effect.void : Effect.fail(disabled()))),
+    )
 
-export const ScheduleHandler = HttpApiBuilder.group(Api, "server.schedule", (handlers) =>
-  handlers
-    .handle(
-      "schedule.list",
-      Effect.fn(function* () {
-        const schedule = yield* ScheduleTask.Service
-        return yield* schedule.list()
-      }),
-    )
-    .handle(
-      "schedule.get",
-      Effect.fn(function* (ctx) {
-        const schedule = yield* ScheduleTask.Service
-        const info = yield* schedule.get(ctx.params.scheduleID)
-        if (!info) return yield* Effect.fail(notFound(ctx.params.scheduleID))
-        return info
-      }),
-    )
-    .handle(
-      "schedule.create",
-      Effect.fn(function* (ctx) {
-        const schedule = yield* ScheduleTask.Service
-        return yield* badCreate(schedule.create(ctx.payload))
-      }),
-    )
-    .handle(
-      "schedule.update",
-      Effect.fn(function* (ctx) {
-        const schedule = yield* ScheduleTask.Service
-        const updated = yield* badSpec(schedule.update(ctx.params.scheduleID, ctx.payload))
-        if (!updated) return yield* Effect.fail(notFound(ctx.params.scheduleID))
-        return updated
-      }),
-    )
-    .handle(
-      "schedule.remove",
-      Effect.fn(function* (ctx) {
-        const schedule = yield* ScheduleTask.Service
-        const removed = yield* schedule.remove(ctx.params.scheduleID)
-        if (!removed) return yield* Effect.fail(notFound(ctx.params.scheduleID))
-        return removed
-      }),
-    )
-    .handle(
-      "schedule.runNow",
-      Effect.fn(function* (ctx) {
-        const schedule = yield* ScheduleTask.Service
-        const info = yield* schedule.runNow(ctx.params.scheduleID)
-        if (!info) return yield* Effect.fail(notFound(ctx.params.scheduleID))
-        return info
-      }),
-    ),
-)
+  // A schedule whose Session is gone, or whose location has the flag off, reads as missing or forbidden like the rest.
+  const find = (id: Schedule.ID) =>
+    Effect.gen(function* () {
+      const info = yield* schedules.get(id).pipe(Effect.mapError(missingSchedule))
+      if (info.sessionID === undefined) return yield* missingSchedule({ scheduleID: id })
+      yield* allowed(info.sessionID).pipe(
+        Effect.catchTag("SessionNotFoundError", () => Effect.fail(missingSchedule({ scheduleID: id }))),
+      )
+      return info
+    })
 
-function notFound(scheduleID: ScheduleTask.ID) {
-  return new ScheduleNotFoundError({ scheduleID, message: "Scheduled task not found" })
+  return {
+    create: (payload: CreatePayload) =>
+      // Stateless HTTP callers have no guaranteed UI listener to answer an interactive ask, so settle asks unattended.
+      schedules.create(Schedule.toCreateInput(payload.sessionID, payload)).pipe(
+        Effect.provideService(Permission.Unattended, []),
+        Effect.map((data) => ({ data })),
+        Effect.catchTags({
+          "Schedule.InvalidError": (error) =>
+            Effect.fail(new InvalidRequestError({ message: error.message, kind: "schedule" })),
+          "Schedule.DisabledError": () => Effect.fail(disabled()),
+          "Permission.BlockedError": (error) => Effect.fail(new ForbiddenError({ message: error.message })),
+          "Permission.CorrectedError": (error) => Effect.fail(new ForbiddenError({ message: error.feedback })),
+          "Session.NotFoundError": (error) => Effect.fail(missingSession(error)),
+        }),
+      ),
+    list: (sessionID: Session.ID) =>
+      allowed(sessionID).pipe(
+        Effect.andThen(schedules.list({ sessionID })),
+        Effect.map((data) => ({ data })),
+      ),
+    get: (id: Schedule.ID) => find(id).pipe(Effect.map((data) => ({ data }))),
+    pause: (id: Schedule.ID) =>
+      find(id).pipe(
+        Effect.andThen(schedules.pause(id).pipe(Effect.mapError(missingSchedule))),
+        Effect.map((data) => ({ data })),
+      ),
+    resume: (id: Schedule.ID) =>
+      find(id).pipe(
+        Effect.andThen(schedules.resume(id).pipe(Effect.mapError(missingSchedule))),
+        Effect.map((data) => ({ data })),
+      ),
+    remove: (id: Schedule.ID) =>
+      find(id).pipe(
+        Effect.andThen(schedules.remove(id).pipe(Effect.mapError(missingSchedule))),
+        Effect.as(HttpApiSchema.NoContent.make()),
+      ),
+  }
+})
+
+function missingSchedule(error: { readonly scheduleID: Schedule.ID }) {
+  return new ScheduleNotFoundError({ scheduleID: error.scheduleID, message: `Schedule not found: ${error.scheduleID}` })
+}
+
+function disabled() {
+  return new ForbiddenError({ message: new Schedule.DisabledError().message })
 }
