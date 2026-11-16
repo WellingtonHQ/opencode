@@ -3,16 +3,31 @@ import { expect, story } from "../../stories/playwright/story"
 story.describe("touch timeline", () => {
   story.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } })
 
-  story("does not show metadata-only footers without hover", async ({ mount, page }) => {
+  story("shows each message's details without hover when enabled", async ({ mount, page }) => {
     const timeline = await mount("current-session-timeline-rows--agent-message-metadata", {
       args: { showMessageMetadata: true },
     })
 
     expect(await page.evaluate(() => matchMedia("(hover: none)").matches)).toBe(true)
 
+    const sonnet = timeline.locator('[data-timeline-part-id="msg_agent_metadata_sonnet:text:0"] [data-slot="text-part-meta"]')
+    const nano = timeline.locator('[data-timeline-part-id="msg_agent_metadata_nano:text:0"] [data-slot="text-part-meta"]')
+    await expect(sonnet).toBeVisible()
+    await expect(sonnet).toContainText("Claude Sonnet 4")
+    await expect(nano).toBeVisible()
+    expect((await sonnet.textContent())?.split(" · ").at(-1)).not.toEqual(
+      (await nano.textContent())?.split(" · ").at(-1),
+    )
+  })
+
+  story("does not show intermediate message details without hover when disabled", async ({ mount }) => {
+    const timeline = await mount("current-session-timeline-rows--agent-message-metadata", {
+      args: { showMessageMetadata: false },
+    })
+
     await expect(
       timeline.locator('[data-timeline-part-id="msg_agent_metadata_sonnet:text:0"] [data-slot="text-part-copy-wrapper"]'),
-    ).toBeHidden()
+    ).toHaveCount(0)
   })
 
   story("keeps message actions and metadata visible without hover", async ({ mount, page }) => {
@@ -182,6 +197,18 @@ story("assistant message hover metadata shows each model and timestamp", async (
   await expect(nanoFooter).toHaveCSS("opacity", "1")
   await expect(nanoFooter.getByRole("button", { name: "Copy response", exact: true })).toBeVisible()
   await expect(nanoMeta).toContainText("Build")
+})
+
+story("shows message details at tablet widths even when hover is available", async ({ mount, page }) => {
+  await page.setViewportSize({ width: 1024, height: 844 })
+  const timeline = await mount("current-session-timeline-rows--agent-message-metadata", {
+    args: { showMessageMetadata: true },
+  })
+
+  expect(await page.evaluate(() => matchMedia("(hover: hover)").matches)).toBe(true)
+  const footer = timeline.locator('[data-timeline-part-id="msg_agent_metadata_sonnet:text:0"] [data-slot="text-part-copy-wrapper"]')
+  await expect(footer).toHaveCSS("opacity", "1")
+  await expect(footer.locator('[data-slot="text-part-meta"]')).toHaveCSS("opacity", "1")
 })
 
 story("assistant message metadata stays hidden when the preference is disabled", async ({ mount }) => {

@@ -1282,7 +1282,6 @@ export function AssistantTextContent(props: {
         data-slot="text-part-copy-wrapper"
         data-interrupted={interrupted() ? "" : undefined}
         data-copy-always-visible={data.copyAlwaysVisible ? "" : undefined}
-        data-message-metadata-only={!props.showCopy ? "" : undefined}
       >
         <Show when={props.showCopy}>
         <MessageActionButton
