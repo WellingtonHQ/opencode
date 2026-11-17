@@ -20,40 +20,50 @@ story.describe("touch timeline", () => {
     )
   })
 
-  story("does not show intermediate message details without hover when disabled", async ({ mount }) => {
+  story("shows intermediate message details without hover even when the preference is off", async ({ mount }) => {
     const timeline = await mount("current-session-timeline-rows--agent-message-metadata", {
       args: { showMessageMetadata: false },
     })
 
-    await expect(
-      timeline.locator('[data-timeline-part-id="msg_agent_metadata_sonnet:text:0"] [data-slot="text-part-copy-wrapper"]'),
-    ).toHaveCount(0)
+    const sonnet = timeline.locator('[data-timeline-part-id="msg_agent_metadata_sonnet:text:0"]')
+
+    await expect(sonnet.locator('[data-slot="text-part-copy-wrapper"]')).toBeVisible()
+    await expect(sonnet.locator('[data-slot="text-part-meta"]')).toContainText("Claude Sonnet 4")
+    // Only the turn's final part offers the copy control.
+    await expect(sonnet.getByRole("button", { name: "Copy response", exact: true })).toHaveCount(0)
   })
 
   story("keeps message actions and metadata visible without hover", async ({ mount, page }) => {
     const timeline = await mount("current-session-timeline-rows--response-speed")
     expect(await page.evaluate(() => matchMedia("(hover: none)").matches)).toBe(true)
 
-    for (const action of [
-      { slot: "user-message-menu", name: "More actions" },
-      { slot: "text-part-copy-wrapper", name: "Copy response" },
-    ]) {
-      const actions = timeline.locator(`[data-slot="${action.slot}"]`)
-      await expect(actions).toHaveCount(1)
-      await expect(actions).toHaveCSS("opacity", "1")
-      await expect(actions).toHaveCSS("pointer-events", "auto")
-      await expect(actions.getByRole("button", { name: action.name, exact: true })).toBeVisible()
+    const menu = timeline.locator('[data-slot="user-message-menu"]')
+    await expect(menu).toHaveCount(1)
+    await expect(menu).toHaveCSS("opacity", "1")
+    await expect(menu).toHaveCSS("pointer-events", "auto")
+    await expect(menu.getByRole("button", { name: "More actions", exact: true })).toBeVisible()
+
+    // Every text part keeps its footer row shown; only the turn's final part offers the copy control.
+    const footers = timeline.locator('[data-slot="text-part-copy-wrapper"]')
+    await expect(footers).toHaveCount(2)
+    for (const footer of await footers.all()) {
+      await expect(footer).toHaveCSS("opacity", "1")
+      await expect(footer).toHaveCSS("pointer-events", "auto")
     }
+    await expect(timeline.getByRole("button", { name: "Copy response", exact: true })).toHaveCount(1)
 
     // Agent and model are omitted on mobile, leaving only the response duration.
     await expect(timeline.locator('[data-slot="user-message-meta-item"]')).toHaveCount(0)
     await expect(timeline.locator('[data-slot="user-message-pending"]')).toBeHidden()
-    const responseMeta = timeline.locator('[data-slot="text-part-meta"]')
+    const responseMeta = timeline.locator('[data-timeline-part-id="msg_speed_reply:text:0"] [data-slot="text-part-meta"]')
     await expect(responseMeta).not.toBeEmpty()
     await expect(responseMeta).not.toContainText("Build")
     await expect(responseMeta).not.toContainText("Sonnet")
     await expect(responseMeta.locator('[data-slot="text-part-meta-speed"]')).toHaveText("·60.0 tok/s")
     await expect(responseMeta.locator('[data-slot="text-part-meta-speed"]')).toBeHidden()
+    // The intermediate part shows its own model and timestamp.
+    const inspectMeta = timeline.locator('[data-timeline-part-id="msg_speed_inspect:text:0"] [data-slot="text-part-meta"]')
+    await expect(inspectMeta).toContainText("Claude Sonnet 4")
   })
 
   story("keeps the always-shown chevron clear of the prompt's text", async ({ mount }) => {
@@ -149,9 +159,15 @@ story("desktop message actions still appear on hover and keyboard focus", async 
       await expect(meta).toHaveCSS("font-size", "12px")
       await expect(meta).toHaveCSS("line-height", "18px")
       await expect(meta).toHaveCSS("gap", "4px")
-      await expect(meta.locator('[data-slot="text-part-meta-item"]')).toHaveText(["Build", "Claude Sonnet 4", "4s"])
+      const items = meta.locator('[data-slot="text-part-meta-item"]')
+      await expect(items).toHaveCount(4)
+      await expect(items.nth(0)).toHaveText("Build")
+      await expect(items.nth(1)).toHaveText("Claude Sonnet 4")
+      await expect(items.nth(2)).toHaveText("4s")
+      // The last item is the turn's timestamp; its value depends on the time zone, so assert its shape only.
+      await expect(items.nth(3)).toHaveText(/\d{1,2}\/\d{1,2}\/\d{2,4}/)
       const separators = meta.locator('[data-slot="text-part-meta-separator"]')
-      await expect(separators).toHaveCount(2)
+      await expect(separators).toHaveCount(3)
 
       for (const separator of await separators.all()) {
         await expect(separator).toHaveText("\u00B7")

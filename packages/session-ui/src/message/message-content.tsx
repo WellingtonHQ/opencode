@@ -1231,6 +1231,9 @@ export function AssistantTextContent(props: {
   // Mobile omits the per-response agent and model; see CurrentUserMessageDisplay.
   const mobile = createMediaQuery("(max-width: 767px)")
 
+  // The footer's CSS only hides it on hover-capable desktops 1025px and up, so the footer is in the DOM everywhere else.
+  const showFooter = createMediaQuery("(hover: none), (max-width: 1024px)")
+
   const meta = createMemo<MetaItem[]>(() => [
     ...(mobile() ? [] : labels()),
     ...[duration(), interrupted() ? i18n.t("ui.message.interrupted") : "", timestamp()].flatMap((label) =>
@@ -1259,7 +1262,12 @@ export function AssistantTextContent(props: {
         <div data-slot="text-part-body">
           <PacedMarkdown text={props.text} cacheKey={props.id} streaming={props.message.time.completed === undefined} />
         </div>
-        <Show when={sources()} fallback={<Show when={props.showCopy || props.showMessageMetadata}>{copyFooter()}</Show>}>
+        <Show
+          when={sources()}
+          fallback={
+            <Show when={props.showCopy || props.showMessageMetadata || showFooter()}>{copyFooter()}</Show>
+          }
+        >
           {(value) => (
             <div data-slot="text-part-footer">
               <SourcesChip
