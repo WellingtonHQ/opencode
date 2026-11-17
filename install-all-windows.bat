@@ -130,13 +130,25 @@ goto :done
 :skip_confirm
 
 rem === Stop the running background service ====================================
-set "SERVICE_PID="
+rem Stop every serve --service process, not just one: the background service
+rem and the desktop app's bundled CLI can both run one, and a survivor keeps
+rem the old version serving (or locks the CLI file) through the copy below.
 if not defined RESTART_SERVICE goto :service_stop_done
-for /f "delims=" %%p in ('powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -like 'opencode*' -and $_.CommandLine -like '*serve --service*' } | Select-Object -ExpandProperty ProcessId"') do set "SERVICE_PID=%%p"
-if not defined SERVICE_PID goto :service_stop_done
-echo Stopping the running background service ^(pid %SERVICE_PID%^).
-taskkill /PID %SERVICE_PID% /F
-if errorlevel 1 goto :fail
+set "SERVICE_STOPPED="
+for /f "delims=" %%p in ('powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -like 'opencode*' -and $_.CommandLine -like '*serve --service*' } | Select-Object -ExpandProperty ProcessId"') do (
+    echo Stopping the running background service ^(pid %%p^).
+    taskkill /PID %%p /F
+    if errorlevel 1 goto :fail
+    set "SERVICE_STOPPED=1"
+)
+if not defined SERVICE_STOPPED echo No running background service found.
+rem A survivor means something (usually the desktop app) respawned the
+rem service: fail loudly instead of copying over a locked file.
+for /f "delims=" %%r in ('powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -like 'opencode*' -and $_.CommandLine -like '*serve --service*' } | Select-Object -ExpandProperty ProcessId"') do (
+    echo ERROR: a background service ^(pid %%r^) survived the stop.
+    echo Close the desktop app and re-run.
+    goto :fail
+)
 :service_stop_done
 
 rem === 1. Install the CLI =====================================================

@@ -126,10 +126,10 @@ rem Unique per run: the desktop stages its private CLI under a version-named
 rem folder and reuses an existing stage with the same version, so rebuilding
 rem with the same version would silently ship the old CLI.
 set "OPENCODE_CHANNEL=dev"
-rem .NET ToUniversalTime() instead of Get-Date -AsUtc: this machine's
-rem Get-Date cmdlet does not expose the -AsUtc parameter, and the failure
-rem is silent on stdout (it only writes to stderr).
-for /f "delims=" %%t in ('powershell -NoProfile -Command "(Get-Date).ToUniversalTime().ToString('yyyyMMddHHmmss')"') do set "OPENCODE_VERSION=0.0.0-dev-%%t"
+rem Local time, so the stamp matches the clock on this machine. The stamp
+rem only needs to be unique per run (builds are minutes apart), and on a
+rem single machine local time is unambiguous.
+for /f "delims=" %%t in ('powershell -NoProfile -Command "(Get-Date).ToString('yyyyMMddHHmmss')"') do set "OPENCODE_VERSION=0.0.0-dev-%%t"
 rem Fail fast if the stamp is malformed (for example an empty timestamp from a
 rem failing date command): a broken version poisons the whole build and later
 rem trips the desktop's version-mismatch replacement.
