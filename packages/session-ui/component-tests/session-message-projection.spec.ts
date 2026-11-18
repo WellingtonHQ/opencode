@@ -10,7 +10,7 @@ story("reveals turn speed with the response footer", async ({ mount, page }) => 
   const speed = meta.locator('[data-slot="text-part-meta-speed"]')
 
   await page.evaluate(() => document.fonts.ready.then(() => undefined))
-  await expect(meta.locator('[data-slot="text-part-meta-item"]').last()).toHaveText("5m 2s")
+  await expect(meta.getByText("5m 2s", { exact: true })).toHaveCount(1)
   await expect(speed).toHaveText("·60.0 tok/s")
   await timeline.getByText("The timeline checks passed.", { exact: false }).hover()
   await expect(footer).toHaveCSS("opacity", "1")

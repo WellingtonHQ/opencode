@@ -584,7 +584,7 @@
 
     /* Production keeps the whole footer hover-only. Dev channels keep the copy control visible and
        hide only the metadata. Keeping the metadata in flow means the copy control does not move. */
-    @media (hover: hover) {
+    @media (hover: hover) and (min-width: 1025px) {
       &:not([data-copy-always-visible]) {
         opacity: 0;
         pointer-events: none;
@@ -592,7 +592,7 @@
     }
 
     &[data-copy-always-visible] [data-slot="text-part-meta"] {
-      @media (hover: hover) {
+      @media (hover: hover) and (min-width: 1025px) {
         opacity: 0;
         pointer-events: none;
       }
@@ -612,12 +612,6 @@
     /* Pulls the glyph toward the reply's text edge. */
     [data-component="tooltip-v2-trigger"]:first-child {
       margin-inline-start: -2px;
-    }
-  }
-
-  [data-slot="text-part-copy-wrapper"][data-message-metadata-only] {
-    @media (hover: none) {
-      display: none;
     }
   }
 
