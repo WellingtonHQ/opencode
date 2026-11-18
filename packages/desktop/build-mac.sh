@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "=== Installing dependencies ==="
 cd "$SCRIPT_DIR/../.."
-bun install --frozen-lockfile
+HUSKY=0 bun install --frozen-lockfile
 
 echo "=== Building ==="
 cd "$SCRIPT_DIR"
