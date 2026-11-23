@@ -300,6 +300,16 @@ export class ScheduleLimitExceededError extends Schema.TaggedError<ScheduleLimit
   { httpApiStatus: 409 },
 ) {}
 
+// The fork's scheduled-task endpoints keep their own error type; upstream automations use AutomationNotFoundError.
+export class ScheduleNotFoundError extends Schema.TaggedError<ScheduleNotFoundError>()(
+  "ScheduleNotFoundError",
+  {
+    scheduleID: Schema.String,
+    message: Schema.String,
+  },
+  { httpApiStatus: 404 },
+) {}
+
 export class ModelNotFoundError extends Schema.TaggedError<ModelNotFoundError>()(
   "ModelNotFoundError",
   {
@@ -342,10 +352,28 @@ export class ProviderRequestError extends Schema.TaggedError<ProviderRequestErro
   { httpApiStatus: 502 },
 ) {}
 
-export class ScheduleNotFoundError extends Schema.TaggedError<ScheduleNotFoundError>()(
-  "ScheduleNotFoundError",
+export class AutomationNotFoundError extends Schema.TaggedError<AutomationNotFoundError>()(
+  "AutomationNotFoundError",
   {
-    scheduleID: Schema.String,
+    automationID: Schema.String,
+    message: Schema.String,
+  },
+  { httpApiStatus: 404 },
+) {}
+
+export class VideoNotFoundError extends Schema.TaggedError<VideoNotFoundError>()(
+  "VideoNotFoundError",
+  {
+    videoID: Schema.String,
+    message: Schema.String,
+  },
+  { httpApiStatus: 404 },
+) {}
+
+export class BlobNotFoundError extends Schema.TaggedError<BlobNotFoundError>()(
+  "BlobNotFoundError",
+  {
+    blobID: Schema.String,
     message: Schema.String,
   },
   { httpApiStatus: 404 },
@@ -355,6 +383,15 @@ export class ArtifactNotFoundError extends Schema.TaggedError<ArtifactNotFoundEr
   "ArtifactNotFoundError",
   {
     artifactID: Schema.String,
+    message: Schema.String,
+  },
+  { httpApiStatus: 404 },
+) {}
+
+export class MachineNotFoundError extends Schema.TaggedError<MachineNotFoundError>()(
+  "MachineNotFoundError",
+  {
+    machine: Schema.String,
     message: Schema.String,
   },
   { httpApiStatus: 404 },

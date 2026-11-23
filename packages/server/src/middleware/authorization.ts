@@ -10,6 +10,7 @@ import {
 import { MCP_CLIENT_PATH, hasMcpClientTicketURL } from "@opencode/protocol/groups/mcp"
 import { isPairingConnectURL, PAIRING_CONNECT_PATH } from "@opencode/protocol/groups/server"
 import { Clock, Effect, Layer, Redacted } from "effect"
+import { isWebSocketUpgrade, MACHINE_LINK_PATH } from "@opencode/protocol/groups/machine"
 import { Base64 } from "effect/encoding"
 import { HttpEffect, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http"
 import { ServerAuth } from "../auth"
@@ -183,6 +184,8 @@ export const authorizationLayer = Layer.effect(
           route.route.path === PAIRING_CONNECT_PATH
         )
           return yield* effect
+        // Machine links authenticate their own handshake before carrying traffic.
+        if (route.route.path === MACHINE_LINK_PATH && isWebSocketUpgrade(request)) return yield* effect
         const result = yield* authorizedRequest(request, config, rateLimit, database.db)
         if (result.authorized) return yield* effect
         yield* HttpEffect.appendPreResponseHandler((_request, response) =>

@@ -22,6 +22,8 @@ type ParseSource =
 type SubstituteInput = ParseSource & {
   text: string
   env?: Record<string, string>
+  /** Collects the resolved path of every {file:path} the text reads. */
+  references?: Set<string>
 }
 
 export type CredentialReference = {
@@ -118,7 +120,8 @@ const substituteFiles = Effect.fnUntraced(function* (input: SubstituteInput, tex
 
     const filePath = token.slice("{file:".length, -1)
     const expandedPath = filePath.startsWith("~/") ? path.join(os.homedir(), filePath.slice(2)) : filePath
-    const resolvedPath = path.isAbsolute(expandedPath) ? expandedPath : path.resolve(configDir, expandedPath)
+    const resolvedPath = path.resolve(configDir, expandedPath)
+    input.references?.add(resolvedPath)
     // Like a missing {env:VAR}, a missing or unreadable file substitutes empty so one stale secret
     // reference cannot take down every Location that loads this config.
     const fileContent = yield* fs.readFileString(resolvedPath).pipe(
