@@ -4,10 +4,13 @@ import { NodeHttpServer } from "@effect/platform-node"
 import { Bus } from "@opencode/core/bus"
 import { Database } from "@opencode/core/database/database"
 import { SessionRestart } from "@opencode/core/session/execution/restart"
-import { Schedule } from "@opencode/core/schedule"
+import { Automation } from "@opencode/core/automation"
+import { SessionSearchBuild } from "@opencode/core/session/search-build"
 import { InstallationEvent } from "@opencode/schema/installation-event"
 import { hasPtyConnectTicketURL } from "@opencode/protocol/groups/pty"
 import { hasPersistentPtyConnectTicketURL } from "@opencode/protocol/groups/persistent-pty"
+import { hasMcpClientTicketURL } from "@opencode/protocol/groups/mcp"
+import { isMachineLinkUpgrade } from "@opencode/protocol/groups/machine"
 import { isPairingConnectURL } from "@opencode/protocol/groups/server"
 import { Global } from "@opencode/util/global"
 import { Cause, Context, Effect, Exit, Latch, Layer, Option, Ref, Scope } from "effect"
@@ -18,6 +21,7 @@ import { ServerAuth } from "./auth"
 import { ServerRateLimit } from "./auth/rate-limit"
 import { isAllowedCorsOrigin } from "./cors"
 import { authorizedRequest, isPublicAuthPath, isPublicUIPath, unauthorizedResponse } from "./middleware/authorization"
+import { machinesEnabled } from "./handlers/machine"
 import { withoutParentSpan } from "./request-tracing"
 import { RequestSite } from "./request-site"
 import { createRoutes } from "./routes"
@@ -70,6 +74,7 @@ export const start = Effect.fn("ServerProcess.start")(function* <E, R>(
   const urls = () => [...localURLs(), ...(remoteURLs?.() ?? [])]
   const application = yield* Ref.make(Option.none<App>())
   const rateLimit = ServerRateLimit.make()
+  const machinesFlag = yield* Ref.make(Effect.succeed(false))
   const app = dispatch(
     ServerAuth.Config.of({ password: Option.some(password), username: options.username ?? "opencode", ephemeral: options.ephemeral ?? false }),
     status,
@@ -127,8 +132,9 @@ export const start = Effect.fn("ServerProcess.start")(function* <E, R>(
         Effect.provideService(Scope.Scope, applicationScope),
       )
     }
-    // Upstream's experimental schedules run only when enabled in their Session's config.
-    yield* Effect.forkIn(Context.get(context, Schedule.Service).run, applicationScope)
+    yield* Effect.forkIn(Context.get(context, Automation.Service).run, applicationScope)
+    yield* Effect.forkIn(Context.get(context, SessionSearchBuild.Service).run, applicationScope)
+    yield* Ref.set(machinesFlag, yield* machinesEnabled.pipe(Effect.provide(context)))
     const api = Context.get(context, HttpRouter.HttpRouter).asHttpEffect()
     const frontend = transform ? transform(api) : api
     const auth = Context.get(context, ServerAuth.Config)
@@ -139,13 +145,17 @@ export const start = Effect.fn("ServerProcess.start")(function* <E, R>(
         Effect.gen(function* () {
           const request = yield* HttpServerRequest.HttpServerRequest
           const url = new URL(request.url, "http://localhost")
+          const machines = yield* Ref.get(machinesFlag)
+          const machineLink = isMachineLinkUpgrade(request) && (yield* machines)
           // The bundled UI transform must not swallow the server's browser auth pages.
           if (isPublicAuthPath(request.method, url.pathname)) return yield* api
           if (
             isPublicUIPath(request.method, url.pathname) ||
             isPairingConnectURL(url) ||
             hasPtyConnectTicketURL(url) ||
-            hasPersistentPtyConnectTicketURL(url)
+            hasPersistentPtyConnectTicketURL(url) ||
+            hasMcpClientTicketURL(url) ||
+            machineLink
           )
             return yield* frontend
           const result = yield* authorizedRequest(request, auth, rateLimit, database.db)

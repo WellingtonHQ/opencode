@@ -2,9 +2,11 @@ import { Component, Show, createMemo, type Accessor } from "solid-js"
 import { createMediaQuery } from "@solid-primitives/media"
 import { Select } from "@opencode/ui/select"
 import { Switch } from "@opencode/ui/switch"
+import { Icon } from "@opencode/ui/icon"
 import { TimelineDetailControl } from "@/settings/timeline-detail"
 import { useLanguage } from "@/runtime/i18n/language"
 import { usePlatform } from "@/runtime/platform/platform"
+import { ExternalLink } from "@/runtime/platform/external-link"
 import { PluginSettingsSections } from "@/runtime/plugin/settings-page-view"
 import {
   type EnterKeyBehavior,
@@ -289,6 +291,17 @@ export const SettingsGeneral: Component<{ server: Accessor<ServerConnection.Any 
       <h3 class="settings-section-title">{language.t("settings.general.section.general")}</h3>
       <SettingsList>
         <InterfaceModeSetting />
+        <SettingsRow
+          title={language.t("settings.general.row.sharedSidePanel.title")}
+          description={language.t("settings.general.row.sharedSidePanel.description")}
+        >
+          <div data-action="settings-shared-side-panel">
+            <Switch
+              checked={settings.general.sharedSidePanel()}
+              onChange={(checked) => settings.general.setSharedSidePanel(checked)}
+            />
+          </div>
+        </SettingsRow>
         <LanguageSetting />
 
         <WorkspaceDestinationSetting />
@@ -357,6 +370,16 @@ export const SettingsGeneral: Component<{ server: Accessor<ServerConnection.Any 
               {language.t("settings.preferences.description")}
             </span>
           </div>
+          <div class="settings-tab-header-actions">
+            <ExternalLink
+              data-action="settings-help-feedback"
+              href="https://opencode.ai/desktop-feedback"
+              class="inline-flex items-center gap-1.5 text-13-regular text-v2-text-text-muted no-underline hover:text-v2-text-text-base hover:underline"
+            >
+              {language.t("settings.helpFeedback")}
+              <Icon name="arrow-up-right" size="small" />
+            </ExternalLink>
+          </div>
         </div>
       </div>
       <div class="settings-tab-body settings-tab-body--sectioned">
@@ -373,6 +396,20 @@ export const SettingsGeneral: Component<{ server: Accessor<ServerConnection.Any 
             </div>
             <TimelineWidthSetting />
             <BackgroundActivitySetting />
+            <SettingsRow
+              title={language.t("settings.timeline.row.foldUserMessages.title")}
+              description={language.t("settings.timeline.row.foldUserMessages.description")}
+            >
+              <div data-action="settings-fold-user-messages">
+                <Switch
+                  checked={settings.general.foldUserMessages()}
+                  onChange={(checked) => settings.general.setFoldUserMessages(checked)}
+                  hideLabel
+                >
+                  {language.t("settings.timeline.row.foldUserMessages.title")}
+                </Switch>
+              </div>
+            </SettingsRow>
             <SettingsRow
               title={language.t("settings.timeline.row.turnDiffs.title")}
               description={language.t("settings.timeline.row.turnDiffs.description")}
@@ -392,6 +429,17 @@ export const SettingsGeneral: Component<{ server: Accessor<ServerConnection.Any 
                 <Switch
                   checked={settings.general.showMessageMetadata()}
                   onChange={(checked) => settings.general.setShowMessageMetadata(checked)}
+                />
+              </div>
+            </SettingsRow>
+            <SettingsRow
+              title={language.t("settings.timeline.row.wrapCodeBlocks.title")}
+              description={language.t("settings.timeline.row.wrapCodeBlocks.description")}
+            >
+              <div data-action="settings-wrap-code-blocks">
+                <Switch
+                  checked={settings.general.wrapCodeBlocks()}
+                  onChange={(checked) => settings.general.setWrapCodeBlocks(checked)}
                 />
               </div>
             </SettingsRow>

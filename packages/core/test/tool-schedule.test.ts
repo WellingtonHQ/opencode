@@ -44,6 +44,7 @@ import { offlineModels } from "./fixture/models"
 import { tempGlobalLayer } from "./fixture/global"
 import { tmpdirScoped } from "./fixture/tmpdir"
 import { testEffect } from "./lib/effect"
+import { permissionLayer } from "./lib/permission"
 import { makePluginTestLayer, PluginTestLayer } from "./plugin/fixture"
 import PROMPT from "../src/tool/schedule.txt"
 
@@ -254,7 +255,10 @@ integration.live("Session.command runs /schedule through the runner and Code Mod
           InstructionDiscovery.node.replace(InstructionDiscovery.configured({ project: false, global: false })),
           llmClient.replace(Layer.succeed(LLMClient.Service, llm)),
           SessionRunnerModel.node.replace(
-            Layer.succeed(SessionRunnerModel.Service, { resolve: () => Effect.succeed(model) }),
+            Layer.succeed(SessionRunnerModel.Service, {
+              select: () => Effect.succeed({ info: Model.Info.default(providerID, modelID), variant: undefined }),
+              resolve: () => Effect.succeed(model),
+            }),
           ),
         ]),
       ),
@@ -450,7 +454,7 @@ it.live("invalid schedule inputs and unavailable catalog selections never create
 
 const denied = testEffect(
   makePluginTestLayer(
-    Layer.mock(Permission.Service, {
+    permissionLayer({
       assert: (input) =>
         Effect.gen(function* () {
           expect(input).toMatchObject({
@@ -459,7 +463,8 @@ const denied = testEffect(
             agent: "build",
             resources: [expect.any(String)],
             save: input.resources,
-            source: { type: "tool", messageID, id: "call_schedule" },
+            // Code Mode gives each program call its own ID, so the source carries the nested call's ID.
+            source: { type: "tool", messageID, id: expect.any(String) },
           })
           return yield* new Permission.BlockedError({ permission: "schedule", resources: ["*"], rules: [] })
         }),
@@ -494,7 +499,7 @@ const projects = testEffect(
     [
       offlineModels,
       Watcher.node.replace(Watcher.testLayer),
-      Permission.node.replace(Layer.mock(Permission.Service, { assert: () => Effect.void })),
+      Permission.node.replace(permissionLayer({ assert: () => Effect.void })),
     ],
   ),
 )
