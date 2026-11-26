@@ -37,6 +37,6 @@ if (built) await copyBuiltCliToResources(cli)
 
 if (!built) await downloadCliToResources(channel === "beta" ? "beta" : undefined)
 
-await $`bunx electron-vite build`
+await $`bun x electron-vite build`
 
 await verifyBundles(path.join(dir, "out"))

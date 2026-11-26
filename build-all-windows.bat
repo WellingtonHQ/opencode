@@ -90,7 +90,8 @@ if exist "%BUN_DIR%\bun.exe" goto :check_bun
 if not exist "%BUN_DIR%" mkdir "%BUN_DIR%" || goto :fail
 set "ZIP=%BUN_DIR%.zip"
 set "STAGE=%TEMP%\bun-dl-%RANDOM%"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference = 'Stop'; Invoke-WebRequest -Uri 'https://github.com/oven-sh/bun/releases/download/bun-v%BUN_VERSION%/bun-windows-%BUN_ARCH%.zip' -OutFile '%ZIP%'; Expand-Archive -LiteralPath '%ZIP%' -DestinationPath '%STAGE%' -Force; Move-Item -LiteralPath '%STAGE%\bun-windows-%BUN_ARCH%\bun.exe' -Destination '%BUN_DIR%\bun.exe' -Force; Remove-Item -LiteralPath '%ZIP%' -Force; Remove-Item -Recurse -Force '%STAGE%'"
+rem Windows PowerShell's Expand-Archive can call a ZipFile overload that .NET Framework lacks.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference = 'Stop'; Invoke-WebRequest -Uri 'https://github.com/oven-sh/bun/releases/download/bun-v%BUN_VERSION%/bun-windows-%BUN_ARCH%.zip' -OutFile '%ZIP%'; Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::ExtractToDirectory('%ZIP%', '%STAGE%'); Move-Item -LiteralPath '%STAGE%\bun-windows-%BUN_ARCH%\bun.exe' -Destination '%BUN_DIR%\bun.exe' -Force; Remove-Item -LiteralPath '%ZIP%' -Force; Remove-Item -Recurse -Force '%STAGE%'"
 if errorlevel 1 goto :fail
 
 :check_bun
@@ -172,7 +173,7 @@ set "OPENCODE_CLI_DIST=%~dp0packages\cli\dist"
 set "OPENCODE_TARGET=windows-x64"
 call bun run build
 if errorlevel 1 goto :fail
-call bunx electron-builder --win --x64 --publish never --config electron-builder.config.ts
+call bun x electron-builder --win --x64 --publish never --config electron-builder.config.ts
 if errorlevel 1 goto :fail
 set "INSTALLER=%~dp0packages\desktop\dist\opencode-desktop-win-x64.exe"
 if not exist "%INSTALLER%" (
