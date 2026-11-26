@@ -665,8 +665,9 @@
 
   @media (hover: hover) {
     &:not(:hover, :focus-within) {
-      [data-slot="text-part-copy-wrapper"]:not([data-keep-copy-visible]),
-      [data-slot="text-part-copy-wrapper"][data-keep-copy-visible] [data-slot="text-part-meta"] {
+      [data-slot="text-part-copy-wrapper"]:not([data-keep-copy-visible], [data-show-message-metadata]),
+      [data-slot="text-part-copy-wrapper"][data-keep-copy-visible]:not([data-show-message-metadata]) [data-slot="text-part-meta"],
+      [data-slot="text-part-copy-wrapper"][data-show-message-metadata]:not([data-keep-copy-visible]) [data-component="tooltip-v2-trigger"] {
         opacity: 0;
         pointer-events: none;
       }

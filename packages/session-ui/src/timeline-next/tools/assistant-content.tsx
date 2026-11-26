@@ -20,6 +20,7 @@ export function AssistantContent(props: {
   contentID: string
   showAssistantCopyPartID?: string | null
   keepCopyVisible?: boolean
+  showMessageMetadata?: boolean
   turnDurationMs?: number | null
   turnTokensPerSecond?: number
   sources?: TurnSources
@@ -40,6 +41,7 @@ export function AssistantContent(props: {
             message={props.message}
             showCopy={props.showAssistantCopyPartID === props.contentID}
             keepCopyVisible={props.keepCopyVisible}
+            showMessageMetadata={props.showMessageMetadata}
             turnDurationMs={props.turnDurationMs}
             turnTokensPerSecond={props.turnTokensPerSecond}
             sources={props.sources}

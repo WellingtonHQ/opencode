@@ -1229,13 +1229,10 @@ export function AssistantTextContent(props: {
   // Mobile omits the per-response agent and model; see CurrentUserMessageDisplay.
   const mobile = createMediaQuery("(max-width: 767px)")
 
-  // The footer's CSS only hides it on hover-capable desktops 1025px and up, so the footer is in the DOM everywhere else.
-  const showFooter = createMediaQuery("(hover: none), (max-width: 1024px)")
-
   const meta = createMemo<MetaItem[]>(() => [
     ...(mobile() ? [] : labels()),
-    ...[duration(), interrupted() ? i18n.t("ui.message.interrupted") : "", timestamp()].flatMap((label) =>
-      label ? [{ label }] : [],
+    ...[duration(), interrupted() ? i18n.t("ui.message.interrupted") : "", props.showMessageMetadata ? timestamp() : ""].flatMap(
+      (label) => (label ? [{ label }] : []),
     ),
   ])
 
@@ -1262,9 +1259,7 @@ export function AssistantTextContent(props: {
         </div>
         <Show
           when={sources()}
-          fallback={
-            <Show when={props.showCopy || props.showMessageMetadata || showFooter()}>{copyFooter()}</Show>
-          }
+          fallback={<Show when={props.showCopy || props.showMessageMetadata}>{copyFooter()}</Show>}
         >
           {(value) => (
             <div data-slot="text-part-footer">
@@ -1287,6 +1282,7 @@ export function AssistantTextContent(props: {
       <div
         data-slot="text-part-copy-wrapper"
         data-keep-copy-visible={props.keepCopyVisible ? "" : undefined}
+        data-show-message-metadata={props.showMessageMetadata ? "" : undefined}
         data-interrupted={interrupted() ? "" : undefined}
       >
         <Show when={props.showCopy}>

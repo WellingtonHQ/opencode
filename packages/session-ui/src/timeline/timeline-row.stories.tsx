@@ -839,16 +839,25 @@ const messageMetadataDocument = {
 } satisfies SessionDocument
 
 export const AgentMessageMetadata = {
-  args: { showMessageMetadata: true },
-  render: (args: { showMessageMetadata: boolean }) => (
-    <CurrentSessionTimelineStory
-      title="Assistant message metadata"
-      description="Each assistant response exposes its own model and timestamp on hover."
-      document={messageMetadataDocument}
-      showMessageMetadata={args.showMessageMetadata}
-      width="560px"
-    />
-  ),
+  args: { showMessageMetadata: true, next: false },
+  render: (args: { showMessageMetadata: boolean; next: boolean }) =>
+    args.next ? (
+      <CurrentSessionProviders document={messageMetadataDocument}>
+        <NextSessionTimeline
+          document={messageMetadataDocument}
+          timelineDetail={timelinePresets[2].value}
+          showMessageMetadata={args.showMessageMetadata}
+        />
+      </CurrentSessionProviders>
+    ) : (
+      <CurrentSessionTimelineStory
+        title="Assistant message metadata"
+        description="Each assistant response exposes its own model and timestamp."
+        document={messageMetadataDocument}
+        showMessageMetadata={args.showMessageMetadata}
+        width="560px"
+      />
+    ),
 }
 
 const AliasedModelNotices = {

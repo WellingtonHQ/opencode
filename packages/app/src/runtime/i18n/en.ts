@@ -1244,7 +1244,7 @@ export const dict = {
   "settings.timeline.row.turnDiffs.title": "Changed files",
   "settings.timeline.row.turnDiffs.description": "List the files each turn changed when it finishes",
   "settings.timeline.row.messageMetadata.title": "Message details",
-  "settings.timeline.row.messageMetadata.description": "Show each assistant message’s model and timestamp when hovered",
+  "settings.timeline.row.messageMetadata.description": "Show each assistant message’s model and timestamp",
   "settings.timeline.row.wrapCodeBlocks.title": "Wrap code blocks",
   "settings.timeline.row.wrapCodeBlocks.description":
     "Wrap long lines in code blocks instead of scrolling. Each block can still switch on hover",

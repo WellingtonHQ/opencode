@@ -20,17 +20,16 @@ story.describe("touch timeline", () => {
     )
   })
 
-  story("shows intermediate message details without hover even when the preference is off", async ({ mount }) => {
+  story("hides timestamps when the preference is off on touch devices", async ({ mount }) => {
     const timeline = await mount("current-session-timeline-rows--agent-message-metadata", {
       args: { showMessageMetadata: false },
     })
 
     const sonnet = timeline.locator('[data-timeline-part-id="msg_agent_metadata_sonnet:text:0"]')
 
-    await expect(sonnet.locator('[data-slot="text-part-copy-wrapper"]')).toBeVisible()
-    await expect(sonnet.locator('[data-slot="text-part-meta"]')).toContainText("Claude Sonnet 4")
-    // Only the turn's final part offers the copy control.
-    await expect(sonnet.getByRole("button", { name: "Copy response", exact: true })).toHaveCount(0)
+    await expect(sonnet.locator('[data-slot="text-part-copy-wrapper"]')).toHaveCount(0)
+    const finalMeta = timeline.locator('[data-timeline-part-id="msg_agent_metadata_nano:text:0"] [data-slot="text-part-meta"]')
+    await expect(finalMeta.locator('[data-slot="text-part-meta-item"]')).toHaveCount(1)
   })
 
   story("keeps message actions and metadata visible without hover", async ({ mount, page }) => {
@@ -43,9 +42,9 @@ story.describe("touch timeline", () => {
     await expect(menu).toHaveCSS("pointer-events", "auto")
     await expect(menu.getByRole("button", { name: "More actions", exact: true })).toBeVisible()
 
-    // Every text part keeps its footer row shown; only the turn's final part offers the copy control.
+    // Only the turn's final part offers the copy control when message details are disabled.
     const footers = timeline.locator('[data-slot="text-part-copy-wrapper"]')
-    await expect(footers).toHaveCount(2)
+    await expect(footers).toHaveCount(1)
     for (const footer of await footers.all()) {
       await expect(footer).toHaveCSS("opacity", "1")
       await expect(footer).toHaveCSS("pointer-events", "auto")
@@ -61,9 +60,6 @@ story.describe("touch timeline", () => {
     await expect(responseMeta).not.toContainText("Sonnet")
     await expect(responseMeta.locator('[data-slot="text-part-meta-speed"]')).toHaveText("·60.0 tok/s")
     await expect(responseMeta.locator('[data-slot="text-part-meta-speed"]')).toBeHidden()
-    // The intermediate part shows its own model and timestamp.
-    const inspectMeta = timeline.locator('[data-timeline-part-id="msg_speed_inspect:text:0"] [data-slot="text-part-meta"]')
-    await expect(inspectMeta).toContainText("Claude Sonnet 4")
   })
 
   story("keeps the always-shown chevron clear of the prompt's text", async ({ mount }) => {
@@ -237,7 +233,7 @@ story("desktop keeps only the latest response copy visible at rest", async ({ mo
   await expect(actions).toHaveCSS("pointer-events", "auto")
 })
 
-story("assistant message hover metadata shows each model and timestamp", async ({ mount }) => {
+story("assistant message metadata is always visible on desktop", async ({ mount, page }) => {
   const timeline = await mount("current-session-timeline-rows--agent-message-metadata", {
     args: { showMessageMetadata: true },
   })
@@ -255,13 +251,33 @@ story("assistant message hover metadata shows each model and timestamp", async (
   expect((await sonnetMeta.textContent())?.split(" · ").at(-1)).not.toEqual(
     (await nanoMeta.textContent())?.split(" · ").at(-1),
   )
-  await expect(sonnetFooter).toHaveCSS("opacity", "0")
+  await page.mouse.move(0, 0)
+  await expect(sonnetFooter).toHaveCSS("opacity", "1")
+  await expect(nanoMeta).toHaveCSS("opacity", "1")
   await sonnet.hover()
   await expect(sonnetFooter).toHaveCSS("opacity", "1")
   await nano.hover()
   await expect(nanoFooter).toHaveCSS("opacity", "1")
   await expect(nanoFooter.getByRole("button", { name: "Copy response", exact: true })).toBeVisible()
   await expect(nanoMeta).toContainText("Build")
+})
+
+story("new timeline shows each message's details on desktop", async ({ mount, page }) => {
+  const timeline = await mount("current-session-timeline-rows--agent-message-metadata", {
+    args: { showMessageMetadata: true, next: true },
+  })
+  await page.mouse.move(0, 0)
+  const sonnet = timeline.locator('[data-timeline-part-id="msg_agent_metadata_sonnet:text:0"] [data-slot="text-part-meta"]')
+  const nano = timeline.locator('[data-timeline-part-id="msg_agent_metadata_nano:text:0"] [data-slot="text-part-meta"]')
+  await expect(sonnet).toBeVisible()
+  await expect(sonnet).toContainText("Claude Sonnet 4")
+  await expect(nano).toBeVisible()
+  const timestamps = await page.evaluate(() => {
+    const format = new Intl.DateTimeFormat("en", { dateStyle: "short", timeStyle: "medium" })
+    return [format.format(1_735_689_602_000), format.format(1_735_689_604_000)]
+  })
+  await expect(sonnet.locator('[data-slot="text-part-meta-item"]').last()).toHaveText(timestamps[0])
+  await expect(nano.locator('[data-slot="text-part-meta-item"]').last()).toHaveText(timestamps[1])
 })
 
 story("shows message details at tablet widths even when hover is available", async ({ mount, page }) => {

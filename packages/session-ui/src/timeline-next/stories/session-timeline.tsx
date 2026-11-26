@@ -11,6 +11,7 @@ export function NextSessionTimeline(props: {
   document: SessionDocument
   timelineDetail: TimelineDetail
   turnDiffs?: boolean
+  showMessageMetadata?: boolean
 }) {
   const projection = createNextTimelineProjection({
     sessionMessages: () => props.document.messages,
@@ -27,6 +28,7 @@ export function NextSessionTimeline(props: {
     projection,
     presentation: () => undefined,
     timelineDetail: () => props.timelineDetail,
+    showMessageMetadata: () => props.showMessageMetadata ?? false,
     disclosure: {
       value: (key) => disclosure[key],
       set: (key, open) => setDisclosure(key, open),

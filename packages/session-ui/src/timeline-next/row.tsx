@@ -93,6 +93,7 @@ export function createNextTimelineRowRenderer(input: {
   actions?: SessionUserActions
   timelineDetail: Accessor<TimelineDetail>
   foldUserMessages?: Accessor<boolean>
+  showMessageMetadata?: Accessor<boolean>
   disclosure: {
     value: (key: string) => boolean | undefined
     set: (key: string, open: boolean) => void
@@ -659,6 +660,7 @@ export function createNextTimelineRowRenderer(input: {
                 contentID={ref()!.partID}
                 showAssistantCopyPartID={copyContentID(row().userMessageID)}
                 keepCopyVisible={latestCopyTurn() === row().userMessageID}
+                showMessageMetadata={input.showMessageMetadata?.() ?? false}
                 turnDurationMs={duration(row().userMessageID)}
                 turnTokensPerSecond={turnTokensPerSecond()}
                 sources={turnSourcesValue()}
