@@ -54,8 +54,8 @@ rem     OPENCODE_SERVER_PORT / OPENCODE_SERVER_PASSWORD /
 rem     OPENCODE_SERVER_USERNAME), so the phone and desktop reconnect
 rem     without re-authenticating.
 rem
-rem The running server is not touched until you explicitly confirm the
-rem restart. Building never restarts anything.
+rem Building never restarts anything. The install script restarts the server
+rem unless run with --no-restart.
 rem ============================================================================
 
 rem === Pinned bun toolchain ================================================

@@ -35,10 +35,8 @@ rem   3. stop and restart the background server so the phone's web app picks
 rem      up the new interface, then verify it
 rem
 rem Usage:
-rem   install-all-windows.bat               install everything; asks for
-rem                                           confirmation before stopping and
-rem                                           restarting the background server
-rem   install-all-windows.bat --yes         same, but skip all confirmations
+rem   install-all-windows.bat               install everything and restart
+rem                                           the background server
 rem   install-all-windows.bat --no-desktop  skip the desktop app install
 rem   install-all-windows.bat --no-restart  skip the server stop and restart
 rem
@@ -53,18 +51,15 @@ rem ============================================================================
 rem === Arguments ==============================================================
 set "INSTALL_DESKTOP=1"
 set "RESTART_SERVICE=1"
-set "SKIP_CONFIRM="
 :parse_args
 if "%~1"=="" goto :args_done
 if /i "%~1"=="--no-desktop" goto :arg_known
 if /i "%~1"=="--no-restart" goto :arg_known
-if /i "%~1"=="--yes" goto :arg_known
-echo ERROR: unknown argument %~1 (use --yes, --no-desktop or --no-restart)
+echo ERROR: unknown argument %~1 (use --no-desktop or --no-restart)
 goto :fail
 :arg_known
 if /i "%~1"=="--no-desktop" set "INSTALL_DESKTOP="
 if /i "%~1"=="--no-restart" set "RESTART_SERVICE="
-if /i "%~1"=="--yes" set "SKIP_CONFIRM=1"
 shift
 goto :parse_args
 :args_done
@@ -110,25 +105,6 @@ if not "%CLI_VERSION%"=="%DESKTOP_CLI_VERSION%" (
 )
 echo Build version: %CLI_VERSION%
 
-rem === Confirm: stop and restart the background server =======================
-rem Stopping is required before the CLI file is replaced: a service running
-rem from %USERPROFILE%\.opencode\bin locks that file on Windows. The restart
-rem and verification happen below. --yes skips the confirmation.
-if not defined RESTART_SERVICE goto :skip_confirm
-if defined SKIP_CONFIRM goto :skip_confirm
-echo.
-echo This will STOP and RESTART the background server. Any active agent
-echo sessions and their persistent terminals are interrupted; the phone and
-echo desktop reconnect automatically to the same address with the same
-echo credentials.
-echo.
-set "CONFIRM="
-set /p "CONFIRM=" Restart the background server? [y/N] 
-if /i "%CONFIRM%"=="y" goto :skip_confirm
-echo Aborted: nothing was installed and the server was not touched.
-goto :done
-:skip_confirm
-
 rem === Stop the running background service ====================================
 rem Stop every serve --service process, not just one: the background service
 rem and the desktop app's bundled CLI can both run one, and a survivor keeps
@@ -169,15 +145,8 @@ if errorlevel 1 (
 rem === 2. Install the desktop app ============================================
 if not defined INSTALL_DESKTOP goto :skip_desktop
 echo.
-echo Installing the desktop app. It must be CLOSED for the installer to
-echo replace its files.
-rem The NSIS installer cannot replace files that are in use: fail with a clear
-rem message instead of leaving a half-installed app.
-tasklist /FI "IMAGENAME eq OpenCode Dev.exe" | findstr /I "OpenCode Dev.exe" >nul
-if not errorlevel 1 (
-    echo ERROR: the desktop app is running. Close it and re-run.
-    goto :fail
-)
+echo Installing the desktop app. The installer will prompt you to close it
+echo if necessary.
 start /wait "" "%INSTALLER%"
 if errorlevel 1 (
     echo WARNING: the desktop installer did not complete successfully
