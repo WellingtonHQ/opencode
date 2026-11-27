@@ -1,6 +1,6 @@
 export * as SessionRunCoordinator from "./run-coordinator.js"
 
-import { Deferred, Effect, Exit, Fiber, FiberSet, Scope } from "effect"
+import { Cause, Deferred, Effect, Exit, Fiber, FiberSet, Scope } from "effect"
 import type { Promotable } from "./inbox.js"
 
 /** Serializes execution for each key while allowing different keys to run concurrently. */
@@ -99,6 +99,10 @@ export const make = <Key, E, Reason = never>(options: {
           Effect.andThen(loop(key, execution, force)),
           Effect.onExit((exit) =>
             Effect.sync(() => {
+              // A wake from queued input must not turn a failed step into a new
+              // execution of the queue. Steering input can still recover it.
+              if (Exit.isFailure(exit) && !Cause.hasInterrupts(exit.cause) && execution.pendingWake)
+                execution.pendingWake = "steer"
               execution.owner = undefined
             }).pipe(Effect.andThen(options.settled?.(key, exit, execution.interruptionReason) ?? Effect.void)),
           ),
@@ -111,7 +115,7 @@ export const make = <Key, E, Reason = never>(options: {
     }
 
     // A doorbell that survives the execution loop (rung after the loop decided to end, or
-    // during failure or interruption cleanup) starts a fresh execution for the remaining work.
+    // during settlement or interruption cleanup) starts a fresh execution for the remaining work.
     const settle = (key: Key, execution: Execution<E, Reason>, exit: Exit.Exit<void, E>) => {
       if (execution.pendingWake) start(key, false, execution.pendingWake)
       else executions.delete(key)

@@ -479,18 +479,19 @@ const layer = Layer.unwrap(
         function drain(
           sessionID: Session.ID,
           force: boolean,
+          promotable: SessionInbox.Promotable,
           continuation?: SessionRunner.Continuation,
         ): Effect.Effect<void, SessionRunner.RunError> {
           return sessionRunner
-            .drain({ sessionID, force, continuation })
+            .drain({ sessionID, force, continuation, promotable })
             .pipe(
               Effect.flatMap((result) =>
-                result._tag === "Complete" ? Effect.void : drain(sessionID, false, result.continuation),
+                result._tag === "Complete" ? Effect.void : drain(sessionID, false, promotable, result.continuation),
               ),
             )
         }
         const coordinator = yield* SessionRunCoordinator.make<Session.ID, SessionRunner.RunError>({
-          drain: (sessionID, force) => drain(sessionID, force),
+          drain: (sessionID, force, promotable) => drain(sessionID, force, promotable),
         })
         return SessionExecution.Service.of({
           active: coordinator.active,
@@ -5011,6 +5012,7 @@ describe("SessionRunnerLLM", () => {
     yield* s.llm.push(Stream.fail(failure))
 
     const first = yield* s.resumePaused
+    const queued = yield* s.session.prompt({ sessionID, text: "Wait for later", delivery: "queue" })
     yield* s.session.prompt({ sessionID, text: "Recover with this" })
     expect(yield* first.finish.pipe(Effect.flip)).toBe(failure)
 
@@ -5019,6 +5021,44 @@ describe("SessionRunnerLLM", () => {
 
     expect(s.requests).toHaveLength(2)
     expect(userTexts(s.requests[1])).toEqual(["Start working", "Recover with this"])
+    expect((yield* s.session.inbox(sessionID)).map((item) => item.id)).toEqual([queued.id])
+  })
+
+  scenario("keeps queued prompts pending when the active step fails", function* (s) {
+    yield* s.admit("Start working")
+    const failure = invalidRequest()
+    yield* s.llm.push(Stream.fail(failure))
+
+    const first = yield* s.resumePaused
+    const queued = yield* Effect.forEach(["One", "Two", "Three", "Four", "Five"], (text) =>
+      s.session.prompt({ sessionID, text, delivery: "queue" }),
+    )
+    expect(yield* first.finish.pipe(Effect.flip)).toBe(failure)
+    yield* s.session.wait(sessionID)
+
+    expect(s.requests).toHaveLength(1)
+    expect((yield* s.session.inbox(sessionID)).map((item) => item.id)).toEqual(queued.map((item) => item.id))
+
+    yield* s.llm.push(TestLLM.stop(), TestLLM.stop(), TestLLM.stop(), TestLLM.stop(), TestLLM.stop())
+    yield* s.resume
+    expect(yield* s.session.inbox(sessionID)).toEqual([])
+    expect(s.requests).toHaveLength(6)
+  })
+
+  scenario("keeps prompts queued during a retry when the retry fails", function* (s) {
+    yield* s.admit("Start working")
+    const failure = invalidRequest()
+    yield* s.llm.push(Stream.fail(rateLimited(5_000)), Stream.fail(failure))
+    const scheduled = yield* subscribeRetries(s)
+    const run = yield* s.resume.pipe(Effect.forkChild)
+    yield* Queue.take(scheduled)
+    const queued = yield* s.session.prompt({ sessionID, text: "Wait for later", delivery: "queue" })
+    yield* TestClock.adjust("5 seconds")
+    expect(yield* Fiber.join(run).pipe(Effect.flip)).toBe(failure)
+    yield* s.session.wait(sessionID)
+
+    expect(s.requests).toHaveLength(2)
+    expect((yield* s.session.inbox(sessionID)).map((item) => item.id)).toEqual([queued.id])
   })
 
   scenario("settles abandoned compactions before continuing after a process crash", function* (s) {
